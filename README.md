@@ -13,12 +13,12 @@ prompt beats and camera moves on a timeline, pick a model, and Reactor Render re
     <td><a href="example_outputs/reactor_helios.mp4"><img src="example_outputs/reactor_helios.webp" width="400"></a><br>Helios: a scene steered by prompt changes, from text</td>
   </tr>
   <tr>
-    <td colspan="2"><a href="example_outputs/reactor_ad_variants.mp4"><img src="example_outputs/reactor_ad_variants.webp" width="808"></a><br>LongLive-2.0: one park ad in four seasons and three endings, from one workflow</td>
+    <td colspan="2"><a href="example_outputs/reactor_camera_events.mp4"><img src="example_outputs/reactor_camera_events.webp" width="808"></a><br>LingBot World 2: one ride along the same camera path, with four different events around it</td>
   </tr>
 </table>
 
-Click a preview for the video (480p; the ad grid tiles all 12 variants in one video). All five are
-example workflows from this repo, rendered at seed 42.
+Click a preview for the video (480p; the events grid tiles all four variants in one video). All five
+are example workflows from this repo, rendered at seed 42.
 
 ## What you can do with each model
 
@@ -109,8 +109,8 @@ the graph can feed it:
   ending, or pick one with ComfyUI's If/Else Switch (still experimental). Only the chosen ending runs.
 
 Connect the last beat, or the switch, to Reactor Timeline's `chain` input. The chain then replaces
-anything drawn on that timeline. `reactor_beat_chain`, `reactor_camera_beats` and
-`reactor_ad_variants` work this way.
+anything drawn on that timeline. `reactor_beat_chain`, `reactor_camera_beats`,
+`reactor_camera_events` and `reactor_ad_variants` work this way.
 
 ## Examples
 
@@ -125,6 +125,7 @@ it from ComfyUI's `input` folder, so copy `example_inputs/` there first.
 | `reactor_beat_chain` | LongLive-2.0 | Wildlife montage: three Reactor Beats in a chain, joined by cuts |
 | `reactor_camera_moves` | LingBot World 2 | Jet ski cruise: beats and camera moves drawn on the timeline |
 | `reactor_camera_beats` | LingBot World 2 | The same jet ski cruise as a chain of beats, each with its own moves |
+| `reactor_camera_events` | LingBot World 2 | The jet ski ride on one camera path, with an event you pick: meteors, dolphins, a whale or a seaplane |
 | `reactor_ad_variants` | LongLive-2.0 | Park ad: one opening, three audience endings rendered in one run, and a season you pick |
 | `reactor_visko_orbis_stable` | Visko Orbis Stable | Fisherman in a storm, from an image |
 | `reactor_helios` | Helios | King of the Jungle, from text |

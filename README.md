@@ -12,13 +12,10 @@ prompt beats and camera moves on a timeline, pick a model, and Reactor Render re
     <td><a href="example_outputs/reactor_visko_orbis_stable.mp4"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="400"></a><br>Visko Orbis Stable: a storm morphing around one shot</td>
     <td><a href="example_outputs/reactor_helios.mp4"><img src="example_outputs/reactor_helios.webp" width="400"></a><br>Helios: a scene steered by prompt changes, from text</td>
   </tr>
-  <tr>
-    <td colspan="2"><a href="example_outputs/reactor_camera_events.mp4"><img src="example_outputs/reactor_camera_events.webp" width="808"></a><br>LingBot World 2: one ride along the same camera path, with four different events around it</td>
-  </tr>
 </table>
 
-Click a preview for the video (480p; the events grid tiles all four variants in one video). All five
-are example workflows from this repo, rendered at seed 42.
+Click a preview for the video (480p). All four are example workflows from this repo, rendered at
+seed 42.
 
 ## What you can do with each model
 

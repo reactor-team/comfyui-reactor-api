@@ -11,7 +11,7 @@ const STYLE = `
 .reactor-tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--p-primary-color, #4a9eff); pointer-events: none; z-index: 1; }
 .reactor-tl-grid { position: absolute; top: 0; bottom: 0; border-left: 1px dotted var(--border-color); opacity: 0.5; pointer-events: none; }
 .reactor-tl-track { position: relative; height: 34px; background: var(--comfy-input-bg); border-radius: 4px; overflow: hidden; }
-.reactor-tl-beat { position: absolute; top: 3px; bottom: 3px; box-sizing: border-box; padding: 2px 6px; border-radius: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: grab; user-select: none; background: var(--comfy-menu-bg); border: 1px solid var(--border-color); }
+.reactor-tl-beat { position: absolute; top: 3px; bottom: 3px; box-sizing: border-box; padding: 2px 6px; border-radius: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; user-select: none; background: var(--comfy-menu-bg); border: 1px solid var(--border-color); }
 .reactor-tl-length { opacity: 0.6; }
 .reactor-tl-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .reactor-tl-boundary { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; cursor: ew-resize; z-index: 1; }
@@ -216,7 +216,7 @@ function chainMoves(beats, spans) {
 
 const moveLabel = (m) => (typeof m.value === "number" ? `${m.value}°` : String(m.value).replace("_", " ")) + (m.speed != null ? ` ${m.speed}°` : "");
 
-const HINT = "Drag a beat to reorder it. Drag the line after a beat to set how long it plays; click a line between two beats to switch shot and cut.";
+const HINT = "Click a beat to edit it. Drag the line after a beat to set how long it plays; click a line between two beats to switch shot and cut.";
 
 // Drags listen on the window, since each redraw replaces the element the drag started on.
 const dragger = (changed) => (onMove, onUp) => {
@@ -417,15 +417,6 @@ function createEditor(node, inputName, inputData) {
                 selected = i;
                 selectedMove = null;
                 changed();
-                if (fromChain) return;
-                // Moving the beat to wherever the pointer passes the midpoint of another beat.
-                drag((m) => {
-                    const t = at(m.clientX);
-                    const [beat] = value.beats.splice(selected, 1);
-                    const rest = layout(value.beats, s.facts);
-                    selected = rest.filter(([a, z]) => (a + z) / 2 < t).length;
-                    value.beats.splice(selected, 0, beat);
-                });
             });
             // The last beat's end has no boundary to drag, so it gets a handle of its own.
             if (!fromChain && i === beats.length - 1) {

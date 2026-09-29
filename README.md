@@ -1,25 +1,65 @@
 # comfyui-reactor-api
 
-ComfyUI nodes that render timelines on Reactor real-time video models. Lay out prompt beats and
-camera moves, in frames, and Reactor Render plays them on the chosen model and returns the video.
+Render videos on [Reactor](https://docs.reactor.inc) real-time video models from ComfyUI. Lay out
+prompt beats and camera moves on a timeline, pick a model, and Reactor Render returns the video.
 
-## Install
+<table>
+  <tr>
+    <td><a href="example_outputs/reactor_timeline_editor.mp4"><img src="example_outputs/reactor_timeline_editor.webp" width="400"></a><br>LongLive-2.0: a nine-beat story with shots and cuts</td>
+    <td><a href="example_outputs/reactor_camera_beats.mp4"><img src="example_outputs/reactor_camera_beats.webp" width="400"></a><br>LingBot World 2: camera moves over a reference image</td>
+  </tr>
+  <tr>
+    <td><a href="example_outputs/reactor_visko_orbis_stable.mp4"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="400"></a><br>Visko Orbis Stable: a storm morphing around one shot</td>
+    <td><a href="example_outputs/reactor_helios.mp4"><img src="example_outputs/reactor_helios.webp" width="400"></a><br>Helios: a scene steered by prompt changes, from text</td>
+  </tr>
+</table>
 
-Clone or symlink this folder into `ComfyUI/custom_nodes/` and install `requirements.txt` into
-ComfyUI's Python. Then copy `config.ini.example` to `config.ini` in this folder and set your Reactor
-API key in it. `REACTOR_API_KEY` in the environment ComfyUI starts from also works, and wins over
-`config.ini`. The key is stored in plain text; `config.ini` is gitignored.
+Click a preview for the video (480p). All four are example workflows from this repo, rendered at
+seed 42.
 
-## Nodes
+## What you can do with each model
 
-- **Reactor Model** picks the model and shows its settings.
-- **Reactor Timeline** is a visual editor: beats on a frame ruler, snapped to the model's chunks,
-  with camera lanes underneath for models that have camera controls.
-- **Reactor Beat** is one beat, chained to others as an alternative to drawing them. Each beat
-  carries its own camera moves; a move continued on the next beat plays as one move.
-- **Reactor Render** runs the timeline and outputs a video.
+Each model has an overview page on docs.reactor.inc and a prompt guide. The prompt guides apply to
+the beats you write here.
 
-## Supported models
+### LongLive-2.0
+
+Tell a story across many scenes from text alone. Each beat is a shot. Mark a beat as a cut to break
+cleanly to a new scene, or leave it as a shot to keep the same world and move the story on.
+[Overview](https://docs.reactor.inc/model-api-reference/longlive-v2/overview) ·
+[Prompt guide](https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide)
+
+### Helios
+
+Generate one continuous scene and steer it with a new prompt on each beat. Any beat can take a
+reference image to guide it. The `sr_scale` setting upscales the output 2x or 4x.
+[Overview](https://docs.reactor.inc/model-api-reference/helios/overview) ·
+[Prompt guide](https://docs.reactor.inc/model-api-reference/helios/prompt-guide)
+
+### LingBot
+
+Walk through a world grown from a seed image. The first beat's image sets how the world looks, the
+prompt steers the rest, and the movement and look lanes drive the camera.
+[Overview](https://docs.reactor.inc/model-api-reference/lingbot/overview) ·
+[Prompt guide](https://docs.reactor.inc/model-api-reference/lingbot/prompt-guide)
+
+### LingBot World 2
+
+The next generation of LingBot. Forward and sideways movement have their own lanes, you can look
+horizontally and vertically, and the camera pose lane adds directed camera moves. Change the prompt
+between beats to restyle the weather, lighting, or events while the reference image stays.
+[Overview](https://docs.reactor.inc/model-api-reference/lingbot-world-2/overview) ·
+[Prompt guide](https://docs.reactor.inc/model-api-reference/lingbot-world-2/prompt-guide)
+
+### Visko Orbis Stable and Visko Orbis Dynamic
+
+Film one uninterrupted shot that changes as it plays. Each new beat's prompt morphs the picture
+instead of cutting. Start from text, or anchor the opening frame with an image on the first beat.
+Output goes up to 4k: Stable offers 1080p, 2k and 4k, and Dynamic also offers native resolution.
+[Stable overview](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/overview) ·
+[Stable prompt guide](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/prompt-guide) ·
+[Dynamic overview](https://docs.reactor.inc/model-api-reference/visko-orbis-dynamic/overview) ·
+[Dynamic prompt guide](https://docs.reactor.inc/model-api-reference/visko-orbis-dynamic/prompt-guide)
 
 | Model | Image | Cuts | Camera moves |
 | --- | --- | --- | --- |
@@ -30,12 +70,28 @@ API key in it. `REACTOR_API_KEY` in the environment ComfyUI starts from also wor
 | Visko Orbis Dynamic | first beat | — | — |
 | Visko Orbis Stable | first beat | — | — |
 
+## Install
+
+Clone or symlink this folder into `ComfyUI/custom_nodes/`, then install `requirements.txt` into
+ComfyUI's Python. Copy `config.ini.example` to `config.ini` in this folder and set your Reactor API
+key in it. You can also set `REACTOR_API_KEY` in the environment ComfyUI starts from; it takes
+priority over `config.ini`. The key is stored in plain text, and `config.ini` is gitignored.
+
+## Nodes
+
+- **Reactor Model** picks the model and shows its settings.
+- **Reactor Timeline** is a visual editor. It shows beats on a frame ruler, snapped to the model's
+  chunks, with camera lanes underneath for models that have camera controls.
+- **Reactor Beat** is a single beat. Chain beats together instead of drawing them. Each beat has
+  its own camera moves, and a move that continues onto the next beat plays as one move.
+- **Reactor Render** runs the timeline and outputs a video.
+
 ## Examples
 
-Each workflow in `example_workflows/` is also in ComfyUI's template browser under
-comfyui-reactor-api. Their scenes come from the examples in
-[reactor-team/js-sdk](https://github.com/reactor-team/js-sdk). The workflows that start from an image
-load it from ComfyUI's `input` folder, so copy `example_inputs/` there first.
+Each workflow in `example_workflows/` also appears in ComfyUI's template browser under
+comfyui-reactor-api. The scenes come from the examples in
+[reactor-team/js-sdk](https://github.com/reactor-team/js-sdk). Workflows that start from an image load
+it from ComfyUI's `input` folder, so copy `example_inputs/` there first.
 
 | Workflow | Model | Scene |
 | --- | --- | --- |
@@ -46,26 +102,15 @@ load it from ComfyUI's `input` folder, so copy `example_inputs/` there first.
 | `reactor_visko_orbis_stable` | Visko Orbis Stable | Fisherman in a storm, from an image |
 | `reactor_helios` | Helios | King of the Jungle, from text |
 
-Below are two of them rendered at seed 42; click a preview for the video (480p). Each graph
-screenshot has its workflow embedded, so you can drag the image straight onto the ComfyUI canvas to
-load it.
+Each graph screenshot below has its workflow embedded. Drag one onto the ComfyUI canvas to load it.
 
-### `reactor_timeline_editor` — LongLive-2.0
-
-A drone reveal of an astronaut's hab, in to suit up, a wave hello, then off into the desert.
+`reactor_timeline_editor`:
 
 ![](example_outputs/reactor_timeline_editor_graph.png)
 
-[![](example_outputs/reactor_timeline_editor.webp)](example_outputs/reactor_timeline_editor.mp4)
-
-### `reactor_camera_beats` — LingBot World 2
-
-A ride forward that turns and strafes into the sunset, then stops and orbits the rider as meteors
-fall.
+`reactor_camera_beats`:
 
 ![](example_outputs/reactor_camera_beats_graph.png)
-
-[![](example_outputs/reactor_camera_beats.webp)](example_outputs/reactor_camera_beats.mp4)
 
 ## Tests
 

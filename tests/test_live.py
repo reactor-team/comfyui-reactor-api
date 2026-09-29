@@ -302,7 +302,7 @@ async def test_a_drive_run_uploads_the_image_and_sends_lane_changes(tmp_path, mo
     assert await asyncio.wait_for(task, 10) == str(tmp_path / "take.mp4")
     messages = texts(sent)
     assert messages[0] == {"type": "config", "mode": "drive", "prompt": "explore", "keys": live.drive_keys(WORLD_2),
-                           "preview": {"width": 832, "height": 480, "fps": 24}, "input": None}
+                           "preview": {"width": 832, "height": 480, "fps": 48}, "input": None}
     assert frames_in(tmp_path / "take.mp4")
 
 
@@ -321,3 +321,77 @@ async def test_a_promptable_model_drives_by_prompt_alone(tmp_path, monkeypatch):
     await asyncio.wait_for(task, 10)
     assert not [c for c, _ in fake.sent if c.startswith("set_move")]
     assert texts(sent)[0]["keys"] == []
+
+
+async def test_a_source_clip_loops_in_place_of_the_camera(tmp_path, monkeypatch):
+    fake = FakeLiveReactor()
+    clip = [np.full((64, 96, 3), level, dtype=np.uint8) for level in (10, 20, 30)]
+    monkeypatch.setattr(live, "Reactor", fake)
+    monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
+    run = live.LiveRun("style", MODELS["X2"], str(tmp_path / "take.mp4"), "a",
+                       live.style_setup(MODELS["X2"], "a", 42, None), None, {"api_key": "rk_test"}, clip)
+    task = asyncio.create_task(run.run(lambda: None))
+    sent = []
+    run.connected(sent.append)
+    assert await until(lambda: fake.published is not None and len(fake.published.pushed) > len(clip))
+    run.receive('{"type":"done"}')
+    await asyncio.wait_for(task, 10)
+    levels = [int(f[0, 0, 0]) for f in fake.published.pushed]
+    assert levels[:4] == [10, 20, 30, 10]
+    assert texts(sent)[0]["input"] is None and texts(sent)[0]["preview"]["width"] == 96
+
+
+
+async def test_every_model_frame_in_a_burst_is_previewed(tmp_path, monkeypatch):
+    encoded = []
+
+    class FakeEncoder:
+        def __init__(self, width, height, fps, max_kbps=None):
+            pass
+
+        def encode(self, frame, force_keyframe=False):
+            encoded.append(int(frame[0, 0, 0]))
+            return b"", False
+
+    monkeypatch.setattr(live, "H264Encoder", FakeEncoder)
+    run = live.LiveRun("drive", WORLD_2, str(tmp_path / "take.mp4"), "a", [], None, {"api_key": "rk_test"})
+    try:
+        for level in range(6):
+            run._offer_preview(np.full((8, 8, 3), level, dtype=np.uint8))
+            assert await until(lambda: run._pending is None)
+        assert await until(lambda: len(encoded) == 6)
+        assert encoded == list(range(6))
+    finally:
+        run.close()
+
+
+async def test_a_backed_up_socket_drops_to_the_next_keyframe():
+    sent, requests, gate = [], [], asyncio.Event()
+
+    async def send(frame):
+        sent.append(frame[9:])
+        await gate.wait()
+
+    sender = live.PreviewSender(send, lambda: requests.append(1))
+    first = asyncio.create_task(sender.push(live.pack_frame(True, 0, b"K1")))
+    await asyncio.sleep(0)
+    for name in (b"D1", b"D2", b"D3"):
+        await sender.push(live.pack_frame(False, 0, name))
+    gate.set()
+    await first
+    assert sent == [b"K1"] and requests == [1]
+    for frame in (live.pack_frame(False, 0, b"D4"), live.pack_frame(True, 0, b"K2"), live.pack_frame(False, 0, b"D5")):
+        await sender.push(frame)
+    assert sent == [b"K1", b"K2", b"D5"] and requests == [1]
+
+
+def test_the_preview_bitrate_ceiling_holds_on_noisy_frames():
+    rng = np.random.default_rng(0)
+    frames = [rng.integers(0, 255, (240, 320, 3), dtype=np.uint8) for _ in range(48)]
+
+    def mbps(max_kbps):
+        encoder = live.H264Encoder(320, 240, 24, max_kbps)
+        return sum(len(encoder.encode(f)[0]) for f in frames) * 8 / 2 / 1e6
+
+    assert mbps(None) > 3
+    assert mbps(1000) < 1.2

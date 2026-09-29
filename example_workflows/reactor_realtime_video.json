@@ -1,0 +1,252 @@
+{
+ "id": "d2977b96-a176-4ec4-aba3-bafaab8908dc",
+ "revision": 0,
+ "last_node_id": 4,
+ "last_link_id": 2,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "Note",
+   "pos": [
+    40,
+    20
+   ],
+   "size": [
+    560,
+    180
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {},
+   "widgets_values": [
+    "Restyle a video file live with Sana Streaming. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Disconnect the video to use your camera instead.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+   ],
+   "widgets_values_named": {
+    "text": "Restyle a video file live with Sana Streaming. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Disconnect the video to use your camera instead.\n\nThe clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+   },
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 2,
+   "type": "ReactorModel",
+   "pos": [
+    40,
+    240
+   ],
+   "size": [
+    270,
+    58
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "model",
+     "name": "model",
+     "type": "COMFY_DYNAMICCOMBO_V3",
+     "widget": {
+      "name": "model"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "REACTOR_MODEL",
+     "name": "REACTOR_MODEL",
+     "type": "REACTOR_MODEL",
+     "links": [
+      1
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ReactorModel"
+   },
+   "widgets_values": [
+    "Sana Streaming"
+   ],
+   "widgets_values_named": {
+    "model": "Sana Streaming"
+   }
+  },
+  {
+   "id": 3,
+   "type": "ReactorRealtime",
+   "pos": [
+    340,
+    240
+   ],
+   "size": [
+    400,
+    300
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "model",
+     "name": "model",
+     "type": "REACTOR_MODEL",
+     "link": 1
+    },
+    {
+     "localized_name": "image",
+     "name": "image",
+     "shape": 7,
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "localized_name": "video",
+     "name": "video",
+     "shape": 7,
+     "type": "VIDEO",
+     "link": 2
+    },
+    {
+     "localized_name": "prompt",
+     "name": "prompt",
+     "type": "STRING",
+     "widget": {
+      "name": "prompt"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "seed",
+     "name": "seed",
+     "type": "INT",
+     "widget": {
+      "name": "seed"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "filename_prefix",
+     "name": "filename_prefix",
+     "type": "STRING",
+     "widget": {
+      "name": "filename_prefix"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "VIDEO",
+     "name": "VIDEO",
+     "type": "VIDEO",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ReactorRealtime"
+   },
+   "widgets_values": [
+    "Apply a Japanese ukiyo-e woodblock print style with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, all original motion, camera movement and composition, with seamless temporal consistency and no jarring frames.",
+    42,
+    "randomize",
+    "reactor/realtime"
+   ],
+   "widgets_values_named": {
+    "prompt": "Make it night in a neon-lit harbour, with pink and teal reflections on the water. Keep the rider, the jet ski, its wake and the camera motion unchanged.",
+    "seed": 42,
+    "control_after_generate": "randomize",
+    "filename_prefix": "reactor/realtime"
+   }
+  },
+  {
+   "id": 4,
+   "type": "LoadVideo",
+   "pos": [
+    40,
+    340
+   ],
+   "size": [
+    270,
+    314
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "file",
+     "name": "file",
+     "type": "COMBO",
+     "widget": {
+      "name": "file"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "choose file to upload",
+     "name": "upload",
+     "type": "IMAGEUPLOAD",
+     "widget": {
+      "name": "upload"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "VIDEO",
+     "name": "VIDEO",
+     "type": "VIDEO",
+     "links": [
+      2
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadVideo"
+   },
+   "widgets_values": [
+    "reactor_camera_beats.mp4",
+    "image"
+   ],
+   "widgets_values_named": {
+    "file": "reactor_camera_beats.mp4",
+    "upload": "image"
+   }
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   3,
+   0,
+   "REACTOR_MODEL"
+  ],
+  [
+   2,
+   4,
+   0,
+   3,
+   2,
+   "VIDEO"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 1,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}

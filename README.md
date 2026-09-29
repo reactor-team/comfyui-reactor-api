@@ -85,6 +85,7 @@ priority over `config.ini`. The key is stored in plain text, and `config.ini` is
 - **Reactor Beat** is a single beat. Chain beats together instead of drawing them. Each beat has
   its own camera moves, and a move that continues onto the next beat plays as one move.
 - **Reactor Render** runs the timeline and outputs a video.
+- **Reactor Realtime** opens a live session you steer while it plays, and saves each take as a video.
 
 ## Two ways to build a timeline
 
@@ -109,12 +110,34 @@ Connect the last beat, or the switch, to Reactor Timeline's `chain` input. The c
 anything drawn on that timeline. `reactor_beat_chain`, `reactor_camera_beats`,
 `reactor_camera_events` and `reactor_ad_variants` work this way.
 
+## Realtime
+
+Reactor Realtime opens a window in ComfyUI that plays the model's output live. Edit the prompt there
+and press Apply to change it mid-take; press Done to save the take under `reactor/realtime`.
+
+- **Video-to-video** models, Sana Streaming and X2, edit a source you stream in. Your camera is the
+  source by default, and the window lets you pick between cameras. Connect a Load Video to stream a
+  file instead; it loops until you press Done. X2 also takes a reference image.
+- **Generating** models start from a prompt, and from an image where the model takes one. For
+  models with camera lanes, click the video and drive with the keys shown under it: W, A, S and D move, the arrow keys look,
+  and Q and E orbit on LingBot World 2. Models without camera lanes are steered by prompt alone.
+
+Live prompts work best written to each model's prompt guide:
+[Sana Streaming](https://docs.reactor.inc/model-api-reference/sana-streaming/prompt-guide) ·
+[X2](https://docs.reactor.inc/model-api-reference/x2/prompt-guide) ·
+[LingBot World 2](https://docs.reactor.inc/model-api-reference/lingbot-world-2/prompt-guide).
+
+The preview plays at the model's frame rate, capped at 3 Mbps by default. If ComfyUI runs on another
+machine over a slow link, lower **Reactor › Realtime › Preview bitrate** in ComfyUI's settings. Saved
+takes are unaffected.
+
 ## Examples
 
 Each workflow in `example_workflows/` also appears in ComfyUI's template browser under
 comfyui-reactor-api. The scenes come from the examples in
 [reactor-team/js-sdk](https://github.com/reactor-team/js-sdk). Workflows that start from an image load
-it from ComfyUI's `input` folder, so copy `example_inputs/` there first.
+it from ComfyUI's `input` folder, so copy `example_inputs/` there first. `reactor_realtime_video`
+loads `example_outputs/reactor_camera_beats.mp4` the same way.
 
 | Workflow | Model | Scene |
 | --- | --- | --- |
@@ -126,6 +149,9 @@ it from ComfyUI's `input` folder, so copy `example_inputs/` there first.
 | `reactor_ad_variants` | LongLive-2.0 | Park ad: one opening, three audience endings rendered in one run, and a season you pick |
 | `reactor_visko_orbis_stable` | Visko Orbis Stable | Fisherman in a storm, from an image |
 | `reactor_helios` | Helios | King of the Jungle, from text |
+| `reactor_realtime_camera` | X2 | Live effect on your camera |
+| `reactor_realtime_video` | Sana Streaming | The jet ski render restyled live as a woodblock print |
+| `reactor_realtime_control` | LingBot World 2 | Drive the jet ski world live with the keyboard |
 
 Each graph screenshot below has its workflow embedded. Drag one onto the ComfyUI canvas to load it.
 

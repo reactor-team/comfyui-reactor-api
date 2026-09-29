@@ -28,6 +28,7 @@ const STYLE = `
 .reactor-live button:disabled { cursor: default; opacity: 0.5; }
 .reactor-live-row { display: flex; gap: 8px; align-items: center; }
 .reactor-live-row.end { justify-content: flex-end; }
+.reactor-live-camera { margin-right: auto; max-width: 50%; }
 `;
 
 function el(tag, attrs = {}, ...children) {
@@ -69,6 +70,7 @@ function openLive({ run_id, mode, title }) {
 
     const url = new URL(api.apiURL(`/reactor/live/${run_id}`), location.href);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.searchParams.set("preview_mbps", app.extensionManager.setting.get(PREVIEW_BITRATE));
     const socket = new WebSocket(url);
     socket.binaryType = "arraybuffer";
 
@@ -245,10 +247,12 @@ function openLive({ run_id, mode, title }) {
             latencyMode: "realtime",
             avc: { format: "annexb" },
         });
-        const media = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: input.width }, height: { ideal: input.height }, frameRate: { ideal: input.fps } },
+        const open = (deviceId) => navigator.mediaDevices.getUserMedia({
+            video: { deviceId: deviceId && { exact: deviceId }, width: { ideal: input.width }, height: { ideal: input.height },
+                     frameRate: { ideal: input.fps } },
             audio: false,
         });
+        const media = await open();
         if (closed) {
             for (const track of media.getTracks()) track.stop();
             return;
@@ -256,6 +260,24 @@ function openLive({ run_id, mode, title }) {
         stream = media;
         video = el("video", { autoplay: true, muted: true, playsInline: true, srcObject: stream });
         preview.append(video);
+        // Device labels are only readable once camera access is granted, so the picker comes after the first open.
+        const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+        if (cameras.length > 1) {
+            const current = stream.getVideoTracks()[0]?.getSettings().deviceId;
+            const picker = el("select", { className: "reactor-live-camera", title: "Camera" },
+                              ...cameras.map((camera, i) => el("option", { value: camera.deviceId, textContent: camera.label || `Camera ${i + 1}`,
+                                                                             selected: camera.deviceId === current })));
+            picker.addEventListener("change", async () => {
+                const next = await open(picker.value).catch(() => null);
+                if (!next) return void (status.textContent = "That camera is unavailable.");
+                if (closed) return next.getTracks().forEach((track) => track.stop());
+                for (const track of stream.getTracks()) track.stop();
+                stream = next;
+                video.srcObject = next;
+                wantKey = true;
+            });
+            buttons.prepend(picker);
+        }
         const onFrame = (cb) => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(cb) : requestAnimationFrame(cb));
         const pump = () => {
             if (!video) return;
@@ -390,10 +412,20 @@ function openLive({ run_id, mode, title }) {
     return { cancel: cancelRun };
 }
 
+const PREVIEW_BITRATE = "Reactor.Realtime.PreviewBitrate";
 let current = null;
 
 app.registerExtension({
     name: "reactor.live",
+    settings: [{
+        id: PREVIEW_BITRATE,
+        category: ["Reactor", "Realtime", "Preview bitrate"],
+        name: "Realtime preview bitrate (Mbps)",
+        tooltip: "The most the live preview uses between ComfyUI and this browser. Lower it on a slow link to a remote ComfyUI. Saved takes are unaffected.",
+        type: "number",
+        defaultValue: 3,
+        attrs: { min: 0.5, max: 20, step: 0.5 },
+    }],
     setup() {
         document.head.append(el("style", { textContent: STYLE }));
         api.addEventListener("reactor.live.open", ({ detail }) => {

@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import itertools
 import json
 import logging
 import queue
@@ -22,9 +23,10 @@ LIVE_SESSION_LIMIT_SECONDS = 1800
 # How long a run waits for the browser modal to open its socket before giving up.
 BROWSER_TIMEOUT_SECONDS = 60.0
 INPUT_FPS = 24
-# The preview the browser shows is capped at this width and rate; the take is unaffected.
+# The preview the browser shows is capped at this width and, by default, this bitrate; the take is
+# unaffected. The browser's Reactor setting overrides the bitrate per run.
 PREVIEW_MAX_WIDTH = 832
-PREVIEW_MAX_FPS = 24
+PREVIEW_KBPS = 3000
 # How often the browser gets the model connection's stats.
 STATS_INTERVAL_SECONDS = 1.0
 
@@ -36,6 +38,42 @@ RUNS: dict[str, "LiveRun"] = {}
 def pack_frame(keyframe: bool, timestamp_us: int, access_unit: bytes) -> bytes:
     """The websocket's binary framing: a keyframe byte, a big-endian microsecond timestamp, the AU."""
     return bytes([keyframe]) + timestamp_us.to_bytes(8, "big") + access_unit
+
+
+
+class PreviewSender:
+    """Sends preview frames to one socket, newest first, without breaking the H.264 chain.
+
+    A frame waits while the one before it is sent. When a newer delta frame arrives behind a
+    waiting one, the socket has fallen behind: both are dropped, a keyframe is requested, and
+    deltas are dropped until it arrives, since a delta decoded after a gap shows corruption.
+    """
+
+    def __init__(self, send, request_keyframe):
+        self._send, self._request_keyframe = send, request_keyframe
+        self._waiting: bytes | None = None
+        self._sending = False
+        self._resync = False
+
+    async def push(self, frame: bytes) -> None:
+        keyframe = frame[0] == 1
+        if not keyframe and (self._resync or self._waiting is not None):
+            if not self._resync:
+                self._resync = True
+                self._request_keyframe()
+            self._waiting = None
+            return
+        self._resync = self._resync and not keyframe
+        self._waiting = frame
+        if self._sending:
+            return
+        self._sending = True
+        try:
+            while self._waiting is not None:
+                frame, self._waiting = self._waiting, None
+                await self._send(frame)
+        finally:
+            self._sending = False
 
 
 def unpack_frame(message: bytes) -> tuple[bool, int, bytes]:
@@ -115,15 +153,17 @@ class H264Encoder:
     """rgb24 arrays encoded to Annex-B H.264 access units the browser decodes cold per keyframe:
     baseline, no B-frames, a keyframe at least every two seconds, SPS/PPS inline before each one."""
 
-    def __init__(self, width: int, height: int, fps: int):
+    def __init__(self, width: int, height: int, fps: int, max_kbps: int | None = None):
         self.context = av.CodecContext.create("libx264", "w")
         self.context.width, self.context.height, self.context.pix_fmt = width, height, "yuv420p"
         self.context.framerate = Fraction(fps)
         self.context.time_base = Fraction(1, fps)
         self.context.gop_size = fps * 2
         self.context.max_b_frames = 0
+        # A max_kbps ceiling holds over half a second, so a keyframe cannot burst past it.
+        vbv = f":vbv-maxrate={max_kbps}:vbv-bufsize={max_kbps // 2}" if max_kbps else ""
         self.context.options = {"preset": "ultrafast", "tune": "zerolatency", "profile": "baseline",
-                                "x264-params": "repeat-headers=1"}
+                                "x264-params": "repeat-headers=1" + vbv}
         self.context.open()
         self.index = 0
 
@@ -165,15 +205,16 @@ class LiveRun:
     """
 
     def __init__(self, mode: str, spec: ModelSpec, path: str, prompt: str, setup: list[tuple[str, dict]],
-                 input_size: tuple[int, int] | None, connect: dict):
+                 input_size: tuple[int, int] | None, connect: dict, clip: list[np.ndarray] | None = None):
         self.run_id = uuid.uuid4().hex
         self.mode, self.spec, self.path = mode, spec, path
         self.prompt, self.setup = prompt, setup
-        self.input_size = input_size
+        self.input_size, self.clip = input_size, clip
         self.connect = connect
         # The config message's preview hint; the encoder retargets on the first real frame.
-        self.preview_hint = preview_size(*(input_size if mode == "style" else spec.size))
-        self.preview_fps = min(PREVIEW_MAX_FPS, int(spec.fps))
+        size = (clip[0].shape[1], clip[0].shape[0]) if clip else input_size if mode == "style" else spec.size
+        self.preview_hint = preview_size(*size)
+        self.preview_fps = int(spec.fps)
         # Set just before "ended" goes out; the websocket handler closes the socket on it.
         self.ended = False
         # Gates recording and preview, as Session.capturing does: the stream opens with a
@@ -199,26 +240,32 @@ class LiveRun:
         self._latest: tuple[np.ndarray, int] | None = None
         self._latest_lock = threading.Lock()
         self._decoded = 0
-        # Preview path: the media thread keeps only the newest frame pending; the encoder
-        # thread paces itself under PREVIEW_MAX_FPS and never re-queues.
+        # Preview path: the media thread keeps only the newest frame pending for the encoder
+        # thread, which never re-queues.
         self._pending: np.ndarray | None = None
         self._pending_cond = threading.Condition()
         self._force_keyframe = False
-        self._last_preview_at = 0.0
+        self.preview_kbps = PREVIEW_KBPS
         self._closed = False
         self._threads = [threading.Thread(target=self._decode_webcam, daemon=True),
                          threading.Thread(target=self._encode_preview, daemon=True)]
         for thread in self._threads:
             thread.start()
 
-    def connected(self, send) -> bool:
-        """Attach the browser's sender. False when the run already has (or had) a socket."""
+    def connected(self, send, preview_kbps: int = PREVIEW_KBPS) -> bool:
+        """Attach the browser's sender and its preview bitrate. False when the run already has (or had) a socket."""
         with self._send_lock:
             if self._send is not None or self.ended:
                 return False
             self._send = send
+            self.preview_kbps = preview_kbps
         self._loop.call_soon_threadsafe(self._connected.set)
         return True
+
+    def request_keyframe(self) -> None:
+        """Make the next preview frame a keyframe. Thread-safe."""
+        with self._pending_cond:
+            self._force_keyframe = True
 
     def receive(self, message) -> None:
         """A websocket message from the browser, handed to the run's loop."""
@@ -297,7 +344,7 @@ class LiveRun:
                 if self.mode == "drive":
                     self._apply_drive()
                 if source is not None:
-                    push = asyncio.create_task(self._push_webcam(source))
+                    push = asyncio.create_task(self._push_clip(source) if self.clip else self._push_webcam(source))
                     push.add_done_callback(self._push_failed)
                 self._status("")
                 stats = asyncio.create_task(self._report_stats(reactor))
@@ -360,6 +407,14 @@ class LiveRun:
                 track.push_frame(frame)
             await asyncio.sleep(1 / INPUT_FPS)
 
+    async def _push_clip(self, track) -> None:
+        """Push the source clip at the model's frame rate, looping until the run ends."""
+        next_at = time.monotonic()
+        for frame in itertools.cycle(self.clip):
+            track.push_frame(frame)
+            next_at += 1 / self.spec.fps
+            await asyncio.sleep(max(next_at - time.monotonic(), 0))
+
     async def _report_stats(self, reactor) -> None:
         while True:
             await asyncio.sleep(STATS_INTERVAL_SECONDS)
@@ -373,7 +428,7 @@ class LiveRun:
     def _push_failed(task) -> None:
         """A dead push task stops the model's whole input; never let it die quietly."""
         if not task.cancelled() and task.exception() is not None:
-            logging.error("Reactor live: webcam push task died.", exc_info=task.exception())
+            logging.error("Reactor live: source push task died.", exc_info=task.exception())
 
     async def _send_command(self, command: str, data: dict) -> None:
         data = {key: await self._reactor.upload_file(value, name=f"{key}.png", mime_type="image/png")
@@ -423,10 +478,6 @@ class LiveRun:
 
     def _offer_preview(self, frame) -> None:
         with self._pending_cond:
-            now = time.monotonic()
-            if now - self._last_preview_at < 1 / self.preview_fps:
-                return
-            self._last_preview_at = now
             self._pending = frame
             self._pending_cond.notify()
 
@@ -442,7 +493,7 @@ class LiveRun:
                 force, self._force_keyframe = self._force_keyframe, False
             if encoder is None:
                 height, width = frame.shape[:2]
-                encoder = H264Encoder(*preview_size(width, height), self.preview_fps)
+                encoder = H264Encoder(*preview_size(width, height), self.preview_fps, self.preview_kbps)
             access_unit, keyframe = encoder.encode(frame, force_keyframe=force)
             if access_unit:
                 self._send_bytes(pack_frame(keyframe, time.monotonic_ns() // 1000, access_unit))
@@ -466,8 +517,7 @@ class LiveRun:
             self.held = set(msg.get("held") or [])
             self._apply_drive()
         elif kind == "keyframe":
-            with self._pending_cond:
-                self._force_keyframe = True
+            self.request_keyframe()
         elif kind == "done":
             self._done = True
             self._finished.set()

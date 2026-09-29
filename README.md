@@ -12,10 +12,13 @@ prompt beats and camera moves on a timeline, pick a model, and Reactor Render re
     <td><a href="example_outputs/reactor_visko_orbis_stable.mp4"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="400"></a><br>Visko Orbis Stable: a storm morphing around one shot</td>
     <td><a href="example_outputs/reactor_helios.mp4"><img src="example_outputs/reactor_helios.webp" width="400"></a><br>Helios: a scene steered by prompt changes, from text</td>
   </tr>
+  <tr>
+    <td colspan="2"><a href="example_outputs/reactor_ad_variants.mp4"><img src="example_outputs/reactor_ad_variants.webp" width="808"></a><br>LongLive-2.0: one park ad in four seasons and three endings, from one workflow</td>
+  </tr>
 </table>
 
-Click a preview for the video (480p). All four are example workflows from this repo, rendered at
-seed 42.
+Click a preview for the video (480p; the ad grid tiles all 12 variants in one video). All five are
+example workflows from this repo, rendered at seed 42.
 
 ## What you can do with each model
 
@@ -86,6 +89,29 @@ priority over `config.ini`. The key is stored in plain text, and `config.ini` is
   its own camera moves, and a move that continues onto the next beat plays as one move.
 - **Reactor Render** runs the timeline and outputs a video.
 
+## Two ways to build a timeline
+
+**Draw it on Reactor Timeline.** This is the simple way. Add beats on the ruler, type a prompt into
+each one, drag the edges to set how long it plays, and draw camera moves in the lanes underneath.
+The whole video lives in one node. `reactor_timeline_editor` and `reactor_camera_moves` work this
+way.
+
+**Chain Reactor Beat nodes.** Use this for more control. Each beat is its own node, so the rest of
+the graph can feed it:
+
+- **ComfyUI nodes build the beats.** A beat's prompt, length, and image are ordinary inputs. Fill
+  them from any other node, such as text built from templates, a prompt from a language model node,
+  or an image you generated or edited earlier in the graph. For example, write each prompt as a
+  Format Text template and feed it a character from a Custom Combo. Picking another character then
+  recasts every beat. The chain compiles into the timeline when it runs.
+- **Narratives can fork.** A beat's output can feed more than one next beat. Branch a shared opening
+  into different endings. Give each branch its own Reactor Timeline and Reactor Render to get every
+  ending, or pick one with ComfyUI's If/Else Switch (still experimental). Only the chosen ending runs.
+
+Connect the last beat, or the switch, to Reactor Timeline's `chain` input. The chain then replaces
+anything drawn on that timeline. `reactor_beat_chain`, `reactor_camera_beats` and
+`reactor_ad_variants` work this way.
+
 ## Examples
 
 Each workflow in `example_workflows/` also appears in ComfyUI's template browser under
@@ -99,6 +125,7 @@ it from ComfyUI's `input` folder, so copy `example_inputs/` there first.
 | `reactor_beat_chain` | LongLive-2.0 | Wildlife montage: three Reactor Beats in a chain, joined by cuts |
 | `reactor_camera_moves` | LingBot World 2 | Jet ski cruise: beats and camera moves drawn on the timeline |
 | `reactor_camera_beats` | LingBot World 2 | The same jet ski cruise as a chain of beats, each with its own moves |
+| `reactor_ad_variants` | LongLive-2.0 | Park ad: one opening, three audience endings rendered in one run, and a season you pick |
 | `reactor_visko_orbis_stable` | Visko Orbis Stable | Fisherman in a storm, from an image |
 | `reactor_helios` | Helios | King of the Jungle, from text |
 

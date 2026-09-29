@@ -53,6 +53,12 @@ function widgetValue(node, name) {
     return node.widgets?.find((w) => w.name === name)?.value;
 }
 
+// An input's value: its widget's, or a linked primitive's; undefined when another node computes it.
+function inputValue(node, name) {
+    const source = upstream(node, name);
+    return source ? widgetValue(source, "value") : widgetValue(node, name);
+}
+
 // The model's grid facts, or null when the model link does not come straight from a Reactor Model.
 function modelFacts(node) {
     const source = upstream(node, "model");
@@ -64,7 +70,7 @@ function beatsUpTo(last) {
     const beats = [];
     for (let beat = last; beat; beat = upstream(beat, "chain")) {
         if (beat.comfyClass !== "ReactorBeat") return "unknown";
-        const prompt = widgetValue(beat, "prompt"), frames = widgetValue(beat, "frames"), kind = widgetValue(beat, "kind");
+        const prompt = inputValue(beat, "prompt") ?? "(linked prompt)", frames = inputValue(beat, "frames"), kind = widgetValue(beat, "kind");
         if (typeof prompt !== "string" || typeof frames !== "number") return "unknown";
         beats.push({ prompt, frames, cut: kind === "cut", image: upstream(beat, "image") ? "image" : null, moves: widgetValue(beat, "moves")?.moves ?? [] });
     }
@@ -516,7 +522,7 @@ function createEditor(node, inputName, inputData) {
         } else {
             footer.append(el("span", { className: "reactor-tl-badge", textContent: "Read-only", title: "Beats come from the chain input; edit them on their Reactor Beat nodes." }));
         }
-        footer.append(el("span", { className: "reactor-tl-note", textContent: s.facts ? `${length} frames, ${(length / s.facts.fps).toFixed(1)} s at ${s.facts.fps} fps` : `${length} frames` }));
+        if (s.chain !== "unknown") footer.append(el("span", { className: "reactor-tl-note", textContent: s.facts ? `${length} frames, ${(length / s.facts.fps).toFixed(1)} s at ${s.facts.fps} fps` : `${length} frames` }));
         if (!s.facts) footer.append(el("span", { className: "reactor-tl-note", textContent: "Connect a Reactor Model to snap to its chunks." }));
     }
 

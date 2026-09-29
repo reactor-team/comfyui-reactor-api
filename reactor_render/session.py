@@ -18,9 +18,9 @@ FRAME_GRACE_SECONDS = 3.0
 # TODO: Drop this once a command sent at once after `connect()` is reliably answered. Observed on
 # cloud sessions: such a command can go unanswered, timing out the render.
 CONNECT_SETTLE_SECONDS = 1.0
-# A 429 at connect is retried this many times. Without a Retry-After, wait one refill of the
+# A 429 at connect is retried for this long. Without a Retry-After, wait one refill of the
 # session bucket (docs: resources/rate-limits).
-RATE_LIMIT_RETRIES = 3
+CONNECT_RETRY_SECONDS = 300.0
 RATE_LIMIT_WAIT_SECONDS = 6.0
 # How often a render reports progress, with its newest frame as a preview.
 PROGRESS_INTERVAL_SECONDS = 0.125
@@ -112,14 +112,19 @@ RUNNERS = {"chunked": run_chunked}
 
 async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], None]) -> None:
     """`reactor.connect()`, retried while Reactor refuses the new session with a 429."""
-    for attempt in range(RATE_LIMIT_RETRIES + 1):
+    give_up = time.monotonic() + CONNECT_RETRY_SECONDS
+    while True:
         try:
             return await reactor.connect()
         except RateLimitedError as e:
             wait = e.retry_after_ms / 1000 if e.retry_after_ms is not None else RATE_LIMIT_WAIT_SECONDS
-            if attempt == RATE_LIMIT_RETRIES:
+            # Reactor also answers 429 when the model has no free servers, with no Retry-After.
+            busy = "no available capacity" in str(e)
+            if time.monotonic() + wait > give_up:
+                if busy:
+                    raise RuntimeError("Reactor has no free servers for this model right now; try again shortly.") from e
                 raise RuntimeError(f"Reactor is rate-limiting new sessions; try again in {math.ceil(wait)}s.") from e
-            logging.warning("Reactor: rate-limited starting a session; retrying in %.0fs.", wait)
+            logging.warning("Reactor: %s starting a session; retrying in %.0fs.", "no free servers" if busy else "rate-limited", wait)
             # A fresh native handle for the next attempt; handlers stay registered on `reactor`.
             reactor.close()
             deadline = time.monotonic() + wait

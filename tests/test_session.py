@@ -27,12 +27,12 @@ class FakeReactor:
     The stream opens with a black placeholder frame; `start` then emits `chunks` chunk_complete
     messages, each followed shortly by its white frames, as media trails the messages. A chunk is
     `frames` frames, or `first` for the first one. `frames_emitted` counts the session's frames so
-    far, as LongLive reports it, or with `per_chunk` only the chunk's, as Helios does. The first `refusals` connects raise a 429 carrying `retry_after_ms`.
+    far, as LongLive reports it, or with `per_chunk` only the chunk's, as Helios does. The first `refusals` connects raise a 429 carrying `retry_after_ms` and the message `refusal`.
     Each command's reply takes `reply_seconds`.
     """
 
     def __init__(self, chunks, frames=2, first=None, per_chunk=False, replies=None, complete_after=None, stall=False,
-                 refusals=0, retry_after_ms=10, reply_seconds=0):
+                 refusals=0, retry_after_ms=10, refusal="too many requests", reply_seconds=0):
         self.chunks, self.frames, self.first, self.per_chunk = chunks, frames, frames if first is None else first, per_chunk
         self.replies = replies or {}
         self.complete_after = complete_after
@@ -40,7 +40,7 @@ class FakeReactor:
         self.sent = []
         self.disconnected = False
         self.track = FakeTrack()
-        self.refusals, self.retry_after_ms = refusals, retry_after_ms
+        self.refusals, self.retry_after_ms, self.refusal = refusals, retry_after_ms, refusal
         self.connects = self.closes = 0
         self.reply_seconds, self.in_flight, self.most_in_flight = reply_seconds, 0, 0
 
@@ -65,7 +65,7 @@ class FakeReactor:
     async def connect(self):
         self.connects += 1
         if self.connects <= self.refusals:
-            raise RateLimitedError("too many requests", retry_after_ms=self.retry_after_ms)
+            raise RateLimitedError(self.refusal, retry_after_ms=self.retry_after_ms)
         self.track_handler(self.track)
         self.track.push(np.full((16, 16, 3), BLACK, dtype=np.uint8))
 
@@ -263,13 +263,24 @@ async def test_a_rate_limited_connect_waits_retry_after_and_retries(tmp_path, mo
     assert START in fake.sent
 
 
-async def test_a_connect_still_rate_limited_after_the_retries_raises_with_the_wait(tmp_path, monkeypatch):
+async def test_a_connect_still_rate_limited_when_retrying_ends_raises_with_the_wait(tmp_path, monkeypatch):
     fake = FakeReactor(chunks=1, refusals=10, retry_after_ms=1500)
-    monkeypatch.setattr(session, "RATE_LIMIT_RETRIES", 1)
+    monkeypatch.setattr(session, "CONNECT_RETRY_SECONDS", 2)
     _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch)
     with pytest.raises(RuntimeError, match="try again in 2s"):
         await coro
     assert fake.connects == 2 and fake.sent == [] and fake.disconnected
+
+
+async def test_a_connect_refused_for_capacity_keeps_retrying_then_says_so(tmp_path, monkeypatch):
+    fake = FakeReactor(chunks=1, refusals=10, retry_after_ms=None,
+                       refusal='429 from create session: {"error":"no available capacity: no available servers to handle the request"}')
+    monkeypatch.setattr(session, "CONNECT_RETRY_SECONDS", 0.2)
+    monkeypatch.setattr(session, "RATE_LIMIT_WAIT_SECONDS", 0.05)
+    _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch)
+    with pytest.raises(RuntimeError, match="no free servers"):
+        await coro
+    assert fake.connects > 2
 
 
 async def test_an_interrupt_during_the_rate_limit_wait_stops_the_render(tmp_path, monkeypatch):

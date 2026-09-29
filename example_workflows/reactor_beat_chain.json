@@ -1,0 +1,587 @@
+{
+  "id": "35fb2323-e49f-4ae3-994e-5e00e2668b1f",
+  "revision": 0,
+  "last_node_id": 8,
+  "last_link_id": 6,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        560,
+        150
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Each Reactor Beat plays its prompt for its frames, starting where the beat before it in the chain ends. The timeline draws the chain read-only; edit the beats on their own nodes.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Each Reactor Beat plays its prompt for its frames, starting where the beat before it in the chain ends. The timeline draws the chain read-only; edit the beats on their own nodes.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "ReactorBeat",
+      "pos": [
+        40,
+        220
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_BEATS",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "kind",
+          "name": "kind",
+          "type": "COMBO",
+          "widget": {
+            "name": "kind"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_BEATS",
+          "name": "REACTOR_BEATS",
+          "type": "REACTOR_BEATS",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorBeat"
+      },
+      "widgets_values": [
+        "A slow aerial shot over a misty pine forest at dawn",
+        128,
+        "shot"
+      ],
+      "widgets_values_named": {
+        "prompt": "A slow aerial shot over a misty pine forest at dawn",
+        "frames": 128,
+        "kind": "shot"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorBeat",
+      "pos": [
+        370,
+        220
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_BEATS",
+          "link": 1
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "kind",
+          "name": "kind",
+          "type": "COMBO",
+          "widget": {
+            "name": "kind"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_BEATS",
+          "name": "REACTOR_BEATS",
+          "type": "REACTOR_BEATS",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorBeat"
+      },
+      "widgets_values": [
+        "The mist lifts to reveal a mountain lake reflecting the sunrise",
+        128,
+        "shot"
+      ],
+      "widgets_values_named": {
+        "prompt": "The mist lifts to reveal a mountain lake reflecting the sunrise",
+        "frames": 128,
+        "kind": "shot"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ReactorBeat",
+      "pos": [
+        700,
+        220
+      ],
+      "size": [
+        300,
+        200
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_BEATS",
+          "link": 2
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "kind",
+          "name": "kind",
+          "type": "COMBO",
+          "widget": {
+            "name": "kind"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_BEATS",
+          "name": "REACTOR_BEATS",
+          "type": "REACTOR_BEATS",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorBeat"
+      },
+      "widgets_values": [
+        "A neon-lit city street at night in the rain, seen from street level",
+        160,
+        "cut"
+      ],
+      "widgets_values_named": {
+        "prompt": "A neon-lit city street at night in the rain, seen from street level",
+        "frames": 160,
+        "kind": "cut"
+      }
+    },
+    {
+      "id": 5,
+      "type": "ReactorModel",
+      "pos": [
+        40,
+        470
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_MODEL",
+          "name": "REACTOR_MODEL",
+          "type": "REACTOR_MODEL",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorModel"
+      },
+      "widgets_values": [
+        "LongLive-2.0"
+      ],
+      "widgets_values_named": {
+        "model": "LongLive-2.0"
+      }
+    },
+    {
+      "id": 6,
+      "type": "ReactorTimeline",
+      "pos": [
+        320,
+        470
+      ],
+      "size": [
+        640,
+        256
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "REACTOR_MODEL",
+          "link": 4
+        },
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_BEATS",
+          "link": 3
+        },
+        {
+          "localized_name": "image_0",
+          "name": "images.image_0",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "beats",
+          "name": "beats",
+          "type": "REACTOR_BEAT_EDITOR",
+          "widget": {
+            "name": "beats"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_TIMELINE",
+          "name": "REACTOR_TIMELINE",
+          "type": "REACTOR_TIMELINE",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorTimeline"
+      },
+      "widgets_values": [
+        {
+          "beats": []
+        }
+      ],
+      "widgets_values_named": {
+        "beats": {
+          "beats": []
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "ReactorRender",
+      "pos": [
+        1030,
+        220
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "timeline",
+          "name": "timeline",
+          "type": "REACTOR_TIMELINE",
+          "link": 5
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        42,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 8,
+      "type": "SaveVideo",
+      "pos": [
+        1030,
+        560
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 6
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/beats",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/beats",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      3,
+      1,
+      "REACTOR_BEATS"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      1,
+      "REACTOR_BEATS"
+    ],
+    [
+      3,
+      4,
+      0,
+      6,
+      1,
+      "REACTOR_BEATS"
+    ],
+    [
+      4,
+      5,
+      0,
+      6,
+      0,
+      "REACTOR_MODEL"
+    ],
+    [
+      5,
+      6,
+      0,
+      7,
+      0,
+      "REACTOR_TIMELINE"
+    ],
+    [
+      6,
+      7,
+      0,
+      8,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

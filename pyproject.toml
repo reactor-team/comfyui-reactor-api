@@ -1,0 +1,22 @@
+[project]
+name = "comfyui-reactor-api"
+version = "0.1.0"
+description = "ComfyUI nodes that render timelines on Reactor real-time video models."
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = ["reactor-sdk>=1.6"]
+
+[project.urls]
+Repository = "https://github.com/reactor-team/comfyui-reactor-api"
+
+[tool.comfy]
+PublisherId = "reactor"
+DisplayName = "Reactor API: Realtime Video"
+
+[dependency-groups]
+dev = ["av", "pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[tool.uv]
+package = false
+

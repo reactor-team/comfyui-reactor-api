@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right.\n\nDrag a block to move it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
+        "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right.\n\nClick a block to edit it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right.\n\nDrag a block to move it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right.\n\nClick a block to edit it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -83,7 +83,7 @@
         240
       ],
       "size": [
-        640,
+        1200,
         256
       ],
       "flags": {},
@@ -137,20 +137,56 @@
         {
           "beats": [
             {
-              "prompt": "A slow aerial shot over a misty pine forest at dawn",
-              "frames": 128,
+              "prompt": "A vast windswept Martian landscape of deep rust-red dunes and wind-carved rock stretching unbroken to the horizon at golden hour, fine ochre dust streaming off the ridgelines, a pale ringed planet hanging low and enormous in the dusty amber sky. Long sweeping aerial drone shot gliding steadily forward over ridge after ridge, wide-angle, deep focus, slow majestic continuous move, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
               "cut": false,
               "image": null
             },
             {
-              "prompt": "The mist lifts to reveal a mountain lake reflecting the sunrise",
-              "frames": 128,
-              "cut": false,
+              "prompt": "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain — a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
+              "cut": true,
               "image": null
             },
             {
-              "prompt": "A neon-lit city street at night in the rain, seen from street level",
+              "prompt": "A ground-level forward-facing tracking shot on the Martian surface that begins on a medium shot of a spartan futuristic research habitat — the whole low cluster of white composite-panel modules visible across the rust-red regolith — then travels steadily forward, closing the distance toward the front airlock door, the ribbed hatch and its lit control panel growing from small to large in frame as the camera covers ground toward the entrance. Eye-level wide-angle, deep focus, pronounced forward dolly, immersive and grounded, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "Interior of a clean, spartan Martian habitat airlock bay: a lone astronaut stands at an open equipment rack methodically suiting up, pulling on a worn white-and-orange pressure suit and latching the chest panel, helmet waiting on the bench beside him. Cool white LED light from overhead, a small porthole glowing with red Martian daylight. Medium close-up, 35mm lens, shallow depth of field, slow push-in, muted steel-and-white palette with warm accents, photoreal, cinematic.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "Interior tracking shot following an astronaut in a worn white-and-orange pressure suit, now fully suited with the helmet on, walking purposefully down a narrow corridor inside the spartan Martian habitat toward the airlock at the far end, clean white composite walls and softly glowing LED strip lighting lining the passage, cabling and equipment racks set along the panels. Steady forward Steadicam tracking from behind, 35mm lens, shallow depth of field, cool white interior light with warm accents, muted steel-and-white palette, photoreal, cinematic.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "Exterior on the Martian surface: the astronaut in the worn white-and-orange pressure suit stands directly in front of his spartan research habitat, the white composite-panel modules, recessed portholes, angled solar arrays and slender comms mast rising clearly directly behind him, ochre dust drifting past his boots across the rust-red ground. Golden low sunlight rakes across suit and structure alike, wide cinematic shot, long lens, shallow depth of field, slow dolly, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "The same astronaut, still standing in front of his habitat on the rust-red Martian surface, raises an arm and waves warmly toward the camera, the white composite-panel modules and slender comms mast rising behind him, ochre dust drifting past his boots. Golden low sunlight rakes across suit and structure, wide cinematic shot, long lens, shallow depth of field, slow dolly, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
               "frames": 160,
+              "cut": false,
+              "image": null
+            },
+            {
+              "prompt": "An astronaut in a worn white-and-orange pressure suit walks across a vast, utterly empty Martian expanse, a single small figure crossing an immense open plain of rust-red dunes with nothing but bare horizon ahead, boots kicking up trailing veils of fine dust. Wide dramatic tracking shot following from behind, long lens, deep focus, the emptiness stretching huge around him, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look, epic and cinematic.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "An extreme wide aerial drone shot of the Martian desert, a lone astronaut in a white-and-orange pressure suit reduced to a tiny speck far below crossing the colossal sweep of rust-red dunes, a single track of footprints trailing behind him, the ringed planet vast on the distant horizon. Towering high-altitude drone view craning up and pulling back, ultra-wide, deep focus, the figure dwarfed to almost nothing, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look, epic and cinematic.",
+              "frames": 157,
               "cut": true,
               "image": null
             }
@@ -161,20 +197,56 @@
         "beats": {
           "beats": [
             {
-              "prompt": "A slow aerial shot over a misty pine forest at dawn",
-              "frames": 128,
+              "prompt": "A vast windswept Martian landscape of deep rust-red dunes and wind-carved rock stretching unbroken to the horizon at golden hour, fine ochre dust streaming off the ridgelines, a pale ringed planet hanging low and enormous in the dusty amber sky. Long sweeping aerial drone shot gliding steadily forward over ridge after ridge, wide-angle, deep focus, slow majestic continuous move, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
               "cut": false,
               "image": null
             },
             {
-              "prompt": "The mist lifts to reveal a mountain lake reflecting the sunrise",
-              "frames": 128,
-              "cut": false,
+              "prompt": "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain — a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
+              "cut": true,
               "image": null
             },
             {
-              "prompt": "A neon-lit city street at night in the rain, seen from street level",
+              "prompt": "A ground-level forward-facing tracking shot on the Martian surface that begins on a medium shot of a spartan futuristic research habitat — the whole low cluster of white composite-panel modules visible across the rust-red regolith — then travels steadily forward, closing the distance toward the front airlock door, the ribbed hatch and its lit control panel growing from small to large in frame as the camera covers ground toward the entrance. Eye-level wide-angle, deep focus, pronounced forward dolly, immersive and grounded, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "Interior of a clean, spartan Martian habitat airlock bay: a lone astronaut stands at an open equipment rack methodically suiting up, pulling on a worn white-and-orange pressure suit and latching the chest panel, helmet waiting on the bench beside him. Cool white LED light from overhead, a small porthole glowing with red Martian daylight. Medium close-up, 35mm lens, shallow depth of field, slow push-in, muted steel-and-white palette with warm accents, photoreal, cinematic.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "Interior tracking shot following an astronaut in a worn white-and-orange pressure suit, now fully suited with the helmet on, walking purposefully down a narrow corridor inside the spartan Martian habitat toward the airlock at the far end, clean white composite walls and softly glowing LED strip lighting lining the passage, cabling and equipment racks set along the panels. Steady forward Steadicam tracking from behind, 35mm lens, shallow depth of field, cool white interior light with warm accents, muted steel-and-white palette, photoreal, cinematic.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "Exterior on the Martian surface: the astronaut in the worn white-and-orange pressure suit stands directly in front of his spartan research habitat, the white composite-panel modules, recessed portholes, angled solar arrays and slender comms mast rising clearly directly behind him, ochre dust drifting past his boots across the rust-red ground. Golden low sunlight rakes across suit and structure alike, wide cinematic shot, long lens, shallow depth of field, slow dolly, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "The same astronaut, still standing in front of his habitat on the rust-red Martian surface, raises an arm and waves warmly toward the camera, the white composite-panel modules and slender comms mast rising behind him, ochre dust drifting past his boots. Golden low sunlight rakes across suit and structure, wide cinematic shot, long lens, shallow depth of field, slow dolly, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
               "frames": 160,
+              "cut": false,
+              "image": null
+            },
+            {
+              "prompt": "An astronaut in a worn white-and-orange pressure suit walks across a vast, utterly empty Martian expanse, a single small figure crossing an immense open plain of rust-red dunes with nothing but bare horizon ahead, boots kicking up trailing veils of fine dust. Wide dramatic tracking shot following from behind, long lens, deep focus, the emptiness stretching huge around him, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look, epic and cinematic.",
+              "frames": 157,
+              "cut": true,
+              "image": null
+            },
+            {
+              "prompt": "An extreme wide aerial drone shot of the Martian desert, a lone astronaut in a white-and-orange pressure suit reduced to a tiny speck far below crossing the colossal sweep of rust-red dunes, a single track of footprints trailing behind him, the ringed planet vast on the distant horizon. Towering high-altitude drone view craning up and pulling back, ultra-wide, deep focus, the figure dwarfed to almost nothing, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look, epic and cinematic.",
+              "frames": 157,
               "cut": true,
               "image": null
             }
@@ -186,7 +258,7 @@
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1000,
+        1560,
         240
       ],
       "size": [
@@ -239,7 +311,7 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1000,
+        1560,
         580
       ],
       "size": [

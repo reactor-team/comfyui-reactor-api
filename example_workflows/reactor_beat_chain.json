@@ -101,13 +101,13 @@
         "Node name for S&R": "ReactorBeat"
       },
       "widgets_values": [
-        "A slow aerial shot over a misty pine forest at dawn",
-        128,
+        "A powerful Bengal tiger prowls slowly through tall sun-bleached savanna grass at golden hour, muscles rolling beneath its orange-and-black striped fur, amber eyes fixed ahead, whiskers catching the light. Warm low sunlight rakes through the swaying grass. Long telephoto, very shallow depth of field, slow tracking dolly, rich golden-amber palette, fine fur detail, photoreal nature-documentary look.",
+        317,
         "shot"
       ],
       "widgets_values_named": {
-        "prompt": "A slow aerial shot over a misty pine forest at dawn",
-        "frames": 128,
+        "prompt": "A powerful Bengal tiger prowls slowly through tall sun-bleached savanna grass at golden hour, muscles rolling beneath its orange-and-black striped fur, amber eyes fixed ahead, whiskers catching the light. Warm low sunlight rakes through the swaying grass. Long telephoto, very shallow depth of field, slow tracking dolly, rich golden-amber palette, fine fur detail, photoreal nature-documentary look.",
+        "frames": 317,
         "kind": "shot"
       }
     },
@@ -182,14 +182,14 @@
         "Node name for S&R": "ReactorBeat"
       },
       "widgets_values": [
-        "The mist lifts to reveal a mountain lake reflecting the sunrise",
-        128,
-        "shot"
+        "A pod of bottlenose dolphins leaps in unison through the glittering turquoise surface of a calm open ocean, sleek grey bodies arcing clear of the water, sheets of spray catching the bright midday sun. Low angle just above the waterline, crisp high-shutter clarity, deep blue-green palette with sparkling highlights, photoreal.",
+        317,
+        "cut"
       ],
       "widgets_values_named": {
-        "prompt": "The mist lifts to reveal a mountain lake reflecting the sunrise",
-        "frames": 128,
-        "kind": "shot"
+        "prompt": "A pod of bottlenose dolphins leaps in unison through the glittering turquoise surface of a calm open ocean, sleek grey bodies arcing clear of the water, sheets of spray catching the bright midday sun. Low angle just above the waterline, crisp high-shutter clarity, deep blue-green palette with sparkling highlights, photoreal.",
+        "frames": 317,
+        "kind": "cut"
       }
     },
     {
@@ -263,13 +263,13 @@
         "Node name for S&R": "ReactorBeat"
       },
       "widgets_values": [
-        "A neon-lit city street at night in the rain, seen from street level",
-        160,
+        "A herd of African elephants — towering adults sheltering a small calf — wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
+        317,
         "cut"
       ],
       "widgets_values_named": {
-        "prompt": "A neon-lit city street at night in the rain, seen from street level",
-        "frames": 160,
+        "prompt": "A herd of African elephants — towering adults sheltering a small calf — wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
+        "frames": 317,
         "kind": "cut"
       }
     },

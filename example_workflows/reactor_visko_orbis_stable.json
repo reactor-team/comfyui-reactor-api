@@ -1,0 +1,425 @@
+{
+  "id": "e48b30fe-b3d3-4d75-a769-b73df4f9ffb7",
+  "revision": 0,
+  "last_node_id": 6,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        560,
+        180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "A Visko Orbis Stable scene in three beats. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one beat to the next instead of cutting.\n\nLoad Image feeds image_0. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "A Visko Orbis Stable scene in three beats. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one beat to the next instead of cutting.\n\nLoad Image feeds image_0. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "ReactorModel",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_MODEL",
+          "name": "REACTOR_MODEL",
+          "type": "REACTOR_MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorModel"
+      },
+      "widgets_values": [
+        "Visko Orbis Stable",
+        "2k"
+      ],
+      "widgets_values_named": {
+        "model": "Visko Orbis Stable"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorTimeline",
+      "pos": [
+        320,
+        240
+      ],
+      "size": [
+        900,
+        256
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "REACTOR_MODEL",
+          "link": 1
+        },
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_BEATS",
+          "link": null
+        },
+        {
+          "localized_name": "image_0",
+          "name": "images.image_0",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "localized_name": "beats",
+          "name": "beats",
+          "type": "REACTOR_BEAT_EDITOR",
+          "widget": {
+            "name": "beats"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_TIMELINE",
+          "name": "REACTOR_TIMELINE",
+          "type": "REACTOR_TIMELINE",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorTimeline"
+      },
+      "widgets_values": [
+        {
+          "beats": [
+            {
+              "prompt": "The fisherman grips the rail and braces himself as the boat rises over a towering wave. The camera rocks with the deck while rain and sea spray sweep across the frame.",
+              "frames": 198,
+              "cut": false,
+              "image": "image_0"
+            },
+            {
+              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
+              "frames": 198,
+              "cut": false,
+              "image": null
+            },
+            {
+              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
+              "frames": 198,
+              "cut": false,
+              "image": null
+            }
+          ]
+        }
+      ],
+      "widgets_values_named": {
+        "beats": {
+          "beats": [
+            {
+              "prompt": "The fisherman grips the rail and braces himself as the boat rises over a towering wave. The camera rocks with the deck while rain and sea spray sweep across the frame.",
+              "frames": 198,
+              "cut": false,
+              "image": "image_0"
+            },
+            {
+              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
+              "frames": 198,
+              "cut": false,
+              "image": null
+            },
+            {
+              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
+              "frames": 198,
+              "cut": false,
+              "image": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "ReactorRender",
+      "pos": [
+        1260,
+        240
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "timeline",
+          "name": "timeline",
+          "type": "REACTOR_TIMELINE",
+          "link": 2
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        42,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 5,
+      "type": "SaveVideo",
+      "pos": [
+        1260,
+        580
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 3
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/visko_orbis_stable",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/visko_orbis_stable",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        340
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_fisherman.jpg",
+        "image"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      3,
+      0,
+      "REACTOR_MODEL"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      0,
+      "REACTOR_TIMELINE"
+    ],
+    [
+      3,
+      4,
+      0,
+      5,
+      0,
+      "VIDEO"
+    ],
+    [
+      4,
+      6,
+      0,
+      3,
+      2,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

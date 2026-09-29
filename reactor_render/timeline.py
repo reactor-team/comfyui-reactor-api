@@ -1,7 +1,10 @@
+import io
 import itertools
 import logging
 import math
 from dataclasses import dataclass, field, replace
+
+from PIL import Image, ImageOps
 
 
 @dataclass(frozen=True)
@@ -9,13 +12,15 @@ class Beat:
     """A timeline beat: for `frames` frames of video, the video follows `prompt`. Beats play in order.
 
     `cut` asks for a hard scene break from the beat before instead of a soft transition. `image`
-    is PNG bytes for models that condition on a reference image. `moves` are camera moves counted
-    from the beat's own start and cut at its end.
+    is PNG bytes for models that condition on a reference image. `video` is the source clip as
+    MP4 bytes, for video-to-video models, and only the first beat's is read. `moves` are camera
+    moves counted from the beat's own start and cut at its end.
     """
     prompt: str
     frames: int
     cut: bool = False
     image: bytes | None = None
+    video: bytes | None = None
     moves: tuple["Move", ...] = ()
 
 
@@ -75,9 +80,14 @@ class ModelSpec:
     start), or "any". `frames_per_chunk` is set only for models whose timeline is scheduled by chunk.
     `session_frames` is whether `chunk_complete.frames_emitted` counts the whole session rather
     than the one chunk. `image_required` is whether the opening beat must carry an image.
-    `first_chunk_frames` is the length of a scene's first chunk when it differs from the rest.
+    `videos` is which beats may carry one, "none" or "first", as `images` is. `video_required`
+    is whether the opening beat must carry one. `source_track` names the inbound track a
+    "source" model's live source is pushed to. `first_chunk_frames` is the length of a scene's
+    first chunk when it differs from the rest. `size` is the native frame size images and source
+    frames are fitted to; with `keeps_aspect`, only its short side is fixed and the source's aspect holds.
+    `starts` is whether the model waits for a `start` command before generating.
     `settings` maps each setting's command field to the setting. `camera` maps each camera lane,
-    named by its command's field, to the lane.
+    named by its command's field, to the lane. `prompt_command` changes the prompt mid-run.
     """
     slug: str
     pattern: str
@@ -88,9 +98,32 @@ class ModelSpec:
     max_scene_chunks: int | None = None
     session_frames: bool = False
     image_required: bool = False
+    videos: str = "none"
+    video_required: bool = False
+    source_track: str | None = None
     first_chunk_frames: int | None = None
+    size: tuple[int, int] = (1280, 704)
+    keeps_aspect: bool = False
+    starts: bool = True
     settings: dict[str, Setting] = field(default_factory=dict)
     camera: dict[str, Lane] = field(default_factory=dict)
+    prompt_command: str = "set_prompt"
+
+    def frame_size(self, width: int, height: int) -> tuple[int, int]:
+        """The size a width x height input is sent at."""
+        if not self.keeps_aspect:
+            return self.size
+        scale = min(self.size) / min(width, height)
+        return round(width * scale / 2) * 2, round(height * scale / 2) * 2
+
+    def fit(self, image: Image.Image) -> Image.Image:
+        """The image scaled to cover `frame_size` and center-cropped to it."""
+        return ImageOps.fit(image.convert("RGB"), self.frame_size(*image.size), Image.LANCZOS)
+
+    def fit_png(self, png: bytes) -> bytes:
+        buf = io.BytesIO()
+        self.fit(Image.open(io.BytesIO(png))).save(buf, format="PNG")
+        return buf.getvalue()
 
     def chunks_for(self, frames: float) -> int:
         """How many chunks of a scene come nearest to `frames` of video, halves rounding up as the editor's do."""
@@ -134,24 +167,30 @@ MODELS = {
     # Measured on cloud sessions: a scene's first chunk is 29 frames and every later one 32, where the docs say 29,
     # and `frames_emitted` counts the whole session.
     "LongLive-2.0": ModelSpec("reactor/longlive-v2", "chunked", 24.0, "none", True, frames_per_chunk=32, max_scene_chunks=48,
-                              session_frames=True, first_chunk_frames=29),
+                              session_frames=True, first_chunk_frames=29, size=(1280, 704), prompt_command="set_shot"),
     # TODO: Helios publishes no frame rate, so the 24 the output file plays at is a placeholder.
-    "Helios": ModelSpec("reactor/helios", "chunked", 24.0, "any", False, frames_per_chunk=33,
+    "Helios": ModelSpec("reactor/helios", "chunked", 24.0, "any", False, frames_per_chunk=33, size=(640, 384),
                         settings={"sr_scale": Setting("set_sr_scale", ("off", "2x", "4x"), "2x")}),
     # Measured on cloud sessions, for both LingBots: a run's first chunk is 17 frames and every later one 24.
     # `max_scene_chunks` is a run, after which the model restarts from its image.
     # TODO: LingBot's docs say 16 fps, but frames arrive at about 38, so the output file's rate is unsettled.
     "LingBot": ModelSpec("reactor/lingbot", "chunked", 16.0, "first", False, frames_per_chunk=24, max_scene_chunks=300,
-                         image_required=True, first_chunk_frames=17, camera=LINGBOT_CAMERA),
+                         image_required=True, first_chunk_frames=17, size=(1664, 960), camera=LINGBOT_CAMERA),
     # The docs say about 12 frames a chunk; 17 then 24 is what cloud sessions emit.
     "LingBot World 2": ModelSpec("reactor/lingbot-world-2", "chunked", 48.0, "first", False, frames_per_chunk=24,
-                                 max_scene_chunks=10000, image_required=True, first_chunk_frames=17,
+                                 max_scene_chunks=10000, image_required=True, first_chunk_frames=17, size=(1664, 960),
                                  camera=LINGBOT_WORLD_2_CAMERA),
     # `max_scene_chunks` is `generation_started.max_chunks` on cloud sessions at `2k`; the Dynamic docs say 229.
     "Visko Orbis Dynamic": ModelSpec("reactor/visko-orbis-dynamic", "chunked", 18.0, "first", False, frames_per_chunk=33,
-                                     max_scene_chunks=2000, settings={"resolution": Setting("set_resolution", VISKO_RESOLUTION, "2k")}),
+                                     max_scene_chunks=2000, size=(832, 480), settings={"resolution": Setting("set_resolution", VISKO_RESOLUTION, "2k")}),
     "Visko Orbis Stable": ModelSpec("reactor/visko-orbis-stable", "chunked", 18.0, "first", False, frames_per_chunk=33,
-                                    max_scene_chunks=2000, settings={"resolution": Setting("set_resolution", VISKO_RESOLUTION[1:], "2k")}),
+                                    max_scene_chunks=2000, size=(832, 480), settings={"resolution": Setting("set_resolution", VISKO_RESOLUTION[1:], "2k")}),
+    # TODO: SANA-Streaming's docs publish no frame rate, so the 24 the output file plays at is
+    # a placeholder.
+    "Sana Streaming": ModelSpec("reactor/sana-streaming", "source", 24.0, "none", False, videos="first", video_required=True,
+                                source_track="camera", size=(1280, 704)),
+    "X2": ModelSpec("xmax/x2", "source", 24.0, "first", False, videos="first", video_required=True, source_track="source",
+                size=(1472, 832), keeps_aspect=True, starts=False),
 }
 
 
@@ -165,6 +204,8 @@ def model_facts(spec: ModelSpec) -> dict:
         "max_scene_chunks": spec.max_scene_chunks,
         "images": spec.images,
         "image_required": spec.image_required,
+        "videos": spec.videos,
+        "video_required": spec.video_required,
         "camera": {name: {"options": list(lane.options), "idle": lane.idle, "maximum": lane.maximum,
                           "speed": lane.speed and {"idle": spec.camera[lane.speed].idle, "maximum": spec.camera[lane.speed].maximum}}
                    for name, lane in spec.camera.items() if name not in speed_lanes(spec)},
@@ -193,11 +234,15 @@ class Plan:
 
     `setup` is sent in order before the model runs. `timed` holds `(chunk, command, data)` to send
     once `chunk` chunks have completed, for beats the model cannot schedule itself. `chunks` is how
-    many chunks of video to capture. A command value holding `bytes` is a file to upload first.
+    many chunks of video to capture. `source` is the clip a "source" runner streams, as MP4 bytes;
+    for a "source" model `chunks` and the first element of each `timed` entry count source frames
+    pushed, as a source model reports no chunks. A command value holding `bytes` is a file to
+    upload first.
     """
     setup: list[tuple[str, dict]]
     chunks: int
     timed: list[tuple[int, str, dict]] = field(default_factory=list)
+    source: bytes | None = None
 
 
 def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[str, str] | None = None,
@@ -208,17 +253,27 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
     for i, beat in enumerate(beats):
         if beat.image is not None and spec.images == "none":
             raise ValueError(f"{model} does not take reference images.")
+        if beat.video is not None and spec.videos == "none":
+            raise ValueError(f"{model} does not take a source video.")
         # The first beat opens the video, so there is nothing for it to cut from.
         if i and beat.cut and not spec.supports_cuts:
             raise ValueError(f"{model} has no hard cuts; use a shot beat instead.")
     if spec.image_required and beats[0].image is None:
         raise ValueError(f"{model} needs an image on the first beat.")
+    if spec.video_required and beats[0].video is None:
+        raise ValueError(f"{model} needs a video on the first beat.")
     if spec.images == "first":
         beats = list(beats)
         for i, start in enumerate(itertools.accumulate(b.frames for b in beats[:-1]), 1):
             if beats[i].image is not None:
                 logging.warning("%s reads its image only at start; dropping the image on the beat at frame %d.", model, start)
                 beats[i] = replace(beats[i], image=None)
+    if spec.videos == "first":
+        beats = list(beats)
+        for i, start in enumerate(itertools.accumulate(b.frames for b in beats[:-1]), 1):
+            if beats[i].video is not None:
+                logging.warning("%s reads its video only at start; dropping the video on the beat at frame %d.", model, start)
+                beats[i] = replace(beats[i], video=None)
     moves = list(moves or [])
     if any(beat.moves for beat in beats):
         total, starts = scheduled_chunks(spec, beats)
@@ -231,12 +286,15 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
                     continue
                 moves.append(replace(m, start_frame=start, frames=min(start + m.frames, stop) - start))
     plan = COMPILERS[model](model, spec, beats, seed)
-    start = plan.setup.index(("start", {}))
-    plan.setup[start:start] = [(spec.settings[name].command, {name: value}) for name, value in (settings or {}).items()]
+
+    # A model without `start` ("source") takes its settings and camera commands at setup's end.
+    def at_start() -> int:
+        return plan.setup.index(("start", {})) if ("start", {}) in plan.setup else len(plan.setup)
+
+    plan.setup[at_start():at_start()] = [(spec.settings[name].command, {name: value}) for name, value in (settings or {}).items()]
     for chunk, command, data in camera_commands(model, spec, moves, plan.chunks):
         if chunk == 0:
-            start = plan.setup.index(("start", {}))
-            plan.setup.insert(start, (command, data))
+            plan.setup.insert(at_start(), (command, data))
         else:
             # A live change applies from the chunk after the one generating, so it goes out a chunk early.
             plan.timed.append((chunk - 1, command, data))
@@ -357,5 +415,28 @@ def compile_live(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> P
     return plan
 
 
+def source_prompts(beats: list[Beat]) -> list[tuple[int, str, dict]]:
+    """Each later beat's prompt, sent live as the source reaches the beat's first frame."""
+    starts = itertools.accumulate(beat.frames for beat in beats[:-1])
+    return [(start, "set_prompt", {"prompt": beat.prompt}) for start, beat in zip(starts, beats[1:])]
+
+
+def compile_sana(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
+    # The clip goes up the live `camera` track: the deployed model has no file mode (`set_mode`, `set_video`).
+    return Plan(setup=[("set_seed", {"seed": seed}), ("set_prompt", {"prompt": beats[0].prompt}), ("start", {})],
+                chunks=sum(beat.frames for beat in beats), timed=source_prompts(beats), source=beats[0].video)
+
+
+def compile_x2(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
+    plan = Plan(setup=[("set_keep_backlog", {"keep_backlog": True})], chunks=sum(beat.frames for beat in beats),
+                source=beats[0].video)
+    if beats[0].image is not None:
+        plan.setup.append(("set_reference_image", {"reference_image": beats[0].image}))
+    plan.setup.append(("set_prompt", {"prompt": beats[0].prompt}))
+    plan.timed = source_prompts(beats)
+    return plan
+
+
 COMPILERS = {"LongLive-2.0": compile_longlive, "Helios": compile_helios, "LingBot": compile_live,
-             "LingBot World 2": compile_live, "Visko Orbis Dynamic": compile_live, "Visko Orbis Stable": compile_live}
+             "LingBot World 2": compile_live, "Visko Orbis Dynamic": compile_live, "Visko Orbis Stable": compile_live,
+             "Sana Streaming": compile_sana, "X2": compile_x2}

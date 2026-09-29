@@ -3,6 +3,7 @@ import asyncio
 import dataclasses
 
 import av
+import io
 import numpy as np
 import pytest
 
@@ -21,6 +22,20 @@ class FakeTrack:
         self.push = fn
 
 
+class SendOnlyTrack:
+    """A published source track, recording the frames pushed to it."""
+
+    def __init__(self, name, on_push=None):
+        self.name = name
+        self.pushed = []
+        self.on_push = on_push
+
+    def push_frame(self, frame):
+        self.pushed.append(frame)
+        if self.on_push:
+            self.on_push(len(self.pushed))
+
+
 class FakeReactor:
     """Stands in for reactor_sdk.Reactor.
 
@@ -28,21 +43,27 @@ class FakeReactor:
     messages, each followed shortly by its white frames, as media trails the messages. A chunk is
     `frames` frames, or `first` for the first one. `frames_emitted` counts the session's frames so
     far, as LongLive reports it, or with `per_chunk` only the chunk's, as Helios does. The first `refusals` connects raise a 429 carrying `retry_after_ms` and the message `refusal`.
-    Each command's reply takes `reply_seconds`.
+    Each command's reply takes `reply_seconds`. With `whole_chunks`, the model instead returns a
+    chunk of white frames only once that many more source frames are pushed, holding back a partial one.
     """
 
     def __init__(self, chunks, frames=2, first=None, per_chunk=False, replies=None, complete_after=None, stall=False,
-                 refusals=0, retry_after_ms=10, refusal="too many requests", reply_seconds=0):
+                 refusals=0, retry_after_ms=10, refusal="too many requests", reply_seconds=0, whole_chunks=None):
         self.chunks, self.frames, self.first, self.per_chunk = chunks, frames, frames if first is None else first, per_chunk
         self.replies = replies or {}
         self.complete_after = complete_after
         self.stall = stall
         self.sent = []
+        # `sent_at[i]` is how many source frames were pushed when `sent[i]` went out.
+        self.sent_at = []
+        self.uploads = []
         self.disconnected = False
         self.track = FakeTrack()
+        self.published = None
         self.refusals, self.retry_after_ms, self.refusal = refusals, retry_after_ms, refusal
         self.connects = self.closes = 0
         self.reply_seconds, self.in_flight, self.most_in_flight = reply_seconds, 0, 0
+        self.whole_chunks = whole_chunks
 
     def __call__(self, slug, **connect):
         self.slug, self.options = slug, connect
@@ -56,10 +77,21 @@ class FakeReactor:
         self.track_handler = func
         return func
 
-    async def __aenter__(self):
-        return self
+    async def publish_track(self, name):
+        # A published source is what the model transforms, so the render streams from here on.
+        if self.whole_chunks:
+            self.published = SendOnlyTrack(name, self._return_whole_chunks)
+        else:
+            self.published = SendOnlyTrack(name)
+            asyncio.get_running_loop().create_task(self._emit())
+        return self.published
 
-    async def __aexit__(self, *_):
+    def _return_whole_chunks(self, pushed):
+        if pushed % self.whole_chunks == 0:
+            for _ in range(self.whole_chunks):
+                self.track.push(np.full((16, 16, 3), WHITE, dtype=np.uint8))
+
+    async def disconnect(self):
         self.disconnected = True
 
     async def connect(self):
@@ -73,10 +105,12 @@ class FakeReactor:
         self.closes += 1
 
     async def upload_file(self, data, name, mime_type):
+        self.uploads.append((data, name, mime_type))
         return f"ref:{data.decode()}"
 
     async def send_command(self, command, data):
         self.sent.append((command, data))
+        self.sent_at.append(None if self.published is None else len(self.published.pushed))
         if command == "start":
             asyncio.get_running_loop().create_task(self._emit())
         self.in_flight += 1
@@ -106,13 +140,27 @@ def frames_in(path):
         return [f.to_ndarray(format="rgb24") for f in c.decode(video=0)]
 
 
+def source_clip(levels):
+    """An H.264 MP4 whose frames hold these gray levels, in order."""
+    buf = io.BytesIO()
+    container = av.open(buf, "w", format="mp4")
+    stream = container.add_stream("libx264", rate=24)
+    stream.width, stream.height, stream.pix_fmt = 16, 16, "yuv420p"
+    for level in levels:
+        frame = av.VideoFrame.from_ndarray(np.full((16, 16, 3), level, dtype=np.uint8), format="rgb24")
+        container.mux(stream.encode(frame.reformat(16, 16, "yuv420p")))
+    container.mux(stream.encode())
+    container.close()
+    return buf.getvalue()
+
+
 START = ("start", {})
 
 
-def run(fake, plan, tmp_path, monkeypatch, check_interrupt=lambda: None, model="LongLive-2.0", **connect):
+def run(fake, plan, tmp_path, monkeypatch, check_interrupt=lambda: None, model="LongLive-2.0", fps=None, **connect):
     monkeypatch.setattr(session, "Reactor", fake)
     monkeypatch.setattr(session, "CONNECT_SETTLE_SECONDS", 0)
-    spec = dataclasses.replace(MODELS[model], frames_per_chunk=fake.frames)
+    spec = dataclasses.replace(MODELS[model], frames_per_chunk=fake.frames, fps=fps or MODELS[model].fps)
     progress = []
     coro = session.render(spec, plan, str(tmp_path / "out.mp4"), lambda done, total, frame: progress.append((done, total)), check_interrupt,
                           **(connect or {"api_key": "rk_test"}))
@@ -205,6 +253,7 @@ def interrupt_after(n):
 @pytest.fixture
 def fast_grace(monkeypatch):
     monkeypatch.setattr(session, "FRAME_GRACE_SECONDS", 0.1)
+    monkeypatch.setattr(session, "TAIL_PAD_SECONDS", 0.2)
 
 
 async def test_interrupt_stops_the_session(tmp_path, monkeypatch):
@@ -259,7 +308,7 @@ async def test_a_rate_limited_connect_waits_retry_after_and_retries(tmp_path, mo
     fake = FakeReactor(chunks=1, refusals=2)
     _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch)
     await coro
-    assert (fake.connects, fake.closes) == (3, 2)
+    assert (fake.connects, fake.closes) == (3, 3)
     assert START in fake.sent
 
 
@@ -289,3 +338,90 @@ async def test_an_interrupt_during_the_rate_limit_wait_stops_the_render(tmp_path
     with pytest.raises(Interrupted):
         await asyncio.wait_for(coro, timeout=5)
     assert fake.connects == 1
+
+
+# Source tests run at a pacing of 1000 fps so the pushes finish at once; the grace waits stay real.
+
+
+async def test_send_uploads_a_video_as_mp4_and_images_as_png(tmp_path, monkeypatch):
+    fake = FakeReactor(chunks=1)
+    plan = Plan(setup=[("set_video", {"video": b"clip"}), ("set_conditioning", {"image": b"png"}), START], chunks=1)
+    _, coro = run(fake, plan, tmp_path, monkeypatch)
+    await coro
+    assert fake.uploads == [(b"clip", "video.mp4", "video/mp4"), (b"png", "image.png", "image/png")]
+
+
+async def test_source_frames_are_pushed_in_order(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=2, frames=1)
+    # Source frames carry levels 0, 40, 80, 120, so H.264's quantization cannot reorder them.
+    plan = Plan(setup=[], chunks=4, source=source_clip([i * 40 for i in range(4)]))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    pushed = fake.published.pushed
+    levels = [round(int(f.mean()) / 40) for f in pushed]
+    # Past the clip, its last frame repeats until the output catches up.
+    assert levels[:4] == [0, 1, 2, 3] and set(levels[4:]) <= {3}
+    # X2 keeps the square clip's aspect and scales it to its native short side.
+    assert all(f.shape == (832, 832, 3) and f.dtype == np.uint8 for f in pushed)
+
+
+async def test_source_frames_past_the_planned_count_are_never_pushed(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=2, frames=1)
+    plan = Plan(setup=[], chunks=2, source=source_clip([i * 40 for i in range(6)]))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    assert {round(int(f.mean()) / 40) for f in fake.published.pushed} == {0, 1}
+
+
+async def test_a_source_tail_the_model_holds_back_is_padded_until_it_returns(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=0, whole_chunks=4)
+    plan = Plan(setup=[], chunks=5, source=source_clip([i * 40 for i in range(5)]))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    assert len(fake.published.pushed) == 8
+    assert len(frames_in(tmp_path / "out.mp4")) == 5
+
+
+async def test_source_padding_gives_up_on_a_tail_that_never_returns(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=2, frames=1)
+    plan = Plan(setup=[], chunks=4, source=source_clip([i * 40 for i in range(4)]))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    assert len(frames_in(tmp_path / "out.mp4")) == 2
+
+
+async def test_a_timed_command_goes_out_when_the_source_reaches_its_frame(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=2, frames=1)
+    plan = Plan(setup=[("set_keep_backlog", {"keep_backlog": True})], timed=[(2, "set_prompt", {"prompt": "b"})],
+                chunks=4, source=source_clip([i * 40 for i in range(4)]))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    assert [c for c, _ in fake.sent] == ["set_keep_backlog", "set_prompt"]
+    assert fake.sent_at == [0, 2]
+
+
+async def test_source_capture_records_the_stream_from_the_first_push(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=3, frames=1)
+    plan = Plan(setup=[], chunks=2, source=source_clip([0, 40]))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    frames = frames_in(tmp_path / "out.mp4")
+    # The output is the clip's length: frames past it answer the padding.
+    assert len(frames) == 2
+    assert all(f.mean() > 200 for f in frames)
+
+
+async def test_a_failed_disconnect_still_destroys_the_handle(caplog):
+    class Failing:
+        closes = 0
+
+        async def disconnect(self):
+            raise RuntimeError("gone")
+
+        def close(self):
+            self.closes += 1
+
+    reactor = Failing()
+    async with session.closing_session(reactor):
+        pass
+    assert reactor.closes == 1 and "ending the session failed" in caplog.text

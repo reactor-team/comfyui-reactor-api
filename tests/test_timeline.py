@@ -1,4 +1,6 @@
+import numpy as np
 import pytest
+from PIL import Image
 
 from reactor_render.timeline import MODELS, POSES, Beat, Move, compile_timeline, editor_beats, editor_moves, model_facts
 
@@ -157,11 +159,53 @@ def test_an_editor_beat_naming_an_unconnected_slot_raises():
         editor_beats(editor(("a", 72, False, "image_2")), {"image_0": b"zero"})
 
 
+def test_sana_streams_the_clip_and_sends_later_beats_on_their_frame():
+    plan = compile_timeline("Sana Streaming", [Beat("a", 144, video=b"mp4"), Beat("b", 72)], seed=7)
+    assert plan.setup == [("set_seed", {"seed": 7}), ("set_prompt", {"prompt": "a"}), ("start", {})]
+    assert plan.timed == [(144, "set_prompt", {"prompt": "b"})]
+    assert plan.chunks == 216
+    assert plan.source == b"mp4"
+
+
+def test_x2_streams_the_clip_and_sends_later_beats_on_their_frame():
+    plan = compile_timeline("X2", [Beat("a", 48, video=b"mp4", image=b"png"), Beat("b", 24), Beat("c", 24)], seed=7)
+    assert plan.setup == [
+        ("set_keep_backlog", {"keep_backlog": True}),
+        ("set_reference_image", {"reference_image": b"png"}),
+        ("set_prompt", {"prompt": "a"}),
+    ]
+    assert plan.timed == [(48, "set_prompt", {"prompt": "b"}), (72, "set_prompt", {"prompt": "c"})]
+    assert plan.chunks == 96
+    assert plan.source == b"mp4"
+
+
+def test_x2_without_an_image_sends_no_reference_image():
+    plan = compile_timeline("X2", [Beat("a", 48, video=b"mp4")], seed=0)
+    assert plan.setup == [("set_keep_backlog", {"keep_backlog": True}), ("set_prompt", {"prompt": "a"})]
+
+
+def test_a_model_without_video_rejects_one():
+    with pytest.raises(ValueError, match="LongLive-2.0 does not take a source video"):
+        compile_timeline("LongLive-2.0", [Beat("a", 120, video=b"mp4")], seed=0)
+
+
+def test_a_model_that_needs_a_video_refuses_a_timeline_without_one():
+    with pytest.raises(ValueError, match="Sana Streaming needs a video on the first beat"):
+        compile_timeline("Sana Streaming", [Beat("a", 120)], seed=0)
+
+
+def test_a_follow_up_video_is_dropped_with_a_warning_when_the_model_reads_its_video_only_at_start(caplog):
+    plan = compile_timeline("X2", [Beat("a", 48, video=b"one"), Beat("b", 48, video=b"two")], seed=0)
+    assert plan.timed == [(48, "set_prompt", {"prompt": "b"})]
+    assert plan.source == b"one"
+    assert "dropping the video on the beat at frame 48" in caplog.text
+
+
 def test_model_facts_carry_the_chunk_grid_compile_timeline_snaps_to():
     facts = model_facts(MODELS["LongLive-2.0"])
     assert facts == {"fps": 24.0, "frames_per_chunk": 32, "first_chunk_frames": 29,
                      "supports_cuts": True, "max_scene_chunks": 48, "images": "none", "image_required": False,
-                     "camera": {}}
+                     "videos": "none", "video_required": False, "camera": {}}
     camera = model_facts(MODELS["LingBot"])["camera"]
     assert "rotation_speed_deg" not in camera
     assert camera["look_horizontal"]["speed"] == {"idle": 5.0, "maximum": 30.0}
@@ -298,3 +342,23 @@ def test_a_beat_move_starting_after_its_beat_is_dropped_with_a_warning(caplog):
     beats = [Beat("a", 65, image=b"one", moves=(Move("movement", "back", 70, 24),)), Beat("b", 79)]
     assert camera(compile_timeline("LingBot", beats, seed=0)) == ([], [])
     assert "after the beat ends" in caplog.text
+
+
+def test_inputs_fit_each_models_native_size():
+    wide = Image.new("RGB", (1000, 1000))
+    assert MODELS["LingBot World 2"].fit(wide).size == (1664, 960)
+    assert MODELS["Visko Orbis Stable"].fit(wide).size == (832, 480)
+    assert MODELS["Helios"].fit(wide).size == (640, 384)
+    # X2 picks its output from the source's aspect, so only the short side is fixed.
+    assert MODELS["X2"].frame_size(854, 480) == (1480, 832)
+    assert MODELS["X2"].frame_size(480, 854) == (832, 1480)
+
+
+def test_fitting_crops_to_the_models_aspect_instead_of_squashing():
+    # A red square centred on a wide frame stays square once fitted.
+    image = Image.new("RGB", (2000, 1000), "black")
+    image.paste((255, 0, 0), (750, 250, 1250, 750))
+    fitted = MODELS["Helios"].fit(image)
+    red = np.argwhere(np.asarray(fitted)[:, :, 0] > 128)
+    height, width = red.max(0) - red.min(0) + 1
+    assert abs(int(height) - int(width)) <= 2

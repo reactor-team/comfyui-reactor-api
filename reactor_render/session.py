@@ -1,10 +1,12 @@
 import asyncio
 import contextlib
+import io
 import logging
 import math
 import time
 from collections.abc import Callable
 
+import av
 import numpy as np
 
 from reactor_sdk import Reactor
@@ -15,6 +17,8 @@ from .timeline import ModelSpec, Plan
 
 # Once the model is done, how long to wait without a frame before closing a short capture.
 FRAME_GRACE_SECONDS = 3.0
+# How long a source clip's last frame repeats while the model's output catches up to the clip's length.
+TAIL_PAD_SECONDS = 10.0
 # TODO: Drop this once a command sent at once after `connect()` is reliably answered. Observed on
 # cloud sessions: such a command can go unanswered, timing out the render.
 CONNECT_SETTLE_SECONDS = 1.0
@@ -22,6 +26,8 @@ CONNECT_SETTLE_SECONDS = 1.0
 # session bucket (docs: resources/rate-limits).
 CONNECT_RETRY_SECONDS = 300.0
 RATE_LIMIT_WAIT_SECONDS = 6.0
+# How long ending a session may take before its handle is destroyed anyway.
+DISCONNECT_TIMEOUT_SECONDS = 10.0
 # How often a render reports progress, with its newest frame as a preview.
 PROGRESS_INTERVAL_SECONDS = 0.125
 
@@ -42,22 +48,26 @@ class Session:
         self.reported = -1
 
     async def send(self, command: str, data: dict) -> None:
-        data = {k: await self.reactor.upload_file(v, name=f"{k}.png", mime_type="image/png") if isinstance(v, bytes) else v
-                for k, v in data.items()}
+        async def upload(key: str, value: bytes):
+            # An upload under `video` is the source clip; every other file is a PNG image.
+            name, mime_type = ("video.mp4", "video/mp4") if key == "video" else (f"{key}.png", "image/png")
+            return await self.reactor.upload_file(value, name=name, mime_type=mime_type)
+
+        data = {k: await upload(k, v) if isinstance(v, bytes) else v for k, v in data.items()}
         if command == "start":
             self.capturing = True
         reply = await self.reactor.send_command(command, data)
         if reply is not None and reply.get("type") == "command_error":
             raise RuntimeError(f"Reactor rejected {command}: {reply.get('data', {}).get('reason')}")
 
-    async def next_message(self) -> dict | None:
-        """The next model message, or None after a progress interval without one. Raises on a rejected command."""
+    async def next_message(self, timeout: float = PROGRESS_INTERVAL_SECONDS) -> dict | None:
+        """The next model message, or None after `timeout` without one. Raises on a rejected command."""
         self.check_interrupt()
         if self.writer.received != self.reported:
             self.reported = self.writer.received
             self.on_progress(self.writer.received, self.writer.limit or self.planned, self.writer.previous)
         try:
-            msg = await asyncio.wait_for(self.messages.get(), timeout=PROGRESS_INTERVAL_SECONDS)
+            msg = await asyncio.wait_for(self.messages.get(), timeout=timeout)
         except asyncio.TimeoutError:
             return None
         if msg.get("type") == "command_error":
@@ -107,7 +117,48 @@ async def run_chunked(session: Session, spec: ModelSpec, plan: Plan) -> None:
                 model_done_at = time.monotonic()
 
 
-RUNNERS = {"chunked": run_chunked}
+async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
+    """Drive a model that transforms a live source track; its clock is the source frames pushed."""
+    # The source track is up before setup, so a model's `start` finds it.
+    track = await session.reactor.publish_track(spec.source_track)
+    for command, data in plan.setup:
+        await session.send(command, data)
+    timed = sorted(plan.timed, key=lambda t: t[0])
+    session.capturing = True
+    pushed = 0
+    model_done_at = None
+    # The clip decodes on a thread: a blocking PyAV decode between pushes would starve the message loop.
+    frames = await asyncio.to_thread(
+        lambda: [np.asarray(spec.fit(f.to_image())) for f in av.open(io.BytesIO(plan.source)).decode(video=0)])
+    clip = min(len(frames), plan.chunks)
+    # A model can hold back the clip's tail (it generates whole chunks, and frames sit in flight), so the last
+    # frame repeats until the clip's length is back; the writer's limit drops what the repeats produce.
+    # TODO: Stop on the output frame tagged with the clip's last index once models echo input frame tags.
+    session.writer.limit = clip
+    pad_until = None
+    next_frame_at = time.monotonic()
+    while not session.writer.full and not session.capture_ended(model_done_at):
+        if pushed == clip:
+            pad_until = time.monotonic() + TAIL_PAD_SECONDS
+        if pad_until is not None and time.monotonic() > pad_until:
+            break
+        while timed and timed[0][0] <= pushed:
+            _, command, data = timed.pop(0)
+            await session.send(command, data)
+        next_frame_at += 1 / spec.fps
+        # The wait between frames is the message wait, so a polled message never stalls the pacing.
+        msg = await session.next_message(max(next_frame_at - time.monotonic(), 0.0))
+        if msg is not None and msg.get("type") in ("generation_complete", "generation_stopped"):
+            model_done_at = model_done_at or time.monotonic()
+        track.push_frame(frames[min(pushed, clip - 1)])
+        pushed += 1
+    model_done_at = model_done_at or time.monotonic()
+    # The capture ends as `capture_ended` always does: its frames in, or a grace beat without one.
+    while not session.capture_ended(model_done_at):
+        await session.next_message()
+
+
+RUNNERS = {"chunked": run_chunked, "source": run_source}
 
 
 async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], None]) -> None:
@@ -133,17 +184,37 @@ async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], Non
                 await asyncio.sleep(min(left, 1.0))
 
 
+@contextlib.asynccontextmanager
+async def closing_session(reactor: Reactor):
+    """Hold `reactor` for the block, then end its session with `disconnect()` and destroy its handle.
+
+    The SDK's own `async with` skips `disconnect()` once the client reports "disconnected", as after
+    a dropped connection, which can leave the session running server-side; this always sends it.
+    """
+    try:
+        yield reactor
+    finally:
+        try:
+            await asyncio.wait_for(reactor.disconnect(), DISCONNECT_TIMEOUT_SECONDS)
+        except Exception:
+            logging.warning("Reactor: ending the session failed.", exc_info=True)
+        finally:
+            reactor.close()
+
+
 async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progress,
                  check_interrupt: Callable[[], None], **connect) -> None:
     """Run one Reactor session through `plan` and encode its streamed video to `out_path`.
 
     `connect` is passed to `Reactor` as-is: `api_key` for the cloud, `local`/`api_url` for
-    `reactor run`. Leaving the `async with` block disconnects, which ends the session
-    server-side, so an interrupt or an error never leaves a session running.
+    `reactor run`. The session is ended on the way out, so an interrupt or an error never
+    leaves one running.
     """
     reactor = Reactor(spec.slug, **connect)
     writer = FrameWriter(out_path, spec.fps)
-    session = Session(reactor, writer, plan.chunks * spec.frames_per_chunk, check_interrupt, on_progress)
+    # A "source" plan's chunks count its source frames, so the estimate is the count itself.
+    planned = plan.chunks * (spec.frames_per_chunk or 1)
+    session = Session(reactor, writer, planned, check_interrupt, on_progress)
 
     @reactor.on_message
     def queue_message(msg: dict) -> None:
@@ -155,7 +226,7 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
             track.on_frame(lambda frame: session.capturing and writer.push(frame))
 
     try:
-        async with reactor:
+        async with closing_session(reactor):
             await connect_with_retry(reactor, check_interrupt)
             await asyncio.sleep(CONNECT_SETTLE_SECONDS)
             await RUNNERS[spec.pattern](session, spec, plan)

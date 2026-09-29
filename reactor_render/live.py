@@ -23,8 +23,8 @@ LIVE_SESSION_LIMIT_SECONDS = 1800
 # How long a run waits for the browser modal to open its socket before giving up.
 BROWSER_TIMEOUT_SECONDS = 60.0
 INPUT_FPS = 24
-# The preview the browser shows is capped at this width and, by default, this bitrate; the take is
-# unaffected. The browser's Reactor setting overrides the bitrate per run.
+# The preview the browser shows is capped, by default, at this width and bitrate; the take is
+# unaffected. The browser's Reactor settings override both per run.
 PREVIEW_MAX_WIDTH = 832
 PREVIEW_KBPS = 3000
 # How often the browser gets the model connection's stats.
@@ -80,11 +80,11 @@ def unpack_frame(message: bytes) -> tuple[bool, int, bytes]:
     return bool(message[0]), int.from_bytes(message[1:9], "big"), message[9:]
 
 
-def preview_size(width: int, height: int) -> tuple[int, int]:
-    """The size the preview encoder targets: at most PREVIEW_MAX_WIDTH wide, even dimensions."""
-    if width <= PREVIEW_MAX_WIDTH:
+def preview_size(width: int, height: int, max_width: int | None = PREVIEW_MAX_WIDTH) -> tuple[int, int]:
+    """The size the preview encoder targets: at most max_width wide (None for full size), even dimensions."""
+    if max_width is None or width <= max_width:
         return width, height
-    return PREVIEW_MAX_WIDTH, max(2, round(height * PREVIEW_MAX_WIDTH / width) & ~1)
+    return max_width, max(2, round(height * max_width / width) & ~1)
 
 
 def _axis(held: set, negative: str, positive: str) -> int:
@@ -211,9 +211,9 @@ class LiveRun:
         self.prompt, self.setup = prompt, setup
         self.input_size, self.clip = input_size, clip
         self.connect = connect
-        # The config message's preview hint; the encoder retargets on the first real frame.
-        size = (clip[0].shape[1], clip[0].shape[0]) if clip else input_size if mode == "style" else spec.size
-        self.preview_hint = preview_size(*size)
+        # The frame size the config message's preview hint is scaled from; the encoder retargets
+        # on the first real frame.
+        self.source_size = (clip[0].shape[1], clip[0].shape[0]) if clip else input_size if mode == "style" else spec.size
         self.preview_fps = int(spec.fps)
         # Set just before "ended" goes out; the websocket handler closes the socket on it.
         self.ended = False
@@ -234,31 +234,30 @@ class LiveRun:
         self.held: set[str] = set()
         self.lanes: dict[str, object] = {}
         # Webcam path (style): every access unit is decoded on this thread to keep the stream
-        # valid; only the newest decoded frame is kept, for the paced push to take.
+        # valid; the newest decoded frame waits for the loop to push it.
         self._decoder = H264Decoder(*input_size) if input_size else None
         self._webcam_in: queue.Queue[bytes | None] = queue.Queue()
-        self._latest: tuple[np.ndarray, int] | None = None
-        self._latest_lock = threading.Lock()
-        self._decoded = 0
+        self._latest: np.ndarray | None = None
+        self._webcam_ready = asyncio.Event()
         # Preview path: the media thread keeps only the newest frame pending for the encoder
         # thread, which never re-queues.
         self._pending: np.ndarray | None = None
         self._pending_cond = threading.Condition()
         self._force_keyframe = False
-        self.preview_kbps = PREVIEW_KBPS
+        self.preview_kbps, self.preview_width = PREVIEW_KBPS, PREVIEW_MAX_WIDTH
         self._closed = False
         self._threads = [threading.Thread(target=self._decode_webcam, daemon=True),
                          threading.Thread(target=self._encode_preview, daemon=True)]
         for thread in self._threads:
             thread.start()
 
-    def connected(self, send, preview_kbps: int = PREVIEW_KBPS) -> bool:
-        """Attach the browser's sender and its preview bitrate. False when the run already has (or had) a socket."""
+    def connected(self, send, preview_kbps: int = PREVIEW_KBPS, preview_width: int | None = PREVIEW_MAX_WIDTH) -> bool:
+        """Attach the browser's sender and its preview bitrate and width. False when the run already has (or had) a socket."""
         with self._send_lock:
             if self._send is not None or self.ended:
                 return False
             self._send = send
-            self.preview_kbps = preview_kbps
+            self.preview_kbps, self.preview_width = preview_kbps, preview_width
         self._loop.call_soon_threadsafe(self._connected.set)
         return True
 
@@ -294,8 +293,8 @@ class LiveRun:
             await self._poll(self._connected, BROWSER_TIMEOUT_SECONDS, OPEN_TAB_ERROR, check_interrupt)
             self._send_json({"type": "config", "mode": self.mode, "prompt": self.prompt,
                              "keys": drive_keys(self.spec),
-                             "preview": {"width": self.preview_hint[0], "height": self.preview_hint[1],
-                                         "fps": self.preview_fps},
+                             "preview": dict(zip(("width", "height"), preview_size(*self.source_size, self.preview_width)),
+                                             fps=self.preview_fps),
                              "input": None if self.input_size is None else
                                       {"width": self.input_size[0], "height": self.input_size[1], "fps": INPUT_FPS}})
             await self._session(check_interrupt)
@@ -397,15 +396,11 @@ class LiveRun:
                 logging.warning("Reactor live: %s rejected mid-run: %s", data.get("command"), data.get("reason"))
 
     async def _push_webcam(self, track) -> None:
-        """Push the newest decoded webcam frame at the input rate, skipping none twice."""
-        pushed = -1
+        """Push each decoded webcam frame as it arrives; the browser paces them at the input rate."""
         while True:
-            with self._latest_lock:
-                latest = self._latest
-            if latest is not None and latest[1] != pushed:
-                frame, pushed = latest
-                track.push_frame(frame)
-            await asyncio.sleep(1 / INPUT_FPS)
+            await self._webcam_ready.wait()
+            self._webcam_ready.clear()
+            track.push_frame(self._latest)
 
     async def _push_clip(self, track) -> None:
         """Push the source clip at the model's frame rate, looping until the run ends."""
@@ -472,9 +467,8 @@ class LiveRun:
                 continue
             failed = False
             if frame is not None:
-                with self._latest_lock:
-                    self._decoded += 1
-                    self._latest = (frame, self._decoded)
+                self._latest = frame
+                self._loop.call_soon_threadsafe(self._webcam_ready.set)
 
     def _offer_preview(self, frame) -> None:
         with self._pending_cond:
@@ -493,7 +487,7 @@ class LiveRun:
                 force, self._force_keyframe = self._force_keyframe, False
             if encoder is None:
                 height, width = frame.shape[:2]
-                encoder = H264Encoder(*preview_size(width, height), self.preview_fps, self.preview_kbps)
+                encoder = H264Encoder(*preview_size(width, height, self.preview_width), self.preview_fps, self.preview_kbps)
             access_unit, keyframe = encoder.encode(frame, force_keyframe=force)
             if access_unit:
                 self._send_bytes(pack_frame(keyframe, time.monotonic_ns() // 1000, access_unit))

@@ -1,8 +1,8 @@
 {
  "id": "a41bd83f-13b6-41fd-90ef-472c1665de7d",
  "revision": 0,
- "last_node_id": 3,
- "last_link_id": 1,
+ "last_node_id": 4,
+ "last_link_id": 2,
  "nodes": [
   {
    "id": 1,
@@ -22,10 +22,10 @@
    "outputs": [],
    "properties": {},
    "widgets_values": [
-    "Edit your camera live with X2. Queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Pick another camera there if you have more than one. Edit the prompt in that window and press Apply to change the effect. Press Done to end the take; it is saved as a video under reactor/realtime.\n\nX2 prompts work best as one concrete change tied to something in view, then what to keep; see the X2 prompt guide. Connect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
+    "Edit your camera live with X2. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Edit the prompt in that window and press Apply to change the effect. Press Done to end the take; it is saved as a video under reactor/realtime.\n\nX2 prompts work best as one concrete change tied to something in view, then what to keep; see the X2 prompt guide. Connect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
    ],
    "widgets_values_named": {
-    "text": "Restyle your camera live with X2. Queue the prompt, allow camera access, and the restyled video plays in the Reactor Realtime window. Pick another camera there if you have more than one. Edit the prompt in that window and press Apply to change the style. Press Done to end the take; it is saved as a video under reactor/realtime.\n\nConnect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
+    "text": "Edit your camera live with X2. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Edit the prompt in that window and press Apply to change the effect. Press Done to end the take; it is saved as a video under reactor/realtime.\n\nX2 prompts work best as one concrete change tied to something in view, then what to keep; see the X2 prompt guide. Connect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
    },
    "color": "#432",
    "bgcolor": "#653"
@@ -87,7 +87,7 @@
     300
    ],
    "flags": {},
-   "order": 2,
+   "order": 3,
    "mode": 0,
    "inputs": [
     {
@@ -109,6 +109,13 @@
      "shape": 7,
      "type": "VIDEO",
      "link": null
+    },
+    {
+     "localized_name": "camera",
+     "name": "camera",
+     "shape": 7,
+     "type": "REACTOR_CAMERA",
+     "link": 2
     },
     {
      "localized_name": "prompt",
@@ -156,10 +163,55 @@
     "reactor/realtime"
    ],
    "widgets_values_named": {
-    "prompt": "Turn the scene into a hand-painted watercolour illustration with soft paper texture and loose ink outlines. Preserve the people, their faces, motion, the background layout and the camera.",
+    "prompt": "Glowing blue butterfly wings unfold from the person's back and flutter gently as they move. Preserve the face, clothing, room and camera.",
     "seed": 42,
     "control_after_generate": "randomize",
     "filename_prefix": "reactor/realtime"
+   }
+  },
+  {
+   "id": 4,
+   "type": "ReactorCameraCapture",
+   "pos": [
+    40,
+    330
+   ],
+   "size": [
+    270,
+    58
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "camera",
+     "name": "camera",
+     "type": "REACTOR_CAMERA_DEVICE",
+     "widget": {
+      "name": "camera"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "REACTOR_CAMERA",
+     "name": "REACTOR_CAMERA",
+     "type": "REACTOR_CAMERA",
+     "links": [
+      2
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ReactorCameraCapture"
+   },
+   "widgets_values": [
+    "Default"
+   ],
+   "widgets_values_named": {
+    "camera": "Default"
    }
   }
  ],
@@ -171,6 +223,14 @@
    3,
    0,
    "REACTOR_MODEL"
+  ],
+  [
+   2,
+   4,
+   0,
+   3,
+   3,
+   "REACTOR_CAMERA"
   ]
  ],
  "groups": [],

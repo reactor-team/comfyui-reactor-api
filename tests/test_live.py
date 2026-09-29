@@ -235,6 +235,21 @@ async def test_a_style_run_streams_pushes_and_records_the_take(tmp_path, monkeyp
     assert fake.disconnected
 
 
+async def test_every_webcam_frame_is_pushed_even_when_two_arrive_close_together(tmp_path, monkeypatch):
+    fake = FakeLiveReactor()
+    run = make_run(fake, monkeypatch, "style", "X2", tmp_path / "take.mp4", size=X2_INPUT)
+    task = asyncio.create_task(run.run(lambda: None))
+    run.connected(lambda m: None)
+    assert await until(lambda: fake.published is not None)
+    for level in (40, 60, 80, 100, 120, 140):
+        run.receive(webcam_message(X2_INPUT, level))
+        await asyncio.sleep(0.02 if level // 20 % 2 == 0 else 0.1)
+    assert await until(lambda: len(fake.published.pushed) == 6)
+    run.receive('{"type":"cancel"}')
+    with pytest.raises(RuntimeError):
+        await asyncio.wait_for(task, 10)
+
+
 async def test_a_cancel_raises_and_reports_the_error(tmp_path, monkeypatch):
     fake = FakeLiveReactor()
     run = make_run(fake, monkeypatch, "style", "X2", tmp_path / "take.mp4", size=X2_INPUT)
@@ -361,6 +376,31 @@ async def test_every_model_frame_in_a_burst_is_previewed(tmp_path, monkeypatch):
             assert await until(lambda: run._pending is None)
         assert await until(lambda: len(encoded) == 6)
         assert encoded == list(range(6))
+    finally:
+        run.close()
+
+
+@pytest.mark.parametrize("width, expected", [(None, (1280, 720)), (640, (640, 360)), (1920, (1280, 720))])
+async def test_the_preview_is_encoded_at_the_width_the_browser_asked_for(tmp_path, monkeypatch, width, expected):
+    sizes = []
+
+    class FakeEncoder:
+        def __init__(self, width, height, fps, max_kbps=None):
+            sizes.append((width, height))
+
+        def encode(self, frame, force_keyframe=False):
+            return b"", False
+
+    async def send(message):
+        pass
+
+    monkeypatch.setattr(live, "H264Encoder", FakeEncoder)
+    run = live.LiveRun("drive", WORLD_2, str(tmp_path / "take.mp4"), "a", [], None, {"api_key": "rk_test"})
+    try:
+        assert run.connected(send, live.PREVIEW_KBPS, width)
+        run._offer_preview(np.zeros((720, 1280, 3), dtype=np.uint8))
+        assert await until(lambda: sizes)
+        assert sizes == [expected]
     finally:
         run.close()
 

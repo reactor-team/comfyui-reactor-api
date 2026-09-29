@@ -37,7 +37,7 @@ function el(tag, attrs = {}, ...children) {
     return node;
 }
 
-function openLive({ run_id, mode, title }) {
+function openLive({ run_id, mode, title, camera }) {
     const backdrop = el("div", { className: "reactor-live-backdrop" });
     const header = el("div", { className: "reactor-live-title", textContent: title });
     const canvas = el("canvas");
@@ -71,6 +71,7 @@ function openLive({ run_id, mode, title }) {
     const url = new URL(api.apiURL(`/reactor/live/${run_id}`), location.href);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.searchParams.set("preview_mbps", app.extensionManager.setting.get(PREVIEW_BITRATE));
+    url.searchParams.set("preview_width", app.extensionManager.setting.get(PREVIEW_WIDTH));
     const socket = new WebSocket(url);
     socket.binaryType = "arraybuffer";
 
@@ -219,7 +220,7 @@ function openLive({ run_id, mode, title }) {
         const grab = el("canvas", { width: input.width, height: input.height }).getContext("2d");
         let keyAt = 0;
         let frames = 0;
-        let lastFrame = -Infinity;
+        let nextFrame = -Infinity;
         encoder = new VideoEncoder({
             output: (chunk) => {
                 const data = new Uint8Array(9 + chunk.byteLength);
@@ -239,7 +240,8 @@ function openLive({ run_id, mode, title }) {
             },
         });
         encoder.configure({
-            codec: "avc1.42E01F",
+            // Baseline level 4.0: X2's 1472x832 input is past level 3.1's 1280x720 ceiling.
+            codec: "avc1.42E028",
             width: input.width,
             height: input.height,
             framerate: input.fps,
@@ -252,7 +254,10 @@ function openLive({ run_id, mode, title }) {
                      frameRate: { ideal: input.fps } },
             audio: false,
         });
-        const media = await open();
+        // The node names its camera by label; an unknown label falls back to the default camera.
+        const wanted = camera && camera !== DEFAULT_CAMERA
+            && (await navigator.mediaDevices.enumerateDevices()).find((device) => device.kind === "videoinput" && device.label === camera);
+        const media = await open(wanted?.deviceId);
         if (closed) {
             for (const track of media.getTracks()) track.stop();
             return;
@@ -288,9 +293,10 @@ function openLive({ run_id, mode, title }) {
 
         function encode(now) {
             if (encoder.state !== "configured") return;
-            // rVFC fires at the display's rate; feed the encoder at the rate the server asked for.
-            if (now - lastFrame < 1000 / input.fps - 1) return;
-            lastFrame = now;
+            // rVFC fires at the camera's or display's rate, with jitter; feed the encoder on a
+            // schedule at the rate the server asked for, so a frame a hair early is not dropped.
+            if (now < nextFrame - 1) return;
+            nextFrame = Math.max(nextFrame + 1000 / input.fps, now);
             // Drop before encoding, never after: a skipped frame leaves the stream decodable.
             if (encoder.encodeQueueSize >= 2 || socket.bufferedAmount >= 1048576) return;
             const { videoWidth: vw, videoHeight: vh } = video;
@@ -413,7 +419,32 @@ function openLive({ run_id, mode, title }) {
 }
 
 const PREVIEW_BITRATE = "Reactor.Realtime.PreviewBitrate";
+const PREVIEW_WIDTH = "Reactor.Realtime.PreviewWidth";
+const DEFAULT_CAMERA = "Default";
 let current = null;
+
+// The camera combo on Reactor Camera Capture. Labels are readable only once this page has camera
+// access, so opening the list asks for it the first time.
+function cameraWidget(node, inputName) {
+    let labels = [DEFAULT_CAMERA];
+    const refresh = async (ask) => {
+        let cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+        if (ask && cameras.length && !cameras.some((device) => device.label)) {
+            const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            for (const track of media.getTracks()) track.stop();
+            cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+        }
+        labels = [DEFAULT_CAMERA, ...new Set(cameras.map((device) => device.label).filter(Boolean))];
+    };
+    refresh(false).catch(() => {});
+    const widget = node.addWidget("combo", inputName, DEFAULT_CAMERA, () => {}, {
+        values: () => {
+            refresh(true).catch(() => {});
+            return labels.includes(widget.value) ? labels : [...labels, widget.value];
+        },
+    });
+    return { widget };
+}
 
 app.registerExtension({
     name: "reactor.live",
@@ -425,7 +456,19 @@ app.registerExtension({
         type: "number",
         defaultValue: 3,
         attrs: { min: 0.5, max: 20, step: 0.5 },
+    }, {
+        id: PREVIEW_WIDTH,
+        category: ["Reactor", "Realtime", "Preview resolution"],
+        name: "Realtime preview resolution",
+        tooltip: "The widest the live preview is sent; larger model output is scaled down to it. Full sends the model's own size, at more CPU and bandwidth. Saved takes are unaffected.",
+        type: "combo",
+        defaultValue: 832,
+        options: [{ value: 0, text: "Full" }, { value: 1280, text: "1280 px" }, { value: 832, text: "832 px" },
+                  { value: 640, text: "640 px" }, { value: 480, text: "480 px" }],
     }],
+    getCustomWidgets() {
+        return { REACTOR_CAMERA_DEVICE: cameraWidget };
+    },
     setup() {
         document.head.append(el("style", { textContent: STYLE }));
         api.addEventListener("reactor.live.open", ({ detail }) => {

@@ -86,6 +86,7 @@ priority over `config.ini`. The key is stored in plain text, and `config.ini` is
   its own camera moves, and a move that continues onto the next beat plays as one move.
 - **Reactor Render** runs the timeline and outputs a video.
 - **Reactor Realtime** opens a live session you steer while it plays, and saves each take as a video.
+- **Reactor Camera Capture** picks a camera on this browser to stream into Reactor Realtime.
 
 ## Two ways to build a timeline
 
@@ -115,9 +116,9 @@ anything drawn on that timeline. `reactor_beat_chain`, `reactor_camera_beats`,
 Reactor Realtime opens a window in ComfyUI that plays the model's output live. Edit the prompt there
 and press Apply to change it mid-take; press Done to save the take under `reactor/realtime`.
 
-- **Video-to-video** models, Sana Streaming and X2, edit a source you stream in. Your camera is the
-  source by default, and the window lets you pick between cameras. Connect a Load Video to stream a
-  file instead; it loops until you press Done. X2 also takes a reference image.
+- **Video-to-video** models, Sana Streaming and X2, edit a source you stream in. Connect a Reactor
+  Camera Capture to stream a camera, or a Load Video to stream a file, which loops until you press
+  Done. X2 also takes a reference image.
 - **Generating** models start from a prompt, and from an image where the model takes one. For
   models with camera lanes, click the video and drive with the keys shown under it: W, A, S and D move, the arrow keys look,
   and Q and E orbit on LingBot World 2. Models without camera lanes are steered by prompt alone.
@@ -127,9 +128,9 @@ Live prompts work best written to each model's prompt guide:
 [X2](https://docs.reactor.inc/model-api-reference/x2/prompt-guide) ·
 [LingBot World 2](https://docs.reactor.inc/model-api-reference/lingbot-world-2/prompt-guide).
 
-The preview plays at the model's frame rate, capped at 3 Mbps by default. If ComfyUI runs on another
-machine over a slow link, lower **Reactor › Realtime › Preview bitrate** in ComfyUI's settings. Saved
-takes are unaffected.
+The preview plays at the model's frame rate, at most 832 px wide and 3 Mbps by default. Change either
+under **Reactor › Realtime** in ComfyUI's settings: raise the resolution to see full detail, or lower
+both if ComfyUI runs on another machine over a slow link. Saved takes are unaffected.
 
 ## Examples
 

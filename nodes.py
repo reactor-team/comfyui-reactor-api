@@ -28,6 +28,9 @@ CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.i
 ReactorTimelineType = io.Custom("REACTOR_TIMELINE")
 ReactorBeatsType = io.Custom("REACTOR_BEATS")
 ReactorModelType = io.Custom("REACTOR_MODEL")
+# A browser camera, by its label; the widget lists the cameras the browser can see.
+ReactorCameraType = io.Custom("REACTOR_CAMERA")
+ReactorCameraDeviceType = io.Custom("REACTOR_CAMERA_DEVICE")
 
 
 @io.comfytype(io_type="REACTOR_BEAT_EDITOR")
@@ -224,7 +227,12 @@ async def live_socket(request):
         kbps = min(max(int(float(request.query["preview_mbps"]) * 1000), 500), 20000)
     except (KeyError, ValueError):
         kbps = live.PREVIEW_KBPS
-    if not run.connected(send, kbps):
+    try:
+        width = int(request.query["preview_width"])
+    except (KeyError, ValueError):
+        width = live.PREVIEW_MAX_WIDTH
+    width = max(width, 160) if width else None
+    if not run.connected(send, kbps, width):
         await ws.close(code=4409)
         return ws
     async for msg in ws:
@@ -235,7 +243,7 @@ async def live_socket(request):
 
 
 async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str, dict]],
-                      clip: list[np.ndarray] | None, filename_prefix: str) -> io.NodeOutput:
+                      clip: list[np.ndarray] | None, filename_prefix: str, camera: str | None = None) -> io.NodeOutput:
     """A new take recorded in a live run, saved under the output directory like SaveVideo's files."""
     sid = PromptServer.instance.client_id
     if sid is None:
@@ -252,12 +260,29 @@ async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str,
     try:
         PromptServer.instance.send_sync("reactor.live.open",
                                         {"run_id": run.run_id, "mode": mode,
-                                         "title": "Reactor Realtime"}, sid)
+                                         "title": "Reactor Realtime", "camera": camera}, sid)
         await run.run(comfy.model_management.throw_exception_if_processing_interrupted)
     finally:
         live.RUNS.pop(run.run_id, None)
         run.close()
     return io.NodeOutput(InputImpl.VideoFromFile(path), ui=ui.PreviewVideo([ui.SavedResult(file, subfolder, io.FolderType.output)]))
+
+
+class ReactorCameraCapture(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ReactorCameraCapture",
+            display_name="Reactor Camera Capture",
+            category="Reactor",
+            description="Streams a camera on this browser into Reactor Realtime as the source for a video-to-video model.",
+            inputs=[ReactorCameraDeviceType.Input("camera", tooltip="The camera to stream. Default is the browser's default camera.")],
+            outputs=[ReactorCameraType.Output()],
+        )
+
+    @classmethod
+    def execute(cls, camera) -> io.NodeOutput:
+        return io.NodeOutput(camera)
 
 
 class ReactorRealtime(io.ComfyNode):
@@ -268,7 +293,7 @@ class ReactorRealtime(io.ComfyNode):
             display_name="Reactor Realtime",
             category="Reactor",
             description="Runs a Reactor model live in a modal in your browser tab, where you change the prompt as it plays. "
-                        "A video-to-video model restyles your camera or a video you connect; any other model generates "
+                        "A video-to-video model restyles the camera or video you connect; any other model generates "
                         "from the prompt and image, with keyboard controls on a world model. Each run records a take.",
             not_idempotent=True,
             is_output_node=True,
@@ -276,7 +301,8 @@ class ReactorRealtime(io.ComfyNode):
                 ReactorModelType.Input("model"),
                 io.String.Input("prompt", multiline=True),
                 io.Image.Input("image", optional=True, tooltip="The image the video starts from, or X2's reference image."),
-                io.Video.Input("video", optional=True, tooltip="A source video for video-to-video models, looped until you press Done. Without one, your camera is the source."),
+                io.Video.Input("video", optional=True, tooltip="A source video for video-to-video models, looped until you press Done."),
+                ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera into a video-to-video model instead of a video."),
                 io.Int.Input("seed", default=42, min=0, max=2**31 - 1),
                 io.String.Input("filename_prefix", default="reactor/realtime",
                                 tooltip="Where each take is saved, under ComfyUI's output folder."),
@@ -290,7 +316,7 @@ class ReactorRealtime(io.ComfyNode):
         return uuid.uuid4().hex
 
     @classmethod
-    async def execute(cls, model, prompt, seed, filename_prefix, image=None, video=None) -> io.NodeOutput:
+    async def execute(cls, model, prompt, seed, filename_prefix, image=None, video=None, camera=None) -> io.NodeOutput:
         name, settings = model
         spec = MODELS[name]
         if image is not None and spec.images == "none":
@@ -298,21 +324,25 @@ class ReactorRealtime(io.ComfyNode):
             image = None
         png = None if image is None else spec.fit_png(image_to_png(image))
         if spec.pattern != "source":
-            if video is not None:
-                logging.warning("%s does not take a source video; ignoring it.", name)
+            if video is not None or camera is not None:
+                logging.warning("%s does not take a source video or camera; ignoring it.", name)
             return await live_output("drive", name, prompt, live.drive_setup(name, prompt, seed, png, settings), None, filename_prefix)
+        if video is None and camera is None:
+            raise ValueError(f"{name} needs a source: connect a Load Video or a Reactor Camera Capture.")
+        if video is not None and camera is not None:
+            raise ValueError(f"{name} takes one source: disconnect the Load Video or the Reactor Camera Capture.")
         clip = None
         if video is not None:
             mp4 = video_to_mp4(video)
             # Decoded off the loop: a long clip would stall the server's other requests.
             clip = await asyncio.to_thread(lambda: [np.asarray(spec.fit(f.to_image())) for f in av.open(bytes_io.BytesIO(mp4)).decode(video=0)])
-        return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png), clip, filename_prefix)
+        return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png), clip, filename_prefix, camera)
 
 
 class ReactorExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [ReactorModel, ReactorBeat, ReactorTimeline, ReactorRender, ReactorRealtime]
+        return [ReactorModel, ReactorBeat, ReactorTimeline, ReactorRender, ReactorCameraCapture, ReactorRealtime]
 
 
 async def comfy_entrypoint() -> ReactorExtension:

@@ -46,6 +46,7 @@ class Session:
         # Observed on cloud sessions: the stream opens with a placeholder frame at connect, before the model produces anything.
         self.capturing = False
         self.reported = -1
+        self.reported_at = -PROGRESS_INTERVAL_SECONDS
 
     async def send(self, command: str, data: dict) -> None:
         async def upload(key: str, value: bytes):
@@ -63,8 +64,8 @@ class Session:
     async def next_message(self, timeout: float = PROGRESS_INTERVAL_SECONDS) -> dict | None:
         """The next model message, or None after `timeout` without one. Raises on a rejected command."""
         self.check_interrupt()
-        if self.writer.received != self.reported:
-            self.reported = self.writer.received
+        if self.writer.received != self.reported and time.monotonic() - self.reported_at >= PROGRESS_INTERVAL_SECONDS:
+            self.reported, self.reported_at = self.writer.received, time.monotonic()
             self.on_progress(self.writer.received, self.writer.limit or self.planned, self.writer.previous)
         try:
             msg = await asyncio.wait_for(self.messages.get(), timeout=timeout)

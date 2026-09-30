@@ -415,6 +415,19 @@ async def test_source_capture_records_the_stream_from_the_first_push(tmp_path, m
     assert all(f.mean() > 200 for f in frames)
 
 
+async def test_progress_is_reported_at_most_once_per_interval(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr(session.time, "monotonic", lambda: clock[0])
+    writer = type("Writer", (), {"received": 0, "limit": None, "previous": None})()
+    reports = []
+    s = session.Session(None, writer, 24, lambda: None, lambda done, total, frame: reports.append(done))
+    for frame in range(1, 25):
+        writer.received = frame
+        clock[0] = frame * 0.05
+        await s.next_message(timeout=0)
+    assert len(reports) == 8
+
+
 async def test_a_failed_disconnect_still_destroys_the_handle(caplog):
     class Failing:
         closes = 0

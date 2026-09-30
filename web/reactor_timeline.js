@@ -601,8 +601,9 @@ function createEditor(node, inputName, inputData) {
                 signature = next;
                 render();
             }
+            // Refit on every draw, not only when the content changes: a load or a drag can resize the node too, and the editor is all it holds.
             const measured = contentHeight(root);
-            if (measured !== null && measured !== height) {
+            if (measured !== null) {
                 height = measured;
                 fitNode(node);
             }

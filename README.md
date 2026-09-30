@@ -24,8 +24,8 @@ the beats you write here.
 
 ### LongLive-2.0
 
-Tell a story across many scenes from text alone. Each beat is a shot. Mark a beat as a cut to break
-cleanly to a new scene, or leave it as a shot to keep the same world and move the story on.
+Tell a story across many scenes from text alone. Each beat is a shot. Mark a beat as a cut to start
+fresh, or leave it as a shot to keep the same world and move the story on.
 [Overview](https://docs.reactor.inc/model-api-reference/longlive-v2/overview) ·
 [Prompt guide](https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide)
 

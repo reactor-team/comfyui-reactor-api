@@ -217,7 +217,7 @@ function problems(beats, spans, facts, fromChain, slots) {
             if (i < beats.length && !beats[i].cut) continue;
             const limit = framesIn(facts.max_scene_chunks, facts);
             if (spans[i - 1][1] - spans[first][0] > limit)
-                for (let j = first; j < i; j++) add(j, facts.supports_cuts ? `scene is longer than ${limit} frames; add a cut` : `a render on this model lasts at most ${limit} frames`);
+                for (let j = first; j < i; j++) add(j, facts.supports_cuts ? `longer than ${limit} frames without a cut; add one` : `a render on this model lasts at most ${limit} frames`);
             first = i;
         }
     }
@@ -483,7 +483,7 @@ function createEditor(node, inputName, inputData) {
             const kind = b.cut ? "cut" : "shot";
             const boundary = el("div", {
                 className: `reactor-tl-boundary ${kind}${fromChain ? " locked" : ""}`,
-                title: (kind === "cut" ? "Cut: starts a fresh scene." + (fromChain ? "" : " Click for a shot.")
+                title: (kind === "cut" ? "Cut: starts fresh, with no blend." + (fromChain ? "" : " Click for a shot.")
                     : "Shot: blends from the beat before." + (fromChain ? "" : cuts ? " Click for a cut." : " This model has no hard cuts."))
                     + (fromChain ? "" : "\nDrag to change how long the beat before plays."),
                 style: `left:${pct(start)}`,
@@ -537,7 +537,7 @@ function createEditor(node, inputName, inputData) {
             const frames = el("input", { type: "number", min: 1, step: s.facts?.frames_per_chunk ?? 1, value: beat.frames });
             frames.addEventListener("change", () => { beat.frames = snapLength(Number(frames.value) || 0, s.facts); changed(); });
             const kind = el("select", { disabled: selected === 0 || (!cuts && !beat.cut) },
-                el("option", { value: "shot", textContent: "shot (blend in)" }), el("option", { value: "cut", textContent: "cut (new scene)" }));
+                el("option", { value: "shot", textContent: "shot (blend in)" }), el("option", { value: "cut", textContent: "cut (start fresh)" }));
             kind.value = beat.cut && selected > 0 ? "cut" : "shot";
             kind.addEventListener("change", () => { beat.cut = kind.value === "cut"; changed(); });
             const slots = [...new Set([...s.slots, ...(beat.image ? [beat.image] : [])])];

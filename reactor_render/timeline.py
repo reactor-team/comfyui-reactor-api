@@ -378,7 +378,7 @@ def compile_longlive(model: str, spec: ModelSpec, beats: list[Beat], seed: int) 
     bounds = [0] + [c for b, c in zip(beats[1:], at[1:]) if b.cut] + [chunks]
     for start, end in zip(bounds, bounds[1:]):
         if end - start > spec.max_scene_chunks:
-            raise ValueError(f"A {model} scene can last at most {spec.frames_in(spec.max_scene_chunks)} frames; add a cut beat to go longer.")
+            raise ValueError(f"{model} plays at most {spec.frames_in(spec.max_scene_chunks)} frames without a cut; add a cut beat to go longer.")
     plan = Plan(setup=[("set_seed", {"seed": seed}), ("set_shot", {"prompt": beats[0].prompt})], chunks=chunks)
     for beat, chunk in zip(beats[1:], at[1:]):
         command = "schedule_scene_cut" if beat.cut else "schedule_shot"

@@ -102,7 +102,7 @@ class ReactorChain(io.ComfyNode):
                 io.Int.Input("frames", default=120, min=1, max=100000,
                              tooltip="How many frames of video this beat plays. It starts where the beat before it in the chain ends; both ends round to the nearest chunk."),
                 io.Combo.Input("kind", options=["shot", "cut"],
-                               tooltip="How this beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video."),
+                               tooltip="How this beat enters from the one before: shot blends softly, cut starts fresh. The first beat just opens the video."),
                 io.Image.Input("image", optional=True, tooltip="Reference image, for models that take one."),
                 io.Video.Input("video", optional=True, tooltip="Source clip to edit, for video-to-video models. Only the first beat's is used."),
                 MoveEditor.Input("moves", tooltip="Camera moves during this beat, for models with camera controls. A move ends with its beat; continue it on the next beat to keep it going."),

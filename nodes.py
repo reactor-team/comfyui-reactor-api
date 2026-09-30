@@ -305,6 +305,8 @@ class ReactorRealtime(io.ComfyNode):
     async def execute(cls, model, prompt, seed, filename_prefix, image=None, video=None, camera=None) -> io.NodeOutput:
         name, settings = model
         spec = MODELS[name]
+        if not spec.live:
+            raise ValueError(f"{name} isn't available in Reactor Realtime yet; render it with Reactor Render instead.")
         if image is not None and spec.images == "none":
             logging.warning("%s has no image input; ignoring it.", name)
             image = None

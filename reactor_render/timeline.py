@@ -85,7 +85,8 @@ class ModelSpec:
     "source" model's live source is pushed to. `first_chunk_frames` is the length of a scene's
     first chunk when it differs from the rest. `size` is the native frame size images and source
     frames are fitted to; with `keeps_aspect`, only its short side is fixed and the source's aspect holds.
-    `starts` is whether the model waits for a `start` command before generating.
+    `starts` is whether the model waits for a `start` command before generating. `live` is whether
+    Reactor Realtime offers the model.
     `settings` maps each setting's command field to the setting. `camera` maps each camera lane,
     named by its command's field, to the lane. `prompt_command` changes the prompt mid-run.
     """
@@ -105,6 +106,7 @@ class ModelSpec:
     size: tuple[int, int] = (1280, 704)
     keeps_aspect: bool = False
     starts: bool = True
+    live: bool = True
     settings: dict[str, Setting] = field(default_factory=dict)
     camera: dict[str, Lane] = field(default_factory=dict)
     prompt_command: str = "set_prompt"
@@ -188,7 +190,7 @@ MODELS = {
     # TODO: SANA-Streaming's docs publish no frame rate, so the 24 the output file plays at is
     # a placeholder.
     "Sana Streaming": ModelSpec("reactor/sana-streaming", "source", 24.0, "none", False, videos="first", video_required=True,
-                                source_track="camera", size=(1280, 704)),
+                                source_track="camera", size=(1280, 704), live=False),
     "X2": ModelSpec("xmax/x2", "source", 24.0, "first", False, videos="first", video_required=True, source_track="source",
                 size=(1472, 832), keeps_aspect=True, starts=False),
 }

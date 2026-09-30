@@ -22,10 +22,10 @@
    "outputs": [],
    "properties": {},
    "widgets_values": [
-    "Restyle a video file live with Sana Streaming. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Disconnect the video to use your camera instead.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+    "Restyle a video file live with X2. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Disconnect the video to use your camera instead.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
    ],
    "widgets_values_named": {
-    "text": "Restyle a video file live with Sana Streaming. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Disconnect the video to use your camera instead.\n\nThe clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+    "text": "Restyle a video file live with X2. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Disconnect the video to use your camera instead.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
    },
    "color": "#432",
    "bgcolor": "#653"
@@ -69,10 +69,10 @@
     "Node name for S&R": "ReactorModel"
    },
    "widgets_values": [
-    "Sana Streaming"
+    "X2"
    ],
    "widgets_values_named": {
-    "model": "Sana Streaming"
+    "model": "X2"
    }
   },
   {
@@ -150,13 +150,13 @@
     "Node name for S&R": "ReactorRealtime"
    },
    "widgets_values": [
-    "Apply a Japanese ukiyo-e woodblock print style with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, all original motion, camera movement and composition, with seamless temporal consistency and no jarring frames.",
+    "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
     42,
     "randomize",
     "reactor/realtime"
    ],
    "widgets_values_named": {
-    "prompt": "Make it night in a neon-lit harbour, with pink and teal reflections on the water. Keep the rider, the jet ski, its wake and the camera motion unchanged.",
+    "prompt": "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
     "seed": 42,
     "control_after_generate": "randomize",
     "filename_prefix": "reactor/realtime"

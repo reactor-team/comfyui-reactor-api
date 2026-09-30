@@ -116,15 +116,14 @@ anything drawn on that timeline. `reactor_beat_chain`, `reactor_camera_beats`,
 Reactor Realtime opens a window in ComfyUI that plays the model's output live. Edit the prompt there
 and press Apply to change it mid-take; press Done to save the take under `reactor/realtime`.
 
-- **Video-to-video** models, Sana Streaming and X2, edit a source you stream in. Connect a Reactor
-  Camera Capture to stream a camera, or a Load Video to stream a file, which loops until you press
-  Done. X2 also takes a reference image.
+- **Video-to-video** models edit a source you stream in. Connect a Reactor Camera Capture to stream
+  a camera, or a Load Video to stream a file, which loops until you press Done. X2 also takes a
+  reference image. Sana Streaming isn't available in Realtime yet; render it with Reactor Render.
 - **Generating** models start from a prompt, and from an image where the model takes one. For
   models with camera lanes, click the video and drive with the keys shown under it: W, A, S and D move, the arrow keys look,
   and Q and E orbit on LingBot World 2. Models without camera lanes are steered by prompt alone.
 
 Live prompts work best written to each model's prompt guide:
-[Sana Streaming](https://docs.reactor.inc/model-api-reference/sana-streaming/prompt-guide) ·
 [X2](https://docs.reactor.inc/model-api-reference/x2/prompt-guide) ·
 [LingBot World 2](https://docs.reactor.inc/model-api-reference/lingbot-world-2/prompt-guide).
 
@@ -151,7 +150,7 @@ loads `example_outputs/reactor_camera_beats.mp4` the same way.
 | `reactor_visko_orbis_stable` | Visko Orbis Stable | Fisherman in a storm, from an image |
 | `reactor_helios` | Helios | King of the Jungle, from text |
 | `reactor_realtime_camera` | X2 | Live effect on your camera |
-| `reactor_realtime_video` | Sana Streaming | The jet ski render restyled live as a woodblock print |
+| `reactor_realtime_video` | X2 | The jet ski render restyled live as a woodblock print |
 | `reactor_realtime_control` | LingBot World 2 | Drive the jet ski world live with the keyboard |
 
 Each graph screenshot below has its workflow embedded. Drag one onto the ComfyUI canvas to load it.

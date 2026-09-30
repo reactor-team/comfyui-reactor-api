@@ -187,6 +187,7 @@ class ReactorRender(io.ComfyNode):
                 io.Int.Input("seed", default=42, min=0, max=2**31 - 1, control_after_generate=True),
             ],
             outputs=[io.Video.Output()],
+            hidden=[io.Hidden.unique_id],
         )
 
     @classmethod
@@ -201,8 +202,10 @@ class ReactorRender(io.ComfyNode):
         await render(spec, plan, out_path,
                      on_progress=lambda done, total, frame: pbar.update_absolute(
                          done, total, None if frame is None else ("JPEG", Image.fromarray(frame), args.preview_size)),
+                     on_status=lambda text: PromptServer.instance.send_progress_text(f"Status: {text}", cls.hidden.unique_id),
                      check_interrupt=comfy.model_management.throw_exception_if_processing_interrupted,
                      **connect)
+        PromptServer.instance.send_progress_text("Status: Completed", cls.hidden.unique_id)
         return io.NodeOutput(InputImpl.VideoFromFile(out_path))
 
 

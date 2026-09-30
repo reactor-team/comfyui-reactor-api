@@ -245,7 +245,7 @@ class LiveRun:
             raise RuntimeError(self._error)
 
     async def _connect(self, reactor, check_interrupt) -> None:
-        task = asyncio.ensure_future(connect_with_retry(reactor, check_interrupt))
+        task = asyncio.ensure_future(connect_with_retry(reactor, check_interrupt, self._status))
         try:
             waited = 0.0
             while True:

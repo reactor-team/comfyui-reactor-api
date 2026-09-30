@@ -157,12 +157,12 @@ def source_clip(levels):
 START = ("start", {})
 
 
-def run(fake, plan, tmp_path, monkeypatch, check_interrupt=lambda: None, model="LongLive-2.0", fps=None, **connect):
+def run(fake, plan, tmp_path, monkeypatch, check_interrupt=lambda: None, model="LongLive-2.0", fps=None, on_status=lambda text: None, **connect):
     monkeypatch.setattr(session, "Reactor", fake)
     monkeypatch.setattr(session, "CONNECT_SETTLE_SECONDS", 0)
     spec = dataclasses.replace(MODELS[model], frames_per_chunk=fake.frames, fps=fps or MODELS[model].fps)
     progress = []
-    coro = session.render(spec, plan, str(tmp_path / "out.mp4"), lambda done, total, frame: progress.append((done, total)), check_interrupt,
+    coro = session.render(spec, plan, str(tmp_path / "out.mp4"), lambda done, total, frame: progress.append((done, total)), on_status, check_interrupt,
                           **(connect or {"api_key": "rk_test"}))
     return progress, coro
 
@@ -306,10 +306,12 @@ async def test_commands_due_on_one_chunk_are_sent_together(tmp_path, monkeypatch
 
 async def test_a_rate_limited_connect_waits_retry_after_and_retries(tmp_path, monkeypatch):
     fake = FakeReactor(chunks=1, refusals=2)
-    _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch)
+    statuses = []
+    _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch, on_status=statuses.append)
     await coro
     assert (fake.connects, fake.closes) == (3, 3)
     assert START in fake.sent
+    assert statuses == ["Connecting to Reactor…", "Rate-limited; retrying…", "Rate-limited; retrying…", "Rendering"]
 
 
 async def test_a_connect_still_rate_limited_when_retrying_ends_raises_with_the_wait(tmp_path, monkeypatch):
@@ -326,10 +328,12 @@ async def test_a_connect_refused_for_capacity_keeps_retrying_then_says_so(tmp_pa
                        refusal='429 from create session: {"error":"no available capacity: no available servers to handle the request"}')
     monkeypatch.setattr(session, "CONNECT_RETRY_SECONDS", 0.2)
     monkeypatch.setattr(session, "RATE_LIMIT_WAIT_SECONDS", 0.05)
-    _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch)
+    statuses = []
+    _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch, on_status=statuses.append)
     with pytest.raises(RuntimeError, match="no free servers"):
         await coro
     assert fake.connects > 2
+    assert statuses[:2] == ["Connecting to Reactor…", "Waiting for a free server…"] and "Rendering" not in statuses
 
 
 async def test_an_interrupt_during_the_rate_limit_wait_stops_the_render(tmp_path, monkeypatch):

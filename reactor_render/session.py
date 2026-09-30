@@ -161,7 +161,7 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
 RUNNERS = {"chunked": run_chunked, "source": run_source}
 
 
-async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], None]) -> None:
+async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], None], on_status: Callable[[str], None]) -> None:
     """`reactor.connect()`, retried while Reactor refuses the new session with a 429."""
     give_up = time.monotonic() + CONNECT_RETRY_SECONDS
     while True:
@@ -176,6 +176,7 @@ async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], Non
                     raise RuntimeError("Reactor has no free servers for this model right now; try again shortly.") from e
                 raise RuntimeError(f"Reactor is rate-limiting new sessions; try again in {math.ceil(wait)}s.") from e
             logging.warning("Reactor: %s starting a session; retrying in %.0fs.", "no free servers" if busy else "rate-limited", wait)
+            on_status("Waiting for a free server…" if busy else "Rate-limited; retrying…")
             # A fresh native handle for the next attempt; handlers stay registered on `reactor`.
             reactor.close()
             deadline = time.monotonic() + wait
@@ -202,7 +203,7 @@ async def closing_session(reactor: Reactor):
             reactor.close()
 
 
-async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progress,
+async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progress, on_status: Callable[[str], None],
                  check_interrupt: Callable[[], None], **connect) -> None:
     """Run one Reactor session through `plan` and encode its streamed video to `out_path`.
 
@@ -227,8 +228,10 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
 
     try:
         async with closing_session(reactor):
-            await connect_with_retry(reactor, check_interrupt)
+            on_status("Connecting to Reactor…")
+            await connect_with_retry(reactor, check_interrupt, on_status)
             await asyncio.sleep(CONNECT_SETTLE_SECONDS)
+            on_status("Rendering")
             await RUNNERS[spec.pattern](session, spec, plan)
     except BaseException:
         # The session's error is the one worth reporting, not the encoder's.

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render.timeline import MODELS, POSES, Beat, Move, compile_timeline, editor_beats, editor_moves, model_facts
+from reactor_render.timeline import MODELS, POSES, Beat, Move, Timeline, compile_timeline, editor_beats, editor_moves, join_chains, model_facts
 
 # LongLive: a scene opens with a 29-frame chunk, then 32 frames a chunk. A beat's start is the chunk
 # whose video comes nearest its running total of frames: 96 -> 3, 175 -> 6.
@@ -367,3 +367,21 @@ def test_fitting_crops_to_the_models_aspect_instead_of_squashing():
     red = np.argwhere(np.asarray(fitted)[:, :, 0] > 128)
     height, width = red.max(0) - red.min(0) + 1
     assert abs(int(height) - int(width)) <= 2
+
+
+def test_joined_chains_play_in_order_with_later_moves_from_where_their_chain_starts():
+    # LingBot's 60-frame beat rounds to 3 chunks, 17 + 24 + 24 = 65 frames, so the second chain starts there.
+    held = Move("movement", "forward", 10, 20)
+    first = Timeline("LingBot", (Beat("a", 60),), {}, (held,))
+    second = Timeline("LingBot", (Beat("b", 48, cut=True),), {}, (Move("movement", "back", 0, 24),))
+    joined = join_chains([first, second])
+    assert [b.prompt for b in joined.beats] == ["a", "b"] and joined.beats[1].cut
+    assert joined.moves == (held, Move("movement", "back", 65, 24))
+
+
+def test_joining_chains_for_different_models_or_settings_is_an_error():
+    chain = Timeline("Visko Orbis Stable", (Beat("a", 48),), {"resolution": "2k"})
+    with pytest.raises(ValueError, match="Chain 2 is for a different Reactor Model or settings"):
+        join_chains([chain, Timeline("Visko Orbis Stable", (Beat("b", 48),), {"resolution": "1080p"})])
+    with pytest.raises(ValueError, match="Chain 2 is for a different Reactor Model"):
+        join_chains([chain, Timeline("Helios", (Beat("b", 48),))])

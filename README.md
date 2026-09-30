@@ -85,8 +85,10 @@ priority over `config.ini`. The key is stored in plain text, and `config.ini` is
 - **Reactor Chain** is a single beat. Chain beats together instead of drawing them. The first beat
   takes the Reactor Model, which sets the inputs and camera lanes every beat in the chain offers.
   Each beat has its own camera moves, and a move that continues onto the next beat plays as one move.
-- **Reactor Render** renders a chain, from the last Reactor Chain or from a Reactor Timeline, and
-  outputs a video.
+- **Reactor Chain Join** plays chains or timelines one after another, as one chain. They must be for
+  the same model and settings.
+- **Reactor Render** renders a chain, from the last Reactor Chain, a Reactor Chain Join or a Reactor
+  Timeline, and outputs a video.
 - **Reactor Realtime** opens a live session you steer while it plays, and saves each take as a video.
 - **Reactor Camera Capture** picks a camera on this browser to stream into Reactor Realtime.
 

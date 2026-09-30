@@ -61,10 +61,17 @@ function inputValue(node, name) {
     return source ? widgetValue(source, "value") : widgetValue(node, name);
 }
 
+// The chains a Reactor Chain Join plays, in order.
+function joinedChains(join) {
+    return (join.inputs ?? []).map((input, slot) => [input, slot])
+        .filter(([input]) => input.name.startsWith("chains.") && input.link != null).map(([, slot]) => join.getInputNode(slot));
+}
+
 // The model's grid facts, or null when the model link does not come straight from a Reactor Model.
 // The facts of the model a node is for: its own Reactor Model, or the one its chain started with.
+// Past a Reactor Chain Join that is its first chain's, since the join requires every chain's to match.
 function modelFacts(node) {
-    for (let n = node; n; n = upstream(n, "chain")) {
+    for (let n = node; n; n = n.comfyClass === "ReactorChainJoin" ? joinedChains(n)[0] : upstream(n, "chain")) {
         const source = upstream(n, "model");
         if (source) return source.comfyClass === "ReactorModel" ? MODEL_FACTS[widgetValue(source, "model")] ?? null : null;
     }
@@ -95,6 +102,10 @@ function fitInputs(node, sockets) {
 function beatsUpTo(last) {
     const beats = [];
     for (let beat = last; beat; beat = upstream(beat, "chain")) {
+        if (beat.comfyClass === "ReactorChainJoin") {
+            const parts = joinedChains(beat).map(beatsUpTo);
+            return parts.includes("unknown") ? "unknown" : [...parts.flat(), ...beats.reverse()];
+        }
         if (beat.comfyClass !== "ReactorChain") return "unknown";
         const prompt = inputValue(beat, "prompt") ?? "(linked prompt)", frames = inputValue(beat, "frames"), kind = widgetValue(beat, "kind");
         if (typeof prompt !== "string" || typeof frames !== "number") return "unknown";

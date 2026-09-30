@@ -354,6 +354,23 @@ def speed_lanes(spec: ModelSpec) -> set[str]:
     return {lane.speed for lane in spec.camera.values() if lane.speed}
 
 
+def join_chains(chains: list[Timeline]) -> Timeline:
+    """The chains played one after another as one chain; they must be for the same model and settings."""
+    first, *rest = chains
+    joined = first
+    for i, chain in enumerate(rest, 2):
+        if (chain.model, chain.settings) != (first.model, first.settings):
+            raise ValueError(f"Chain {i} is for a different Reactor Model or settings than chain 1; join chains made for the same model.")
+        moves = chain.moves
+        if moves:
+            # A timeline's moves are placed on its own rendered frames, so they shift to where its first beat now starts.
+            spec = MODELS[first.model]
+            start = spec.frames_in(scheduled_chunks(spec, [*joined.beats, *chain.beats])[1][len(joined.beats)])
+            moves = tuple(replace(m, start_frame=m.start_frame + start) for m in moves)
+        joined = replace(joined, beats=(*joined.beats, *chain.beats), moves=(*joined.moves, *moves))
+    return joined
+
+
 def scheduled_chunks(spec: ModelSpec, beats: list[Beat]) -> tuple[int, list[int]]:
     """The render's length in chunks, and the chunk each beat starts on.
 

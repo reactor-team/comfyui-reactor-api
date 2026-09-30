@@ -21,7 +21,7 @@ from server import PromptServer
 
 from .reactor_render import live
 from .reactor_render.session import render
-from .reactor_render.timeline import MODELS, Beat, Timeline, compile_timeline, editor_beats, editor_moves, model_facts
+from .reactor_render.timeline import MODELS, Beat, Timeline, compile_timeline, editor_beats, editor_moves, model_facts, join_chains
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
 
@@ -122,6 +122,26 @@ class ReactorChain(io.ComfyNode):
         return io.NodeOutput(Timeline(model[0], (beat,), model[1]) if chain is None else replace(chain, beats=(*chain.beats, beat)))
 
 
+class ReactorChainJoin(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ReactorChainJoin",
+            display_name="Reactor Chain Join",
+            category="Reactor",
+            search_aliases=["concat chains", "append timelines", "combine timelines"],
+            description="Play Reactor chains or timelines one after another, as one chain. They must be for the same Reactor Model and settings.",
+            inputs=[io.Autogrow.Input("chains", template=io.Autogrow.TemplatePrefix(
+                ReactorChainType.Input("chain", tooltip="A Reactor Chain or Reactor Timeline. Each plays after the one before; its first beat enters by its own shot or cut."),
+                prefix="chain_", min=2, max=32))],
+            outputs=[ReactorChainType.Output()],
+        )
+
+    @classmethod
+    def execute(cls, chains) -> io.NodeOutput:
+        return io.NodeOutput(join_chains([chain for chain in chains.values() if chain is not None]))
+
+
 class ReactorTimeline(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -183,7 +203,7 @@ class ReactorRender(io.ComfyNode):
             category="Reactor",
             description="Renders a Reactor chain or timeline on its model, with the API key from the REACTOR_API_KEY environment variable or this plugin's config.ini.",
             inputs=[
-                ReactorChainType.Input("chain", tooltip="The last beat of a Reactor Chain, or a Reactor Timeline."),
+                ReactorChainType.Input("chain", tooltip="The last beat of a Reactor Chain, a Reactor Chain Join, or a Reactor Timeline."),
                 io.Int.Input("seed", default=42, min=0, max=2**31 - 1, control_after_generate=True),
             ],
             outputs=[io.Video.Output()],
@@ -341,7 +361,7 @@ class ReactorRealtime(io.ComfyNode):
 class ReactorExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [ReactorModel, ReactorChain, ReactorTimeline, ReactorRender, ReactorCameraCapture, ReactorRealtime]
+        return [ReactorModel, ReactorChain, ReactorChainJoin, ReactorTimeline, ReactorRender, ReactorCameraCapture, ReactorRealtime]
 
 
 async def comfy_entrypoint() -> ReactorExtension:

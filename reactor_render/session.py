@@ -31,6 +31,18 @@ DISCONNECT_TIMEOUT_SECONDS = 10.0
 # How often a render reports progress, with its newest frame as a preview.
 PROGRESS_INTERVAL_SECONDS = 0.125
 
+# The phase each of a call's setup commands ends in, and how long it may take. Creating an avatar
+# took 33 s on a cloud session.
+CALL_PHASES = {"create_avatar": "avatar_ready", "start_call": "live"}
+CALL_SETUP_SECONDS = 180.0
+# A reply is over once the character's sound has been quiet this long; replies measured on cloud
+# sessions paused at most 0.5 s, and began about 3 s after the line was said.
+REPLY_QUIET_SECONDS = 1.0
+REPLY_TIMEOUT_SECONDS = 30.0
+REPLY_ESTIMATE_SECONDS = 9.0
+# Sound above this RMS, in int16 steps, is the character speaking.
+SPEECH_LEVEL = 330.0
+
 Progress = Callable[[int, int, np.ndarray | None], None]
 
 
@@ -45,8 +57,22 @@ class Session:
         self.messages: asyncio.Queue[dict] = asyncio.Queue()
         # Observed on cloud sessions: the stream opens with a placeholder frame at connect, before the model produces anything.
         self.capturing = False
+        self.frame_shape: tuple[int, ...] | None = None
         self.reported = -1
         self.reported_at = -PROGRESS_INTERVAL_SECONDS
+        # When the model's sound was last loud enough to be speech, on the SDK's media thread.
+        self.sounded_at = 0.0
+
+    def push_video(self, frame: np.ndarray) -> None:
+        self.frame_shape = frame.shape
+        if self.capturing:
+            self.writer.push(frame)
+
+    def push_audio(self, pcm: np.ndarray, sample_rate: int) -> None:
+        if np.sqrt(np.mean(np.square(pcm, dtype=np.float32))) > SPEECH_LEVEL:
+            self.sounded_at = time.monotonic()
+        if self.capturing:
+            self.writer.push_audio(pcm, sample_rate)
 
     async def send(self, command: str, data: dict) -> None:
         async def upload(key: str, value: bytes):
@@ -159,7 +185,51 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
         await session.next_message()
 
 
-RUNNERS = {"chunked": run_chunked, "source": run_source}
+def call_phase(msg: dict | None) -> str | None:
+    """The phase a call's `session_state` reports, if `msg` is one. Raises once the call has failed or ended."""
+    if msg is None or msg.get("type") != "session_state":
+        return None
+    data = msg.get("data") or {}
+    if data.get("phase") in ("failed", "ended"):
+        raise RuntimeError(f"The avatar call {data['phase']}: {data.get('last_error') or data.get('end_reason')}")
+    return data.get("phase")
+
+
+async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
+    """Drive a call model; its clock is the character's replies, each over once its sound goes quiet and its hold has played."""
+    for command, data in plan.setup:
+        await session.send(command, data)
+        give_up = time.monotonic() + CALL_SETUP_SECONDS
+        while call_phase(await session.next_message()) != CALL_PHASES[command]:
+            if time.monotonic() > give_up:
+                raise RuntimeError(f"The avatar call never reached {CALL_PHASES[command]}.")
+    # Observed on cloud sessions: a live call keeps streaming the connect placeholder for a few
+    # seconds, until the character appears at a size of its own.
+    placeholder = session.frame_shape
+    give_up = time.monotonic() + REPLY_TIMEOUT_SECONDS
+    while session.frame_shape == placeholder:
+        if time.monotonic() > give_up:
+            raise RuntimeError("The avatar never appeared.")
+        call_phase(await session.next_message(timeout=0.05))
+    session.capturing = True
+    session.writer.fill_gaps = True
+    session.planned = sum(max(hold, round(REPLY_ESTIMATE_SECONDS * spec.fps)) for hold in plan.holds)
+    timed = sorted(plan.timed, key=lambda t: t[0])
+    for replies in range(plan.chunks):
+        # Sound from before this turn's commands is the last reply's.
+        since, held = time.monotonic(), session.writer.received + plan.holds[replies]
+        while timed and timed[0][0] <= replies:
+            _, command, data = timed.pop(0)
+            await session.send(command, data)
+        give_up = time.monotonic() + REPLY_TIMEOUT_SECONDS
+        while (session.sounded_at <= since or time.monotonic() - session.sounded_at < REPLY_QUIET_SECONDS
+               or session.writer.received < held):
+            if session.sounded_at <= since and time.monotonic() > give_up:
+                raise RuntimeError("The avatar never answered.")
+            call_phase(await session.next_message())
+
+
+RUNNERS = {"chunked": run_chunked, "source": run_source, "call": run_call}
 
 
 async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], None], on_status: Callable[[str], None]) -> None:
@@ -225,9 +295,9 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
     @reactor.on_track
     def capture(track) -> None:
         if track.kind == "video" and track.direction == "recvonly":
-            track.on_frame(lambda frame: session.capturing and writer.push(frame))
+            track.on_frame(session.push_video)
         if track.kind == "audio" and track.direction == "recvonly":
-            track.on_frame(lambda pcm, sample_rate: session.capturing and writer.push_audio(pcm, sample_rate))
+            track.on_frame(session.push_audio)
 
     try:
         async with closing_session(reactor):

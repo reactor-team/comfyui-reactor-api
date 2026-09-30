@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Edit a video file with Sana Streaming. Load Video feeds the first beat of the Reactor Chain, and the render streams the clip through the model. Each beat's prompt is an edit: the second beat changes it partway through the clip, on the frame where that beat starts.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. Only the first beat's video is used. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "Edit a video file with Sana Streaming. Load Video feeds the first chain link, and the render streams the clip through the model. Each beat's prompt is an edit: the second beat changes it partway through the clip, on the frame where that beat starts.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. Only the first beat's video is used. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Edit a video file with Sana Streaming. Load Video feeds the first beat of the Reactor Chain, and the render streams the clip through the model. Each beat's prompt is an edit: the second beat changes it partway through the clip, on the frame where that beat starts.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. Only the first beat's video is used. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "text": "Edit a video file with Sana Streaming. Load Video feeds the first chain link, and the render streams the clip through the model. Each beat's prompt is an edit: the second beat changes it partway through the clip, on the frame where that beat starts.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. Only the first beat's video is used. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -87,53 +87,8 @@
       }
     },
     {
-      "id": 3,
-      "type": "ReactorModel",
-      "pos": [
-        40,
-        660
-      ],
-      "size": [
-        270,
-        58
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "COMFY_DYNAMICCOMBO_V3",
-          "widget": {
-            "name": "model"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_MODEL",
-          "name": "REACTOR_MODEL",
-          "type": "REACTOR_MODEL",
-          "links": [
-            1
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorModel"
-      },
-      "widgets_values": [
-        "Sana Streaming"
-      ],
-      "widgets_values_named": {
-        "model": "Sana Streaming"
-      }
-    },
-    {
       "id": 4,
-      "type": "ReactorChain",
+      "type": "ReactorSanaStreamingChain",
       "pos": [
         360,
         240
@@ -146,13 +101,6 @@
       "order": 4,
       "mode": 0,
       "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "shape": 7,
-          "type": "REACTOR_MODEL",
-          "link": 1
-        },
         {
           "localized_name": "video",
           "name": "video",
@@ -184,24 +132,6 @@
             "name": "frames"
           },
           "link": null
-        },
-        {
-          "localized_name": "kind",
-          "name": "kind",
-          "type": "COMBO",
-          "widget": {
-            "name": "kind"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -215,28 +145,20 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorSanaStreamingChain"
       },
       "widgets_values": [
         "Apply a Japanese ukiyo-e woodblock print style with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski and all original motion and camera movement.",
-        120,
-        "shot",
-        {
-          "moves": []
-        }
+        120
       ],
       "widgets_values_named": {
         "prompt": "Apply a Japanese ukiyo-e woodblock print style with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski and all original motion and camera movement.",
-        "frames": 120,
-        "kind": "shot",
-        "moves": {
-          "moves": []
-        }
+        "frames": 120
       }
     },
     {
       "id": 5,
-      "type": "ReactorChain",
+      "type": "ReactorSanaStreamingChain",
       "pos": [
         810,
         240
@@ -273,24 +195,6 @@
             "name": "frames"
           },
           "link": null
-        },
-        {
-          "localized_name": "kind",
-          "name": "kind",
-          "type": "COMBO",
-          "widget": {
-            "name": "kind"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -304,23 +208,15 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorSanaStreamingChain"
       },
       "widgets_values": [
         "Make it night in a neon-lit harbour, with pink and teal reflections on the water and glowing signs along the shore. Keep the rider, the jet ski, its wake and the camera motion unchanged.",
-        120,
-        "shot",
-        {
-          "moves": []
-        }
+        120
       ],
       "widgets_values_named": {
         "prompt": "Make it night in a neon-lit harbour, with pink and teal reflections on the water and glowing signs along the shore. Keep the rider, the jet ski, its wake and the camera motion unchanged.",
-        "frames": 120,
-        "kind": "shot",
-        "moves": {
-          "moves": []
-        }
+        "frames": 120
       }
     },
     {
@@ -476,19 +372,11 @@
       "VIDEO"
     ],
     [
-      1,
-      3,
-      0,
-      4,
-      0,
-      "REACTOR_MODEL"
-    ],
-    [
       2,
       2,
       0,
       4,
-      1,
+      0,
       "VIDEO"
     ],
     [

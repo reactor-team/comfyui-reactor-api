@@ -6,7 +6,7 @@ import av
 import numpy as np
 import pytest
 
-from reactor_render import live
+from reactor_render import live, timeline
 from reactor_render.timeline import MODELS, POSES
 
 X2_INPUT = MODELS["X2"].frame_size(1920, 1080)
@@ -20,6 +20,11 @@ def test_model_tracks_list_the_source_track_only_for_models_that_take_one():
         {"name": "camera", "kind": "video", "direction": "sendonly"},
         {"name": "main_video", "kind": "video", "direction": "recvonly"}]
     assert live.model_tracks(WORLD_2) == [{"name": "main_video", "kind": "video", "direction": "recvonly"}]
+    assert live.model_tracks(MODELS["Vidu S2-Avatar"]) == [
+        {"name": "mic", "kind": "audio", "direction": "sendonly"},
+        {"name": "webcam", "kind": "video", "direction": "sendonly"},
+        {"name": "main_video", "kind": "video", "direction": "recvonly"},
+        {"name": "main_audio", "kind": "audio", "direction": "recvonly"}]
 
 
 def lane(spec, field):
@@ -92,6 +97,10 @@ class FakeLiveReactor:
         self.track_handler = func
         return func
 
+    def on_message(self, func):
+        self.message_handler = func
+        return func
+
     def on_status(self, status):
         def register(func):
             self.dropped = func
@@ -133,6 +142,43 @@ class FakeLiveReactor:
             await asyncio.sleep(self.interval)
 
 
+class AudioRecvTrack:
+    kind, direction = "audio", "recvonly"
+
+    def on_frame(self, fn):
+        self.push = fn
+
+
+class FakeLiveCall(FakeLiveReactor):
+    """A live Vidu S2-Avatar call: `create_avatar` and `start_call` reach their phases, and once
+    the call is live the character streams at a size of its own, with sound."""
+
+    live = False
+
+    async def connect(self):
+        self.audio = AudioRecvTrack()
+        self.track_handler(self.audio)
+        await super().connect()
+
+    async def send_command(self, command, data):
+        await super().send_command(command, data)
+        phase = {"create_avatar": "avatar_ready", "start_call": "live"}.get(command)
+        if phase:
+            self.live = phase == "live"
+            self.message_handler({"type": "session_state", "data": {"phase": phase}})
+
+    async def _emit(self):
+        # As on cloud sessions, the placeholder streams on for a little while after the call is live.
+        after_live = 0
+        while True:
+            after_live += self.live
+            shown = after_live > 10
+            self.track.push(np.full((24, 16, 3) if shown else (16, 16, 3), 255 if shown else 0, dtype=np.uint8))
+            if self.live:
+                self.audio.push(np.full((240, 1), 8000, dtype=np.int16), 48000)
+            await asyncio.sleep(self.interval)
+
+
 def frames_in(path):
     with av.open(str(path)) as container:
         return [f.to_ndarray(format="rgb24") for f in container.decode(video=0)]
@@ -156,7 +202,7 @@ def make_run(fake, monkeypatch, mode, model, path, prompt="a", seed=42, image=No
     fake.tokens = []
     monkeypatch.setattr(live, "session_token", lambda *args: fake.tokens.append(args) or "jwt-test")
     setup = (live.style_setup(MODELS[model], prompt, seed, image) if mode == "style"
-             else live.drive_setup(model, prompt, seed, image, {}))
+             else live.drive_setup(model, timeline.Beat(prompt, 1, image=image), seed, {}))
     return live.LiveRun(mode, MODELS[model], str(path), prompt, setup, size, connect or {"api_key": "rk_test"})
 
 
@@ -188,7 +234,7 @@ async def test_a_camera_run_has_the_browser_publish_and_records_the_take(tmp_pat
     assert fake.sent == [("set_keep_backlog", {"keep_backlog": False}), ("set_prompt", {"prompt": "make it noir"})]
     messages = texts(sent)
     assert messages[0] == {"type": "config", "mode": "style", "prompt": "make it noir", "lanes": [],
-                           "prompt_command": "set_prompt", "preview": {"width": 1480, "height": 832},
+                           "prompt_command": "set_prompt", "prompt_field": "prompt", "preview": {"width": 1480, "height": 832},
                            "input": {"width": 1480, "height": 832, "fps": 24}}
     assert [m["text"] for m in messages if m["type"] == "status"] == ["Connecting to Reactor…", ""]
     assert [m for m in messages if m["type"] == "ended"] == [
@@ -331,7 +377,7 @@ async def test_a_drive_run_uploads_the_image_and_sends_lane_changes(tmp_path, mo
     assert await asyncio.wait_for(task, 10) == str(tmp_path / "take.mp4")
     messages = texts(sent)
     assert messages[0] == {"type": "config", "mode": "drive", "prompt": "explore", "lanes": live.drive_lanes(WORLD_2),
-                           "prompt_command": "set_prompt", "preview": {"width": 1664, "height": 960}, "input": None}
+                           "prompt_command": "set_prompt", "prompt_field": "prompt", "preview": {"width": 1664, "height": 960}, "input": None}
     assert join(sent)["publish"] is None
     assert frames_in(tmp_path / "take.mp4")
 
@@ -370,3 +416,49 @@ async def test_a_source_clip_loops_in_place_of_the_camera(tmp_path, monkeypatch)
     assert join(sent)["publish"] is None
 
 
+
+
+async def test_a_call_waits_for_the_browser_mic_and_records_the_character_once_it_appears(tmp_path, monkeypatch):
+    fake = FakeLiveCall()
+    monkeypatch.setattr(live, "Reactor", fake)
+    monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
+    monkeypatch.setattr(live, "session_token", lambda *args: "jwt-test")
+    setup = timeline.call_setup("Vidu S2-Avatar", b"face", {"persona": "A fisherman.", "voice": "Jennifer", "greeting": ""})
+    run = live.LiveRun("call", MODELS["Vidu S2-Avatar"], str(tmp_path / "take.mp4"), "", setup, None, {"api_key": "rk_test"})
+    task = asyncio.create_task(run.run(lambda: None))
+    sent = []
+    run.connected(sent.append)
+    assert await until(lambda: join(sent) is not None)
+    assert join(sent)["publish"] == "mic"
+    await asyncio.sleep(0.1)
+    assert fake.sent == []
+    run.receive('{"type":"published"}')
+    assert await until(lambda: {"type": "started"} in texts(sent))
+    assert fake.sent == [("create_avatar", {"image": "ref:face"}),
+                         ("start_call", {"call_mode": "audio", "transcripts": False, "persona": "A fisherman.", "voice": "Jennifer"})]
+    assert texts(sent)[0]["prompt_command"] == "say" and texts(sent)[0]["prompt_field"] == "text"
+    assert await until(lambda: run._writer.received > 5)
+    run.receive('{"type":"done"}')
+    assert await asyncio.wait_for(task, 10) == str(tmp_path / "take.mp4")
+    # The connect placeholder is left out, and the character's sound is kept.
+    assert frames_in(tmp_path / "take.mp4") and all(f.shape[0] == 24 for f in frames_in(tmp_path / "take.mp4"))
+    with av.open(str(tmp_path / "take.mp4")) as container:
+        assert container.streams.audio
+
+
+async def test_a_call_that_ends_on_the_server_ends_the_run(tmp_path, monkeypatch):
+    fake = FakeLiveCall()
+    monkeypatch.setattr(live, "Reactor", fake)
+    monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
+    monkeypatch.setattr(live, "session_token", lambda *args: "jwt-test")
+    setup = timeline.call_setup("Vidu S2-Avatar", b"face", {"persona": "A fisherman."})
+    run = live.LiveRun("call", MODELS["Vidu S2-Avatar"], str(tmp_path / "take.mp4"), "", setup, None, {"api_key": "rk_test"})
+    task = asyncio.create_task(run.run(lambda: None))
+    sent = []
+    run.connected(sent.append)
+    run.receive('{"type":"published"}')
+    assert await until(lambda: {"type": "started"} in texts(sent))
+    fake.message_handler({"type": "session_state", "data": {"phase": "ended", "end_reason": "idle_timeout"}})
+    with pytest.raises(RuntimeError, match="idle_timeout"):
+        await asyncio.wait_for(task, 10)
+    assert {"type": "ended", "error": "The avatar call ended: idle_timeout"} in texts(sent)

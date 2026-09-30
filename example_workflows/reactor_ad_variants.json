@@ -200,51 +200,6 @@
       }
     },
     {
-      "id": 5,
-      "type": "ReactorModel",
-      "pos": [
-        40,
-        980
-      ],
-      "size": [
-        440,
-        58
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "COMFY_DYNAMICCOMBO_V3",
-          "widget": {
-            "name": "model"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_MODEL",
-          "name": "REACTOR_MODEL",
-          "type": "REACTOR_MODEL",
-          "links": [
-            36
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorModel"
-      },
-      "widgets_values": [
-        "LongLive-2.0"
-      ],
-      "widgets_values_named": {
-        "model": "LongLive-2.0"
-      }
-    },
-    {
       "id": 6,
       "type": "StringFormat",
       "pos": [
@@ -313,7 +268,7 @@
     },
     {
       "id": 7,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         1000,
         20
@@ -326,13 +281,6 @@
       "order": 10,
       "mode": 0,
       "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "shape": 7,
-          "type": "REACTOR_MODEL",
-          "link": 36
-        },
         {
           "localized_name": "chain",
           "name": "chain",
@@ -366,15 +314,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -389,23 +328,17 @@
       ],
       "title": "Dawn",
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "",
         120,
-        "shot",
-        {
-          "moves": []
-        }
+        "shot"
       ],
       "widgets_values_named": {
         "prompt": "",
         "frames": 120,
-        "kind": "shot",
-        "moves": {
-          "moves": []
-        }
+        "kind": "shot"
       }
     },
     {
@@ -477,7 +410,7 @@
     },
     {
       "id": 9,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         1000,
         320
@@ -523,15 +456,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -548,23 +472,17 @@
       ],
       "title": "Sunrise",
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "",
         120,
-        "shot",
-        {
-          "moves": []
-        }
+        "shot"
       ],
       "widgets_values_named": {
         "prompt": "",
         "frames": 120,
-        "kind": "shot",
-        "moves": {
-          "moves": []
-        }
+        "kind": "shot"
       }
     },
     {
@@ -636,7 +554,7 @@
     },
     {
       "id": 11,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         1000,
         620
@@ -682,15 +600,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -705,23 +614,17 @@
       ],
       "title": "Families (shot)",
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "",
         120,
-        "shot",
-        {
-          "moves": []
-        }
+        "shot"
       ],
       "widgets_values_named": {
         "prompt": "",
         "frames": 120,
-        "kind": "shot",
-        "moves": {
-          "moves": []
-        }
+        "kind": "shot"
       }
     },
     {
@@ -786,7 +689,7 @@
     },
     {
       "id": 13,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         1000,
         960
@@ -832,15 +735,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -855,23 +749,17 @@
       ],
       "title": "Adventure (cut)",
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "",
         120,
-        "cut",
-        {
-          "moves": []
-        }
+        "cut"
       ],
       "widgets_values_named": {
         "prompt": "",
         "frames": 120,
-        "kind": "cut",
-        "moves": {
-          "moves": []
-        }
+        "kind": "cut"
       }
     },
     {
@@ -943,7 +831,7 @@
     },
     {
       "id": 15,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         1000,
         1300
@@ -989,15 +877,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -1012,23 +891,17 @@
       ],
       "title": "Quiet (shot)",
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "",
         120,
-        "shot",
-        {
-          "moves": []
-        }
+        "shot"
       ],
       "widgets_values_named": {
         "prompt": "",
         "frames": 120,
-        "kind": "shot",
-        "moves": {
-          "moves": []
-        }
+        "kind": "shot"
       }
     },
     {
@@ -1556,19 +1429,11 @@
       "STRING"
     ],
     [
-      36,
-      5,
-      0,
-      7,
-      0,
-      "REACTOR_MODEL"
-    ],
-    [
       3,
       6,
       0,
       7,
-      2,
+      1,
       "STRING"
     ],
     [
@@ -1576,7 +1441,7 @@
       4,
       0,
       7,
-      3,
+      2,
       "INT"
     ],
     [

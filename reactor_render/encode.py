@@ -7,6 +7,9 @@ from fractions import Fraction
 import av
 import numpy as np
 
+# How far sound may trail the frames before `fill_gaps` takes it as missing rather than late.
+AUDIO_SLACK_SECONDS = 0.2
+
 
 class FrameWriter:
     """Encodes a session's streamed video to an H.264 MP4, keeping its first `limit` frames once one is set.
@@ -15,6 +18,7 @@ class FrameWriter:
     its own. Every frame is scaled to the first one's size, since WebRTC may change resolution.
     Frames are kept in arrival order: cloud frames carry no frame id or timestamp to place them by.
     Audio pushed with `push_audio` is muxed in on `close`, from the first video frame to the video's end.
+    With `fill_gaps`, sound the stream never sent is filled with silence, keeping the audio in step with the frames.
     """
 
     def __init__(self, path: str, fps: float):
@@ -26,7 +30,9 @@ class FrameWriter:
         self.error: BaseException | None = None
         self.frames: queue.Queue[np.ndarray | None] = queue.Queue()
         self.audio: list[np.ndarray] = []
+        self.audio_samples = 0
         self.sample_rate = 0
+        self.fill_gaps = False
         self.thread = threading.Thread(target=self._encode, daemon=True)
         self.thread.start()
 
@@ -46,7 +52,13 @@ class FrameWriter:
         # The stream carries silence until the first chunk, whose sound arrives with its first frame.
         if self.received == 0:
             return
+        # Observed on avatar calls: blocks go missing around pauses, while frames keep a steady rate.
+        behind = round(self.received / self.fps * sample_rate) - self.audio_samples - len(pcm)
+        if self.fill_gaps and behind > AUDIO_SLACK_SECONDS * sample_rate:
+            self.audio.append(np.zeros((behind, pcm.shape[1]), np.int16))
+            self.audio_samples += behind
         self.audio.append(pcm.copy())
+        self.audio_samples += len(pcm)
         self.sample_rate = sample_rate
 
     def close(self) -> None:

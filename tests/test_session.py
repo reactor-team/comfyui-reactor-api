@@ -442,3 +442,147 @@ async def test_a_failed_disconnect_still_destroys_the_handle(caplog):
     async with session.closing_session(reactor):
         pass
     assert reactor.closes == 1 and "ending the session failed" in caplog.text
+
+
+class AudioTrack:
+    kind, direction = "audio", "recvonly"
+
+    def on_frame(self, fn):
+        self.push = fn
+
+
+PLACEHOLDER = np.zeros((9, 16, 3), dtype=np.uint8)
+
+
+class FakeCall:
+    """Stands in for reactor_sdk.Reactor on a Vidu S2-Avatar call.
+
+    `create_avatar` and `start_call` walk `session_state` through their phases. A placeholder frame
+    streams from connect until a few frames into the call; once the call is live, video and 10 ms
+    audio blocks stream every 10 ms; the audio is loud for `talk` seconds after
+    the character appears and after each `say`, unless `silent`. `fail` names a phase after which the call fails.
+    """
+
+    # A call has no chunks.
+    frames = None
+
+    def __init__(self, talk=0.1, silent=False, fail=None):
+        self.talk, self.silent, self.fail = talk, silent, fail
+        self.sent, self.uploads = [], []
+        # For each `say`, whether the character was still talking when it went out.
+        self.interrupted = []
+        # For each `say`, how many frames had streamed when it went out.
+        self.said_at = []
+        self.streamed = 0
+        self.loud_until = 0.0
+        self.disconnected = False
+        self.video, self.audio = FakeTrack(), AudioTrack()
+
+    def __call__(self, slug, **connect):
+        self.slug = slug
+        return self
+
+    def on_message(self, func):
+        self.handler = func
+        return func
+
+    def on_track(self, func):
+        self.track_handler = func
+        return func
+
+    async def connect(self):
+        self.track_handler(self.video)
+        self.track_handler(self.audio)
+        self.video.push(PLACEHOLDER)
+        self.state("idle")
+
+    def state(self, phase):
+        self.handler({"type": "session_state", "data": {"phase": phase, "last_error": "boom" if phase == "failed" else None}})
+
+    async def walk(self, *phases):
+        for phase in phases:
+            await asyncio.sleep(0.01)
+            self.state(phase)
+            if phase == self.fail:
+                self.state("failed")
+                return
+        if phases[-1] == "live":
+            while not self.disconnected:
+                self.streamed += 1
+                if self.streamed == 6:
+                    self.speak()
+                loud = asyncio.get_running_loop().time() < self.loud_until
+                self.video.push(PLACEHOLDER if self.streamed <= 5 else np.full((16, 16, 3), WHITE, dtype=np.uint8))
+                self.audio.push(np.full((480, 1), 8000 if loud else 0, dtype=np.int16), 48000)
+                await asyncio.sleep(0.01)
+
+    def speak(self):
+        if not self.silent:
+            self.loud_until = asyncio.get_running_loop().time() + self.talk
+
+    async def upload_file(self, data, name, mime_type):
+        self.uploads.append((data, name, mime_type))
+        return f"ref:{data.decode()}"
+
+    async def send_command(self, command, data):
+        self.sent.append((command, data))
+        loop = asyncio.get_running_loop()
+        if command == "create_avatar":
+            loop.create_task(self.walk("preparing_avatar", "avatar_ready"))
+        if command == "start_call":
+            loop.create_task(self.walk("starting", "warming_up", "live"))
+        if command == "say":
+            self.interrupted.append(loop.time() < self.loud_until)
+            self.said_at.append(self.streamed)
+            self.speak()
+
+    async def disconnect(self):
+        self.disconnected = True
+
+    def close(self):
+        pass
+
+
+@pytest.fixture
+def quick_replies(monkeypatch):
+    monkeypatch.setattr(session, "REPLY_QUIET_SECONDS", 0.05)
+    monkeypatch.setattr(session, "REPLY_TIMEOUT_SECONDS", 0.5)
+
+
+CALL = Plan(setup=[("create_avatar", {"image": b"photo"}), ("start_call", {"persona": "p"})], chunks=3,
+            timed=[(1, "say", {"text": "one"}), (2, "say", {"text": "two"})], holds=[0, 0, 0])
+
+
+async def test_a_call_says_each_line_once_the_last_reply_has_gone_quiet(tmp_path, monkeypatch, quick_replies):
+    fake = FakeCall()
+    _, coro = run(fake, CALL, tmp_path, monkeypatch, model="Vidu S2-Avatar")
+    await asyncio.wait_for(coro, timeout=10)
+    assert [c for c, _ in fake.sent] == ["create_avatar", "start_call", "say", "say"]
+    assert fake.uploads == [(b"photo", "image.png", "image/png")]
+    assert fake.interrupted == [False, False]
+    assert fake.disconnected
+    with av.open(str(tmp_path / "out.mp4")) as c:
+        assert c.streams.audio
+        # Capture starts at the character's first frame, not the placeholder before it.
+        assert (c.streams.video[0].height, c.streams.video[0].width) == (16, 16)
+
+
+async def test_a_call_holds_the_next_line_until_the_beats_frames_have_played(tmp_path, monkeypatch, quick_replies):
+    fake = FakeCall()
+    # A reply here lasts about 15 frames, so a 40-frame hold is what keeps the second line back.
+    _, coro = run(fake, dataclasses.replace(CALL, holds=[0, 40, 0]), tmp_path, monkeypatch, model="Vidu S2-Avatar")
+    await asyncio.wait_for(coro, timeout=10)
+    assert fake.said_at[1] - fake.said_at[0] >= 40
+    assert fake.interrupted == [False, False]
+
+
+async def test_a_call_whose_character_never_answers_fails(tmp_path, monkeypatch, quick_replies):
+    _, coro = run(FakeCall(silent=True), CALL, tmp_path, monkeypatch, model="Vidu S2-Avatar")
+    with pytest.raises(RuntimeError, match="never answered"):
+        await asyncio.wait_for(coro, timeout=10)
+
+
+async def test_a_call_that_fails_while_starting_raises_its_error(tmp_path, monkeypatch, quick_replies):
+    _, coro = run(FakeCall(fail="warming_up"), CALL, tmp_path, monkeypatch, model="Vidu S2-Avatar")
+    with pytest.raises(RuntimeError, match="failed: boom"):
+        await asyncio.wait_for(coro, timeout=10)

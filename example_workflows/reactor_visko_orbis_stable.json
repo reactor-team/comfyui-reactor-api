@@ -1,8 +1,8 @@
 {
   "id": "e48b30fe-b3d3-4d75-a769-b73df4f9ffb7",
   "revision": 0,
-  "last_node_id": 6,
-  "last_link_id": 4,
+  "last_node_id": 7,
+  "last_link_id": 6,
   "nodes": [
     {
       "id": 1,
@@ -31,55 +31,10 @@
       "bgcolor": "#653"
     },
     {
-      "id": 2,
-      "type": "ReactorModel",
-      "pos": [
-        40,
-        240
-      ],
-      "size": [
-        270,
-        58
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "COMBO",
-          "widget": {
-            "name": "model"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_MODEL",
-          "name": "REACTOR_MODEL",
-          "type": "REACTOR_MODEL",
-          "links": [
-            1
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorModel"
-      },
-      "widgets_values": [
-        "Visko Orbis Stable"
-      ],
-      "widgets_values_named": {
-        "model": "Visko Orbis Stable"
-      }
-    },
-    {
       "id": 3,
       "type": "ReactorTimeline",
       "pos": [
-        320,
+        470,
         240
       ],
       "size": [
@@ -91,24 +46,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "model",
-          "name": "model",
-          "type": "REACTOR_MODEL",
-          "link": 1
-        },
-        {
           "localized_name": "chain",
           "name": "chain",
-          "shape": 7,
           "type": "REACTOR_CHAIN",
-          "link": null
-        },
-        {
-          "localized_name": "image_0",
-          "name": "images.image_0",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": 4
+          "link": 6
         },
         {
           "localized_name": "beats",
@@ -137,12 +78,6 @@
         {
           "beats": [
             {
-              "prompt": "The fisherman grips the rail and braces himself as the boat rises over a towering wave. The camera rocks with the deck while rain and sea spray sweep across the frame.",
-              "frames": 198,
-              "cut": false,
-              "image": "image_0"
-            },
-            {
               "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
               "frames": 198,
               "cut": false,
@@ -160,12 +95,6 @@
       "widgets_values_named": {
         "beats": {
           "beats": [
-            {
-              "prompt": "The fisherman grips the rail and braces himself as the boat rises over a towering wave. The camera rocks with the deck while rain and sea spray sweep across the frame.",
-              "frames": 198,
-              "cut": false,
-              "image": "image_0"
-            },
             {
               "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
               "frames": 198,
@@ -186,7 +115,7 @@
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1260,
+        1410,
         240
       ],
       "size": [
@@ -239,7 +168,7 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1260,
+        1410,
         580
       ],
       "size": [
@@ -356,7 +285,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            4
+            5
           ]
         },
         {
@@ -373,17 +302,107 @@
         "reactor_fisherman.jpg",
         "image"
       ]
+    },
+    {
+      "id": 7,
+      "type": "ReactorViskoOrbisChain",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 5
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null,
+          "shape": 7
+        },
+        {
+          "localized_name": "audio_prompt",
+          "name": "audio_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "audio_prompt"
+          },
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorViskoOrbisChain"
+      },
+      "widgets_values": [
+        "Visko Orbis Stable",
+        "The fisherman grips the rail and braces himself as the boat rises over a towering wave. The camera rocks with the deck while rain and sea spray sweep across the frame.",
+        198,
+        true,
+        ""
+      ],
+      "widgets_values_named": {
+        "model": "Visko Orbis Stable",
+        "prompt": "The fisherman grips the rail and braces himself as the boat rises over a towering wave. The camera rocks with the deck while rain and sea spray sweep across the frame.",
+        "frames": 198,
+        "audio": true,
+        "audio_prompt": ""
+      }
     }
   ],
   "links": [
-    [
-      1,
-      2,
-      0,
-      3,
-      0,
-      "REACTOR_MODEL"
-    ],
     [
       2,
       3,
@@ -401,12 +420,20 @@
       "VIDEO"
     ],
     [
-      4,
+      5,
       6,
       0,
-      3,
-      2,
+      7,
+      0,
       "IMAGE"
+    ],
+    [
+      6,
+      7,
+      0,
+      3,
+      0,
+      "REACTOR_CHAIN"
     ]
   ],
   "groups": [],

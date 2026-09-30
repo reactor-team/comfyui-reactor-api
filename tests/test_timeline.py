@@ -1,8 +1,10 @@
+import io
+
 import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render.timeline import MODELS, POSES, Beat, Move, Timeline, compile_timeline, editor_beats, editor_moves, join_chains, model_facts
+from reactor_render.timeline import MODELS, POSES, Beat, Move, Reference, Timeline, compile_timeline, editor_beats, editor_moves, join_chains, model_facts
 
 # LongLive: a scene opens with a 29-frame chunk, then 32 frames a chunk. A beat's start is the chunk
 # whose video comes nearest its running total of frames: 96 -> 3, 175 -> 6.
@@ -142,7 +144,7 @@ def test_a_live_render_longer_than_one_run_raises():
 
 
 def test_editor_beats_play_in_the_order_they_are_stored():
-    beats = editor_beats(editor(("first", 96, False, None), ("middle", 79, False, None), ("late", 79, True, None)), {})
+    beats = editor_beats(editor(("first", 96, False, None), ("middle", 79, False, None), ("late", 79, True, None)), {}, {})
     plan = compile_timeline("LongLive-2.0", beats, seed=0)
     assert plan.setup[1:4] == [
         ("set_shot", {"prompt": "first"}),
@@ -152,13 +154,13 @@ def test_editor_beats_play_in_the_order_they_are_stored():
 
 
 def test_an_editor_beat_takes_the_image_from_its_named_slot():
-    beats = editor_beats(editor(("a", 2, False, "image_1"), ("b", 2, False, None)), {"image_0": b"zero", "image_1": b"one"})
+    beats = editor_beats(editor(("a", 2, False, "image_1"), ("b", 2, False, None)), {"image_0": b"zero", "image_1": b"one"}, {})
     assert [b.image for b in beats] == [b"one", None]
 
 
 def test_an_editor_beat_naming_an_unconnected_slot_raises():
     with pytest.raises(ValueError, match="Beat 1 uses image_2, which has no image connected"):
-        editor_beats(editor(("a", 72, False, "image_2")), {"image_0": b"zero"})
+        editor_beats(editor(("a", 72, False, "image_2")), {"image_0": b"zero"}, {})
 
 
 def test_sana_streams_the_clip_and_sends_later_beats_on_their_frame():
@@ -211,7 +213,7 @@ def test_model_facts_give_a_model_without_chunks_one_frame_chunks():
 def test_model_facts_carry_the_chunk_grid_compile_timeline_snaps_to():
     facts = model_facts(MODELS["LongLive-2.0"])
     assert facts == {"fps": 24.0, "frames_per_chunk": 32, "first_chunk_frames": 29,
-                     "supports_cuts": True, "max_scene_chunks": 48, "images": "none", "image_required": False,
+                     "supports_cuts": True, "max_scene_chunks": 48, "images": "none", "image_required": False, "references": False,
                      "videos": "none", "video_required": False, "camera": {}}
     camera = model_facts(MODELS["LingBot"])["camera"]
     assert "rotation_speed_deg" not in camera
@@ -244,15 +246,25 @@ def test_upscaling_is_turned_off_before_start():
 
 
 def test_visko_sound_settings_go_out_as_their_values():
-    plan = compile_timeline("Visko Orbis Dynamic", [Beat("a", 99)], seed=0,
-                            settings={"audio": False, "audio_prompt": "rain on a tin roof"})
+    plan = compile_timeline("Visko Orbis Dynamic", [Beat("a", 99, settings={"audio_prompt": "rain on a tin roof"})], seed=0,
+                            settings={"audio": False})
     assert plan.setup[-3:] == [("set_audio_enabled", {"audio_enabled": False}),
                                ("set_audio_prompt", {"prompt": "rain on a tin roof"}), ("start", {})]
 
 
-def test_helios_image_strength_goes_out_as_a_number():
-    plan = compile_timeline("Helios", [Beat("a", 72)], seed=0, settings={"image_strength": 0.6})
-    assert plan.setup[-2:] == [("set_image_strength", {"image_strength": 0.6}), ("start", {})]
+def test_a_beat_setting_goes_out_where_it_changes_and_holds_until_the_next_change():
+    # Helios chunks are 33 frames, so the beats start on chunks 0, 2, 4 and 6.
+    beats = [Beat("a", 66, settings={"image_strength": 1.0}), Beat("b", 66, settings={"image_strength": 0.6}),
+             Beat("c", 66, settings={"image_strength": 0.6}), Beat("d", 66)]
+    plan = compile_timeline("Helios", beats, seed=0)
+    # The first beat's value is the model's default, so nothing goes out for it.
+    assert not any(command == "set_image_strength" for command, _ in plan.setup)
+    assert [t for t in plan.timed if t[1] == "set_image_strength"] == [(1, "set_image_strength", {"image_strength": 0.6})]
+
+
+def test_a_beat_setting_the_model_does_not_take_is_rejected():
+    with pytest.raises(ValueError, match="LongLive-2.0 has no image_strength setting"):
+        compile_timeline("LongLive-2.0", [Beat("a", 64, settings={"image_strength": 0.5})], seed=0)
 
 
 # LingBot: chunk n of a run ends at 17 + 24(n - 1) frames, so chunk edges fall at frames 17, 41,
@@ -390,9 +402,79 @@ def test_joined_chains_play_in_order_with_later_moves_from_where_their_chain_sta
     assert joined.moves == (held, Move("movement", "back", 65, 24))
 
 
-def test_joining_chains_for_different_models_or_settings_is_an_error():
+def test_joined_chains_start_with_the_first_chains_settings():
     chain = Timeline("Visko Orbis Stable", (Beat("a", 48),), {"audio": True})
-    with pytest.raises(ValueError, match="Chain 2 is for a different Reactor Model or settings"):
-        join_chains([chain, Timeline("Visko Orbis Stable", (Beat("b", 48),), {"audio": False})])
-    with pytest.raises(ValueError, match="Chain 2 is for a different Reactor Model"):
+    joined = join_chains([chain, Timeline("Visko Orbis Stable", (Beat("b", 48),), {"audio": False})])
+    assert joined.settings == {"audio": True} and len(joined.beats) == 2
+
+
+def test_joining_chains_for_different_models_is_an_error():
+    chain = Timeline("Visko Orbis Stable", (Beat("a", 48),))
+    with pytest.raises(ValueError, match="Chain 2 is for Helios and chain 1 for Visko Orbis Stable"):
         join_chains([chain, Timeline("Helios", (Beat("b", 48),))])
+
+
+AVATAR = {"persona": "A gruff fisherman.", "voice": "Marcus", "greeting": ""}
+
+
+def test_an_avatar_call_creates_the_character_then_says_each_beat_after_a_reply():
+    plan = compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 100, image=b"photo"), Beat("How was the catch?", 50)], seed=0, settings=AVATAR)
+    assert plan.setup == [("create_avatar", {"image": b"photo"}),
+                          ("start_call", {"call_mode": "audio", "transcripts": False, "persona": "A gruff fisherman.", "voice": "Marcus"})]
+    # The first reply answers the call's opening; each line then waits for the reply before it.
+    assert plan.chunks == 3
+    assert plan.timed == [(1, "say", {"text": "Hi."}), (2, "say", {"text": "How was the catch?"})]
+    # Each beat's reply plays at least its frames; the opening has no beat.
+    assert plan.holds == [0, 100, 50]
+
+
+def png(color):
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), color).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_avatar_references_are_what_each_beat_has_on_so_only_changes_go_out_before_its_line():
+    cat, hat = Reference("Vidu S2-Avatar", png("red"), "object", "He holds up the cat."), Reference("Vidu S2-Avatar", png("blue"), "garment")
+    beats = [Beat("Hi.", 0, image=b"photo", references=(cat,)), Beat("Nice hat?", 0, references=(cat, hat)),
+             Beat("Where's the cat?", 0, references=(hat,)), Beat("Bye.", 0, references=(hat,))]
+    timed = compile_timeline("Vidu S2-Avatar", beats, seed=0, settings=AVATAR).timed
+    assert [(turn, command) for turn, command, _ in timed] == [
+        (1, "set_reference_images"), (1, "say"), (2, "set_reference_images"), (2, "say"),
+        (3, "clear_reference_images"), (3, "say"), (4, "say")]
+    [held], [added] = timed[0][2]["images"], timed[2][2]["images"]
+    assert held["kind"] == "object" and held["text"] == "He holds up the cat." and held["image_url"].startswith("data:image/jpeg;base64,")
+    # A reference with no text leaves it out.
+    assert set(added) == {"image_url", "image_id", "kind"} and added["image_id"] != held["image_id"]
+    assert timed[4][2] == {"image_ids": [held["image_id"]]}
+
+
+def test_an_avatar_beat_holds_at_most_three_references():
+    refs = tuple(Reference("Vidu S2-Avatar", png(c), "object") for c in ("red", "green", "blue", "white"))
+    with pytest.raises(ValueError, match="Beat 1 has 4 references"):
+        compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo", references=refs)], seed=0, settings=AVATAR)
+
+
+def test_an_avatar_reads_a_beat_image_only_as_the_person_and_its_references_go_to_no_other_model():
+    with pytest.raises(ValueError, match="use a Reactor Vidu S2-Avatar Reference"):
+        compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo"), Beat("Hat?", 0, image=b"hat")], seed=0, settings=AVATAR)
+    with pytest.raises(ValueError, match="Helios does not take Vidu S2-Avatar references"):
+        compile_timeline("Helios", [Beat("a", 48, references=(Reference("Vidu S2-Avatar", b"png", "object"),))], seed=0)
+
+
+def test_editor_beats_pick_their_references_by_slot():
+    value = {"beats": [{"prompt": "a", "frames": 2, "cut": False, "image": None, "references": ["reference_1"]},
+                       {"prompt": "b", "frames": 2, "cut": False, "image": None}]}
+    hat = Reference("Vidu S2-Avatar", b"hat", "garment")
+    assert [b.references for b in editor_beats(value, {}, {"reference_1": hat})] == [(hat,), ()]
+    with pytest.raises(ValueError, match="reference_1, which has no reference connected"):
+        editor_beats(value, {}, {})
+
+
+def test_an_avatar_call_needs_a_persona_a_photo_and_something_to_say():
+    with pytest.raises(ValueError, match="persona"):
+        compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo")], seed=0, settings={**AVATAR, "persona": ""})
+    with pytest.raises(ValueError, match="image on the first beat"):
+        compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0)], seed=0, settings=AVATAR)
+    with pytest.raises(ValueError, match="Beat 2 says nothing"):
+        compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo"), Beat(" ", 0)], seed=0, settings=AVATAR)

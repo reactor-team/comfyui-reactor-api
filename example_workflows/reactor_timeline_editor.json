@@ -1,8 +1,8 @@
 {
   "id": "1d074609-7faf-458e-b165-0731a2d7a71c",
   "revision": 0,
-  "last_node_id": 5,
-  "last_link_id": 3,
+  "last_node_id": 6,
+  "last_link_id": 4,
   "nodes": [
     {
       "id": 1,
@@ -22,64 +22,19 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right.\n\nClick a block to edit it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
+        "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right. The first beat comes from the chain node, which picks the model; it is drawn greyed out, and you edit it on that node.\n\nClick a block to edit it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right.\n\nClick a block to edit it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right. The first beat comes from the chain node, which picks the model; it is drawn greyed out, and you edit it on that node.\n\nClick a block to edit it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
-      "id": 2,
-      "type": "ReactorModel",
-      "pos": [
-        40,
-        240
-      ],
-      "size": [
-        270,
-        58
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "COMBO",
-          "widget": {
-            "name": "model"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_MODEL",
-          "name": "REACTOR_MODEL",
-          "type": "REACTOR_MODEL",
-          "links": [
-            1
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorModel"
-      },
-      "widgets_values": [
-        "LongLive-2.0"
-      ],
-      "widgets_values_named": {
-        "model": "LongLive-2.0"
-      }
-    },
-    {
       "id": 3,
       "type": "ReactorTimeline",
       "pos": [
-        320,
+        470,
         240
       ],
       "size": [
@@ -91,17 +46,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "model",
-          "name": "model",
-          "type": "REACTOR_MODEL",
-          "link": 1
-        },
-        {
           "localized_name": "chain",
           "name": "chain",
-          "shape": 7,
           "type": "REACTOR_CHAIN",
-          "link": null
+          "link": 4
         },
         {
           "localized_name": "image_0",
@@ -136,12 +84,6 @@
       "widgets_values": [
         {
           "beats": [
-            {
-              "prompt": "A vast windswept Martian landscape of deep rust-red dunes and wind-carved rock stretching unbroken to the horizon at golden hour, fine ochre dust streaming off the ridgelines, a pale ringed planet hanging low and enormous in the dusty amber sky. Long sweeping aerial drone shot gliding steadily forward over ridge after ridge, wide-angle, deep focus, slow majestic continuous move, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
-              "frames": 157,
-              "cut": false,
-              "image": null
-            },
             {
               "prompt": "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain — a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
               "frames": 157,
@@ -196,12 +138,6 @@
       "widgets_values_named": {
         "beats": {
           "beats": [
-            {
-              "prompt": "A vast windswept Martian landscape of deep rust-red dunes and wind-carved rock stretching unbroken to the horizon at golden hour, fine ochre dust streaming off the ridgelines, a pale ringed planet hanging low and enormous in the dusty amber sky. Long sweeping aerial drone shot gliding steadily forward over ridge after ridge, wide-angle, deep focus, slow majestic continuous move, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
-              "frames": 157,
-              "cut": false,
-              "image": null
-            },
             {
               "prompt": "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain — a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
               "frames": 157,
@@ -258,7 +194,7 @@
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1560,
+        1710,
         240
       ],
       "size": [
@@ -311,7 +247,7 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1560,
+        1710,
         580
       ],
       "size": [
@@ -387,17 +323,76 @@
         "format.codec": "auto",
         "codec": "auto"
       }
+    },
+    {
+      "id": 6,
+      "type": "ReactorLongLive20Chain",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "kind",
+          "name": "kind",
+          "type": "COMBO",
+          "widget": {
+            "name": "kind"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorLongLive20Chain"
+      },
+      "widgets_values": [
+        "A vast windswept Martian landscape of deep rust-red dunes and wind-carved rock stretching unbroken to the horizon at golden hour, fine ochre dust streaming off the ridgelines, a pale ringed planet hanging low and enormous in the dusty amber sky. Long sweeping aerial drone shot gliding steadily forward over ridge after ridge, wide-angle, deep focus, slow majestic continuous move, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+        157,
+        null
+      ],
+      "widgets_values_named": {
+        "prompt": "A vast windswept Martian landscape of deep rust-red dunes and wind-carved rock stretching unbroken to the horizon at golden hour, fine ochre dust streaming off the ridgelines, a pale ringed planet hanging low and enormous in the dusty amber sky. Long sweeping aerial drone shot gliding steadily forward over ridge after ridge, wide-angle, deep focus, slow majestic continuous move, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+        "frames": 157,
+        "kind": null
+      }
     }
   ],
   "links": [
-    [
-      1,
-      2,
-      0,
-      3,
-      0,
-      "REACTOR_MODEL"
-    ],
     [
       2,
       3,
@@ -413,6 +408,14 @@
       5,
       0,
       "VIDEO"
+    ],
+    [
+      4,
+      6,
+      0,
+      3,
+      0,
+      "REACTOR_CHAIN"
     ]
   ],
   "groups": [],

@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import io
 import itertools
 import logging
@@ -14,7 +16,8 @@ class Beat:
     `cut` asks for a hard scene break from the beat before instead of a soft transition. `image`
     is PNG bytes for models that condition on a reference image. `video` is the source clip as
     MP4 bytes, for video-to-video models, and only the first beat's is read. `moves` are camera
-    moves counted from the beat's own start and cut at its end.
+    moves counted from the beat's own start and cut at its end. `references` are what a call's
+    character has on during the beat. `settings` holds the beat's values of the model's `beat_settings`.
     """
     prompt: str
     frames: int
@@ -22,6 +25,22 @@ class Beat:
     image: bytes | None = None
     video: bytes | None = None
     moves: tuple["Move", ...] = ()
+    references: tuple["Reference", ...] = ()
+    settings: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Reference:
+    """A model's own reference image, made by that model's reference node and carried on beats to it.
+
+    `model` is the model it was made for; no other model takes it. `png` is the image as PNG bytes.
+    `kind` and `text` mean what that model's node says: for Vidu S2-Avatar, whether it is an
+    "object", "garment" or "background", and a sentence saying what happens with it.
+    """
+    model: str
+    png: bytes
+    kind: str
+    text: str = ""
 
 
 @dataclass(frozen=True)
@@ -40,7 +59,7 @@ class Move:
 
 @dataclass(frozen=True)
 class Timeline:
-    """A whole render request: the model, its settings, its beats in play order, and its camera moves."""
+    """A whole render request: the model, the settings its chain's first link starts it with, its beats in play order, and its camera moves."""
     model: str
     beats: tuple[Beat, ...]
     settings: dict[str, object] = field(default_factory=dict)
@@ -49,7 +68,7 @@ class Timeline:
 
 @dataclass(frozen=True)
 class Setting:
-    """A model option picked on Reactor Model and sent before `start` as `command` with one field.
+    """A model option sent as `command` with one field: before `start` as the first link sets it, when a later beat changes it, or as a field of a call's `start_call`.
 
     `field` is that field's name, when it differs from the setting's. A setting with no `options`
     takes a value of its `default`'s type: a toggle, a number from 0 to `maximum`, or text.
@@ -81,8 +100,8 @@ class ModelSpec:
     """A Reactor model as the plugin drives it.
 
     `pattern` is how the model is driven: "chunked" models generate from prompts and report each
-    chunk, "source" models transform a video the client sends, and "clips" models build and play
-    queued clips. `images` is which beats may carry an image: "none", "first" (read only at
+    chunk, "source" models transform a video the client sends, "clips" models build and play
+    queued clips, and "call" models hold a conversation, answering each beat's prompt aloud. `images` is which beats may carry an image: "none", "first" (read only at
     start), or "any". `frames_per_chunk` is set only for models whose timeline is scheduled by chunk.
     `session_frames` is whether `chunk_complete.frames_emitted` counts the whole session rather
     than the one chunk. `image_required` is whether the opening beat must carry an image.
@@ -91,10 +110,11 @@ class ModelSpec:
     "source" model's live source is pushed to. `first_chunk_frames` is the length of a scene's
     first chunk when it differs from the rest. `size` is the native frame size images and source
     frames are fitted to; with `keeps_aspect`, only its short side is fixed and the source's aspect holds.
-    `starts` is whether the model waits for a `start` command before generating. `live` is whether
+    `references` is whether beats may carry its references. `starts` is whether the model waits for a `start` command before generating. `live` is whether
     Reactor Realtime offers the model.
     `native` is the commands, sent before `start`, that keep the video at the model's native size, or its nearest.
-    `settings` maps each setting's command field to the setting. `camera` maps each camera lane,
+    `settings` are the settings the model reads only at start, set on a chain's first link. `beat_settings` are settings the
+    model takes mid-run, so each beat sets its own and a value holds until a later beat changes it. `camera` maps each camera lane,
     named by its command's field, to the lane. `prompt_command` changes the prompt mid-run.
     """
     slug: str
@@ -108,6 +128,7 @@ class ModelSpec:
     image_required: bool = False
     videos: str = "none"
     video_required: bool = False
+    references: bool = False
     source_track: str | None = None
     first_chunk_frames: int | None = None
     size: tuple[int, int] = (1280, 704)
@@ -116,6 +137,7 @@ class ModelSpec:
     live: bool = True
     native: tuple[tuple[str, dict], ...] = ()
     settings: dict[str, Setting] = field(default_factory=dict)
+    beat_settings: dict[str, Setting] = field(default_factory=dict)
     camera: dict[str, Lane] = field(default_factory=dict)
     prompt_command: str = "set_prompt"
 
@@ -170,8 +192,16 @@ LINGBOT_WORLD_2_CAMERA = {"camera_pose": Lane("set_camera_pose", POSES, []),
                           **LOOK}
 
 
-VISKO_SETTINGS = {"audio": Setting("set_audio_enabled", (), True, field="audio_enabled"),
-                  "audio_prompt": Setting("set_audio_prompt", (), "", field="prompt")}
+VISKO_SETTINGS = {"audio": Setting("set_audio_enabled", (), True, field="audio_enabled")}
+VISKO_BEAT_SETTINGS = {"audio_prompt": Setting("set_audio_prompt", (), "", field="prompt")}
+
+
+# The voices reactor.inc offers for Vidu S2-Avatar, in its order; `list_voices` returns more.
+AVATAR_VOICES = ("Jennifer", "Katerina", "Serena", "Roya", "Momo", "Sonrisa", "Mione", "Siiri", "Griet", "Arda", "Ethan",
+                 "Andre", "Theo Calm", "Li Cassian", "Radio Gol", "Marcus", "Harvey", "Bodega", "Li")
+AVATAR_SETTINGS = {"persona": Setting("start_call", (), ""),
+                   "voice": Setting("start_call", AVATAR_VOICES, "Jennifer"),
+                   "greeting": Setting("start_call", (), "")}
 
 
 MODELS = {
@@ -182,7 +212,7 @@ MODELS = {
     # TODO: Helios publishes no frame rate, so the 24 the output file plays at is a placeholder.
     "Helios": ModelSpec("reactor/helios", "chunked", 24.0, "any", False, frames_per_chunk=33, size=(640, 384),
                         native=(("set_sr_scale", {"sr_scale": "off"}),),
-                        settings={"image_strength": Setting("set_image_strength", (), 1.0, maximum=1.0)}),
+                        beat_settings={"image_strength": Setting("set_image_strength", (), 1.0, maximum=1.0)}),
     # Measured on cloud sessions, for both LingBots: a run's first chunk is 17 frames and every later one 24.
     # `max_scene_chunks` is a run, after which the model restarts from its image.
     # TODO: LingBot's docs say 16 fps, but frames arrive at about 38, so the output file's rate is unsettled.
@@ -195,17 +225,20 @@ MODELS = {
     # `max_scene_chunks` is `generation_started.max_chunks` on cloud sessions at `2k`; the Dynamic docs say 229.
     "Visko Orbis Dynamic": ModelSpec("reactor/visko-orbis-dynamic", "chunked", 18.0, "first", False, frames_per_chunk=33,
                                      max_scene_chunks=2000, size=(832, 480), settings=VISKO_SETTINGS,
-                                     native=(("set_resolution", {"resolution": "native"}),)),
+                                     beat_settings=VISKO_BEAT_SETTINGS, native=(("set_resolution", {"resolution": "native"}),)),
     # Stable offers no native tier, so it delivers its smallest, 1080p.
     "Visko Orbis Stable": ModelSpec("reactor/visko-orbis-stable", "chunked", 18.0, "first", False, frames_per_chunk=33,
                                     max_scene_chunks=2000, size=(832, 480), settings=VISKO_SETTINGS,
-                                    native=(("set_resolution", {"resolution": "1080p"}),)),
+                                    beat_settings=VISKO_BEAT_SETTINGS, native=(("set_resolution", {"resolution": "1080p"}),)),
     # TODO: SANA-Streaming's docs publish no frame rate, so the 24 the output file plays at is
     # a placeholder.
     "Sana Streaming": ModelSpec("reactor/sana-streaming", "source", 24.0, "none", False, videos="first", video_required=True,
                                 source_track="camera", size=(1280, 704), live=False),
     "X2": ModelSpec("xmax/x2", "source", 24.0, "first", False, videos="first", video_required=True, source_track="source",
                 size=(1472, 832), keeps_aspect=True, starts=False),
+    # An avatar takes a photo of any shape, so only its short side is fitted.
+    "Vidu S2-Avatar": ModelSpec("reactor/vidu-s2-avatar", "call", 25.0, "first", False, references=True, image_required=True, size=(864, 1152),
+                                keeps_aspect=True, settings=AVATAR_SETTINGS),
 }
 
 
@@ -221,6 +254,7 @@ def model_facts(spec: ModelSpec) -> dict:
         "max_scene_chunks": spec.max_scene_chunks,
         "images": spec.images,
         "image_required": spec.image_required,
+        "references": spec.references,
         "videos": spec.videos,
         "video_required": spec.video_required,
         "camera": {name: {"options": list(lane.options), "idle": lane.idle, "maximum": lane.maximum,
@@ -229,14 +263,19 @@ def model_facts(spec: ModelSpec) -> dict:
     }
 
 
-def editor_beats(value: dict, images: dict[str, bytes]) -> list[Beat]:
-    """The beats stored in a timeline editor's widget value. `images` maps a connected slot name to PNG bytes."""
+def editor_beats(value: dict, images: dict[str, bytes], references: dict[str, Reference]) -> list[Beat]:
+    """The beats stored in a timeline editor's widget value. `images` and `references` map a connected slot name to what it holds."""
     beats = []
     for b in value["beats"]:
         slot = b["image"]
         if slot is not None and slot not in images:
             raise ValueError(f"Beat {len(beats) + 1} uses {slot}, which has no image connected.")
-        beats.append(Beat(b["prompt"], int(b["frames"]), cut=b["cut"], image=None if slot is None else images[slot]))
+        # A value saved before references existed has none.
+        picked = b.get("references", [])
+        if missing := [r for r in picked if r not in references]:
+            raise ValueError(f"Beat {len(beats) + 1} uses {missing[0]}, which has no reference connected.")
+        beats.append(Beat(b["prompt"], int(b["frames"]), cut=b["cut"], image=None if slot is None else images[slot],
+                          references=tuple(references[r] for r in picked)))
     return beats
 
 
@@ -253,13 +292,15 @@ class Plan:
     once `chunk` chunks have completed, for beats the model cannot schedule itself. `chunks` is how
     many chunks of video to capture. `source` is the clip a "source" runner streams, as MP4 bytes;
     for a "source" model `chunks` and the first element of each `timed` entry count source frames
-    pushed, as a source model reports no chunks. A command value holding `bytes` is a file to
+    pushed, as a source model reports no chunks. For a "call" model, `holds` is the least number of
+    frames each of its `chunks` plays before the next goes out. A command value holding `bytes` is a file to
     upload first.
     """
     setup: list[tuple[str, dict]]
     chunks: int
     timed: list[tuple[int, str, dict]] = field(default_factory=list)
     source: bytes | None = None
+    holds: list[int] = field(default_factory=list)
 
 
 def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[str, object] | None = None,
@@ -272,6 +313,10 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
             raise ValueError(f"{model} does not take reference images.")
         if beat.video is not None and spec.videos == "none":
             raise ValueError(f"{model} does not take a source video.")
+        if other := next((r.model for r in beat.references if r.model != model), None):
+            raise ValueError(f"{model} does not take {other} references.")
+        if unknown := next((name for name in beat.settings if name not in spec.beat_settings), None):
+            raise ValueError(f"{model} has no {unknown} setting.")
         # The first beat opens the video, so there is nothing for it to cut from.
         if i and beat.cut and not spec.supports_cuts:
             raise ValueError(f"{model} has no hard cuts; use a shot beat instead.")
@@ -279,6 +324,9 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
         raise ValueError(f"{model} needs an image on the first beat.")
     if spec.video_required and beats[0].video is None:
         raise ValueError(f"{model} needs a video on the first beat.")
+    if spec.pattern == "call":
+        # A call's settings are fields of its `start_call`, and it has no camera.
+        return compile_call(model, beats, settings or {})
     if spec.images == "first":
         beats = list(beats)
         for i, start in enumerate(itertools.accumulate(b.frames for b in beats[:-1]), 1):
@@ -310,6 +358,18 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
 
     plan.setup[at_start():at_start()] = [*spec.native] + [(spec.settings[name].command, {spec.settings[name].field or name: value})
                                             for name, value in (settings or {}).items()]
+    # A beat's setting goes out only when it changes, so the model's default is never sent.
+    held = {name: setting.default for name, setting in spec.beat_settings.items()}
+    for beat, chunk in zip(beats, scheduled_chunks(spec, beats)[1] if spec.beat_settings else []):
+        for name, value in beat.settings.items():
+            if value == held[name]:
+                continue
+            held[name] = value
+            command = (spec.beat_settings[name].command, {spec.beat_settings[name].field or name: value})
+            if chunk == 0:
+                plan.setup.insert(at_start(), command)
+            else:
+                plan.timed.append((chunk - 1, *command))
     for chunk, command, data in camera_commands(model, spec, moves, plan.chunks):
         if chunk == 0:
             plan.setup.insert(at_start(), (command, data))
@@ -369,12 +429,12 @@ def speed_lanes(spec: ModelSpec) -> set[str]:
 
 
 def join_chains(chains: list[Timeline]) -> Timeline:
-    """The chains played one after another as one chain; they must be for the same model and settings."""
+    """The chains played one after another as one chain, for the same model; the first chain's settings start it."""
     first, *rest = chains
     joined = first
     for i, chain in enumerate(rest, 2):
-        if (chain.model, chain.settings) != (first.model, first.settings):
-            raise ValueError(f"Chain {i} is for a different Reactor Model or settings than chain 1; join chains made for the same model.")
+        if chain.model != first.model:
+            raise ValueError(f"Chain {i} is for {chain.model} and chain 1 for {first.model}; join chains made for the same model.")
         moves = chain.moves
         if moves:
             # A timeline's moves are placed on its own rendered frames, so they shift to where its first beat now starts.
@@ -469,6 +529,58 @@ def compile_x2(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Pla
         plan.setup.append(("set_reference_image", {"reference_image": beats[0].image}))
     plan.setup.append(("set_prompt", {"prompt": beats[0].prompt}))
     plan.timed = source_prompts(beats)
+    return plan
+
+
+def data_url(png: bytes) -> str:
+    """The image as an inline JPEG `data:` URL.
+
+    Observed on cloud sessions: `set_reference_images` takes one, where the docs ask for a public URL.
+    """
+    buf = io.BytesIO()
+    Image.open(io.BytesIO(png)).convert("RGB").save(buf, format="JPEG", quality=90)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def call_setup(model: str, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
+    """The commands that open a call: the character from `image`, then the call, heard through `mic`."""
+    if not settings.get("persona"):
+        raise ValueError(f"{model} needs a persona; set one on the chain's first link.")
+    # An optional field left empty is left out, so the model uses its default.
+    start = {"call_mode": "audio", "transcripts": False, **{k: v for k, v in settings.items() if v != ""}}
+    return [("create_avatar", {"image": image}), ("start_call", start)]
+
+
+def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> Plan:
+    """A scripted call: the first beat's image becomes the character, and each beat's prompt is said to it in turn.
+
+    A call's `chunks` count the character's replies. The first answers the call opening, so beat i
+    goes out after i + 1, and its reply plays for at least the beat's frames. A beat's references
+    are what the character has on during it: before its line, any the beat before had and it lacks
+    are cleared, and any new are set.
+    """
+    for i, beat in enumerate(beats):
+        if not beat.prompt.strip():
+            raise ValueError(f"Beat {i + 1} says nothing; give it a prompt.")
+        if i and beat.image is not None:
+            raise ValueError(f"{model} reads a beat's image only as the person, on the first beat; use a Reactor Vidu S2-Avatar Reference for later beats.")
+    plan = Plan(setup=call_setup(model, beats[0].image, settings), chunks=len(beats) + 1,
+                holds=[0] + [beat.frames for beat in beats])
+    held = {}
+    for i, beat in enumerate(beats):
+        # An id names a reference by its content, so one a beat keeps from the beat before is never resent.
+        refs = {hashlib.sha256(r.png + f"{r.kind}|{r.text}".encode()).hexdigest()[:32]: r for r in beat.references}
+        if len(refs) > 3:
+            raise ValueError(f"Beat {i + 1} has {len(refs)} references; {model} holds at most 3.")
+        if gone := [ref_id for ref_id in held if ref_id not in refs]:
+            plan.timed.append((i + 1, "clear_reference_images", {"image_ids": gone}))
+        # The docs cap `text` at 200 characters.
+        new = [{"image_url": data_url(r.png), "image_id": ref_id, "kind": r.kind, **({"text": r.text[:200]} if r.text else {})}
+               for ref_id, r in refs.items() if ref_id not in held]
+        if new:
+            plan.timed.append((i + 1, "set_reference_images", {"images": new}))
+        plan.timed.append((i + 1, "say", {"text": beat.prompt}))
+        held = refs
     return plan
 
 

@@ -1,252 +1,245 @@
 {
- "id": "d2977b96-a176-4ec4-aba3-bafaab8908dc",
- "revision": 0,
- "last_node_id": 4,
- "last_link_id": 2,
- "nodes": [
-  {
-   "id": 1,
-   "type": "Note",
-   "pos": [
-    40,
-    20
-   ],
-   "size": [
-    560,
-    180
-   ],
-   "flags": {},
-   "order": 0,
-   "mode": 0,
-   "inputs": [],
-   "outputs": [],
-   "properties": {},
-   "widgets_values": [
-    "Restyle a video file live with X2. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving. To edit your camera instead, swap Load Video for a Reactor Camera Capture, as in reactor_realtime_camera.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
-   ],
-   "widgets_values_named": {
-    "text": "Restyle a video file live with X2. Load Video feeds the Reactor Realtime node, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving. To edit your camera instead, swap Load Video for a Reactor Camera Capture, as in reactor_realtime_camera.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
-   },
-   "color": "#432",
-   "bgcolor": "#653"
-  },
-  {
-   "id": 2,
-   "type": "ReactorModel",
-   "pos": [
-    40,
-    240
-   ],
-   "size": [
-    270,
-    58
-   ],
-   "flags": {},
-   "order": 1,
-   "mode": 0,
-   "inputs": [
+  "id": "d2977b96-a176-4ec4-aba3-bafaab8908dc",
+  "revision": 0,
+  "last_node_id": 5,
+  "last_link_id": 4,
+  "nodes": [
     {
-     "localized_name": "model",
-     "name": "model",
-     "type": "COMFY_DYNAMICCOMBO_V3",
-     "widget": {
-      "name": "model"
-     },
-     "link": null
-    }
-   ],
-   "outputs": [
-    {
-     "localized_name": "REACTOR_MODEL",
-     "name": "REACTOR_MODEL",
-     "type": "REACTOR_MODEL",
-     "links": [
-      1
-     ]
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "ReactorModel"
-   },
-   "widgets_values": [
-    "X2"
-   ],
-   "widgets_values_named": {
-    "model": "X2"
-   }
-  },
-  {
-   "id": 3,
-   "type": "ReactorRealtime",
-   "pos": [
-    340,
-    240
-   ],
-   "size": [
-    400,
-    300
-   ],
-   "flags": {},
-   "order": 3,
-   "mode": 0,
-   "inputs": [
-    {
-     "localized_name": "model",
-     "name": "model",
-     "type": "REACTOR_MODEL",
-     "link": 1
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        560,
+        180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Restyle a video file live with X2. Load Video feeds the chain node that starts Reactor Realtime, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving. To edit your camera instead, swap Load Video for a Reactor Camera Capture, as in reactor_realtime_camera.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Restyle a video file live with X2. Load Video feeds the chain node that starts Reactor Realtime, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving. To edit your camera instead, swap Load Video for a Reactor Camera Capture, as in reactor_realtime_camera.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
-     "localized_name": "image",
-     "name": "image",
-     "shape": 7,
-     "type": "IMAGE",
-     "link": null
+      "id": 3,
+      "type": "ReactorRealtime",
+      "pos": [
+        470,
+        240
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "type": "REACTOR_CHAIN",
+          "link": 4
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRealtime"
+      },
+      "widgets_values": [
+        42,
+        "randomize",
+        "reactor/realtime"
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "randomize",
+        "filename_prefix": "reactor/realtime"
+      }
     },
     {
-     "localized_name": "video",
-     "name": "video",
-     "shape": 7,
-     "type": "VIDEO",
-     "link": 2
+      "id": 4,
+      "type": "LoadVideo",
+      "pos": [
+        40,
+        340
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "file",
+          "name": "file",
+          "type": "COMBO",
+          "widget": {
+            "name": "file"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "reactor_camera_beats.mp4",
+        "image"
+      ],
+      "widgets_values_named": {
+        "file": "reactor_camera_beats.mp4",
+        "upload": "image"
+      }
     },
     {
-     "localized_name": "prompt",
-     "name": "prompt",
-     "type": "STRING",
-     "widget": {
-      "name": "prompt"
-     },
-     "link": null
-    },
-    {
-     "localized_name": "seed",
-     "name": "seed",
-     "type": "INT",
-     "widget": {
-      "name": "seed"
-     },
-     "link": null
-    },
-    {
-     "localized_name": "filename_prefix",
-     "name": "filename_prefix",
-     "type": "STRING",
-     "widget": {
-      "name": "filename_prefix"
-     },
-     "link": null
+      "id": 5,
+      "type": "ReactorX2Chain",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "shape": 7,
+          "type": "VIDEO",
+          "link": 3
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorX2Chain"
+      },
+      "widgets_values": [
+        "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
+        120
+      ],
+      "widgets_values_named": {
+        "prompt": "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
+        "frames": 120
+      }
     }
-   ],
-   "outputs": [
-    {
-     "localized_name": "VIDEO",
-     "name": "VIDEO",
-     "type": "VIDEO",
-     "links": null
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "ReactorRealtime"
-   },
-   "widgets_values": [
-    "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
-    42,
-    "randomize",
-    "reactor/realtime"
-   ],
-   "widgets_values_named": {
-    "prompt": "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
-    "seed": 42,
-    "control_after_generate": "randomize",
-    "filename_prefix": "reactor/realtime"
-   }
-  },
-  {
-   "id": 4,
-   "type": "LoadVideo",
-   "pos": [
-    40,
-    340
-   ],
-   "size": [
-    270,
-    314
-   ],
-   "flags": {},
-   "order": 2,
-   "mode": 0,
-   "inputs": [
-    {
-     "localized_name": "file",
-     "name": "file",
-     "type": "COMBO",
-     "widget": {
-      "name": "file"
-     },
-     "link": null
-    },
-    {
-     "localized_name": "choose file to upload",
-     "name": "upload",
-     "type": "IMAGEUPLOAD",
-     "widget": {
-      "name": "upload"
-     },
-     "link": null
-    }
-   ],
-   "outputs": [
-    {
-     "localized_name": "VIDEO",
-     "name": "VIDEO",
-     "type": "VIDEO",
-     "links": [
-      2
-     ]
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "LoadVideo"
-   },
-   "widgets_values": [
-    "reactor_camera_beats.mp4",
-    "image"
-   ],
-   "widgets_values_named": {
-    "file": "reactor_camera_beats.mp4",
-    "upload": "image"
-   }
-  }
- ],
- "links": [
-  [
-   1,
-   2,
-   0,
-   3,
-   0,
-   "REACTOR_MODEL"
   ],
-  [
-   2,
-   4,
-   0,
-   3,
-   2,
-   "VIDEO"
-  ]
- ],
- "groups": [],
- "config": {},
- "extra": {
-  "ds": {
-   "scale": 1,
-   "offset": [
-    0,
-    0
-   ]
-  }
- },
- "version": 0.4
+  "links": [
+    [
+      3,
+      4,
+      0,
+      5,
+      0,
+      "VIDEO"
+    ],
+    [
+      4,
+      5,
+      0,
+      3,
+      0,
+      "REACTOR_CHAIN"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
 }

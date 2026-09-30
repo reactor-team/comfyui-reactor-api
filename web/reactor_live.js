@@ -41,7 +41,8 @@ function openLive({ run_id, mode, title, camera }) {
     const backdrop = el("div", { className: "reactor-live-backdrop" });
     const header = el("div", { className: "reactor-live-title", textContent: title });
     const output = el("video", { className: "reactor-live-output", autoplay: true, muted: true, playsInline: true });
-    const preview = el("div", { className: "reactor-live-preview" }, output);
+    const sound = el("audio", { autoplay: true });
+    const preview = el("div", { className: "reactor-live-preview" }, output, sound);
     const status = el("div", { className: "reactor-live-status", textContent: "Connecting…" });
     // Keycaps for the drive keys, lit while held.
     const caps = new Map();
@@ -71,10 +72,11 @@ function openLive({ run_id, mode, title, camera }) {
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     const socket = new WebSocket(url);
 
-    let stream = null;       // the camera, when this browser publishes it
+    let stream = null;       // the camera or microphone, when this browser publishes it
     let held = null;
     let lanes = [];          // the model's drive lanes, from the config
     let promptCommand = null;
+    let promptField = null;
     let started = false;     // setup is done, and this browser sends the model its commands
     const lastSent = new Map();  // each lane's field to the value last sent
     let reactor = null;      // this browser's own client in the session
@@ -216,12 +218,22 @@ function openLive({ run_id, mode, title, camera }) {
         buttons.prepend(picker);
     }
 
+    async function startMic() {
+        const media = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false,
+        });
+        if (closed) return media.getTracks().forEach((track) => track.stop());
+        stream = media;
+    }
+
     async function joinSession(join) {
+        const mic = join.tracks.find((track) => track.name === join.publish)?.kind === "audio";
         if (join.publish) {
             try {
-                await startCamera();
+                await (mic ? startMic() : startCamera());
             } catch {
-                throw new Error("The camera is unavailable; allow camera access and run again.");
+                throw new Error(mic ? "The microphone is unavailable; allow microphone access and run again."
+                                    : "The camera is unavailable; allow camera access and run again.");
             }
             if (closed) return;
         }
@@ -229,7 +241,9 @@ function openLive({ run_id, mode, title, camera }) {
         if (closed) return;
         reactor = new Reactor({ modelName: join.model, local: join.local, modelTracks: join.tracks });
         reactor.on("trackReceived", (name, track, media) => {
-            if (name !== join.publish && track.kind === "video") output.srcObject = media;
+            if (name === join.publish) return;
+            if (track.kind === "video") output.srcObject = media;
+            else sound.srcObject = media;
         });
         reactor.on("statsUpdate", (stats) => { own = stats; });
         let joined = false;
@@ -252,10 +266,10 @@ function openLive({ run_id, mode, title, camera }) {
             throw new Error(`This browser could not join the Reactor session: ${e?.message ?? e}`);
         }
         if (!join.publish || closed) return;
-        const track = stream.getVideoTracks()[0];
+        const track = mic ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
         await reactor.publishTrack(join.publish, track);
         const sender = reactor.getPeerConnection()?.getSenders().find((s) => s.track === track);
-        if (sender) {
+        if (sender && !mic) {
             // The model's input size is fixed for the session: drop frames on a slow link, never resolution.
             const params = sender.getParameters();
             params.degradationPreference = "maintain-resolution";
@@ -278,6 +292,13 @@ function openLive({ run_id, mode, title, camera }) {
             // Only the keys this model's camera lanes answer to are shown, and a pad left empty goes too.
             lanes = message.lanes;
             promptCommand = message.prompt_command;
+            promptField = message.prompt_field;
+            if (mode === "call") {
+                apply.textContent = "Send";
+                // The placeholder goes once there is text, so the two ways to talk are also said above the box.
+                prompt.before(el("div", { textContent: "Talk to the character out loud, or type a message and press Send." }));
+                prompt.placeholder = "Type a message for the character…";
+            }
             const keys = new Set(lanes.flatMap((lane) => lane.axes.flatMap(([low, high]) => [low, high])));
             for (const [code, node] of caps) if (!keys.has(code)) {
                 node.remove();
@@ -334,7 +355,11 @@ function openLive({ run_id, mode, title, camera }) {
         else stay("Connection lost.", true);
     });
 
-    apply.onclick = () => command(promptCommand, { prompt: prompt.value });
+    apply.onclick = () => {
+        command(promptCommand, { [promptField]: prompt.value });
+        // A message to the character is gone once sent; a prompt stays to be edited.
+        if (mode === "call") prompt.value = "";
+    };
     done.onclick = () => {
         done.disabled = true;
         send({ type: "done" });

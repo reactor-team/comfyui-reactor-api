@@ -22,17 +22,17 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Each Reactor Chain node is one beat: it plays its prompt for its frames, starting where the beat before it ends. The first beat takes the Reactor Model, later beats take it from the chain, and the last one feeds Reactor Render.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+        "Each Reactor LongLive-2.0 Chain node is one beat: it plays its prompt for its frames, starting where the beat before it ends. The first link sets the model and its settings, later links take them from the chain, and the last one feeds Reactor Render.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Each Reactor Chain node is one beat: it plays its prompt for its frames, starting where the beat before it ends. The first beat takes the Reactor Model, later beats take it from the chain, and the last one feeds Reactor Render.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Each Reactor LongLive-2.0 Chain node is one beat: it plays its prompt for its frames, starting where the beat before it ends. The first link sets the model and its settings, later links take them from the chain, and the last one feeds Reactor Render.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
       "id": 2,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         40,
         220
@@ -45,13 +45,6 @@
       "order": 1,
       "mode": 0,
       "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "shape": 7,
-          "type": "REACTOR_MODEL",
-          "link": 7
-        },
         {
           "localized_name": "chain",
           "name": "chain",
@@ -85,15 +78,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -107,28 +91,22 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "A powerful Bengal tiger prowls slowly through tall sun-bleached savanna grass at golden hour, muscles rolling beneath its orange-and-black striped fur, amber eyes fixed ahead, whiskers catching the light. Warm low sunlight rakes through the swaying grass. Long telephoto, very shallow depth of field, slow tracking dolly, rich golden-amber palette, fine fur detail, photoreal nature-documentary look.",
         317,
-        "shot",
-        {
-          "moves": []
-        }
+        "shot"
       ],
       "widgets_values_named": {
         "prompt": "A powerful Bengal tiger prowls slowly through tall sun-bleached savanna grass at golden hour, muscles rolling beneath its orange-and-black striped fur, amber eyes fixed ahead, whiskers catching the light. Warm low sunlight rakes through the swaying grass. Long telephoto, very shallow depth of field, slow tracking dolly, rich golden-amber palette, fine fur detail, photoreal nature-documentary look.",
         "frames": 317,
-        "kind": "shot",
-        "moves": {
-          "moves": []
-        }
+        "kind": "shot"
       }
     },
     {
       "id": 3,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         370,
         220
@@ -174,15 +152,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -196,28 +165,22 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "A pod of bottlenose dolphins leaps in unison through the glittering turquoise surface of a calm open ocean, sleek grey bodies arcing clear of the water, sheets of spray catching the bright midday sun. Low angle just above the waterline, crisp high-shutter clarity, deep blue-green palette with sparkling highlights, photoreal.",
         317,
-        "cut",
-        {
-          "moves": []
-        }
+        "cut"
       ],
       "widgets_values_named": {
         "prompt": "A pod of bottlenose dolphins leaps in unison through the glittering turquoise surface of a calm open ocean, sleek grey bodies arcing clear of the water, sheets of spray catching the bright midday sun. Low angle just above the waterline, crisp high-shutter clarity, deep blue-green palette with sparkling highlights, photoreal.",
         "frames": 317,
-        "kind": "cut",
-        "moves": {
-          "moves": []
-        }
+        "kind": "cut"
       }
     },
     {
       "id": 4,
-      "type": "ReactorChain",
+      "type": "ReactorLongLive20Chain",
       "pos": [
         700,
         220
@@ -263,15 +226,6 @@
             "name": "kind"
           },
           "link": null
-        },
-        {
-          "localized_name": "moves",
-          "name": "moves",
-          "type": "REACTOR_MOVE_EDITOR",
-          "widget": {
-            "name": "moves"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -285,68 +239,17 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorChain"
+        "Node name for S&R": "ReactorLongLive20Chain"
       },
       "widgets_values": [
         "A herd of African elephants — towering adults sheltering a small calf — wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
         317,
-        "cut",
-        {
-          "moves": []
-        }
+        "cut"
       ],
       "widgets_values_named": {
         "prompt": "A herd of African elephants — towering adults sheltering a small calf — wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
         "frames": 317,
-        "kind": "cut",
-        "moves": {
-          "moves": []
-        }
-      }
-    },
-    {
-      "id": 5,
-      "type": "ReactorModel",
-      "pos": [
-        40,
-        470
-      ],
-      "size": [
-        270,
-        58
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "COMFY_DYNAMICCOMBO_V3",
-          "widget": {
-            "name": "model"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_MODEL",
-          "name": "REACTOR_MODEL",
-          "type": "REACTOR_MODEL",
-          "links": [
-            7
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorModel"
-      },
-      "widgets_values": [
-        "LongLive-2.0"
-      ],
-      "widgets_values_named": {
-        "model": "LongLive-2.0"
+        "kind": "cut"
       }
     },
     {
@@ -500,14 +403,6 @@
       8,
       0,
       "VIDEO"
-    ],
-    [
-      7,
-      5,
-      0,
-      2,
-      0,
-      "REACTOR_MODEL"
     ],
     [
       1,

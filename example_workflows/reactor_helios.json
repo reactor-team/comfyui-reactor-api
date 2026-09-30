@@ -1,8 +1,8 @@
 {
   "id": "d8b92636-5337-41c5-96ee-400ba063a955",
   "revision": 0,
-  "last_node_id": 5,
-  "last_link_id": 3,
+  "last_node_id": 6,
+  "last_link_id": 4,
   "nodes": [
     {
       "id": 1,
@@ -31,55 +31,10 @@
       "bgcolor": "#653"
     },
     {
-      "id": 2,
-      "type": "ReactorModel",
-      "pos": [
-        40,
-        240
-      ],
-      "size": [
-        270,
-        58
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "COMBO",
-          "widget": {
-            "name": "model"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_MODEL",
-          "name": "REACTOR_MODEL",
-          "type": "REACTOR_MODEL",
-          "links": [
-            1
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorModel"
-      },
-      "widgets_values": [
-        "Helios"
-      ],
-      "widgets_values_named": {
-        "model": "Helios"
-      }
-    },
-    {
       "id": 3,
       "type": "ReactorTimeline",
       "pos": [
-        320,
+        470,
         240
       ],
       "size": [
@@ -91,17 +46,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "model",
-          "name": "model",
-          "type": "REACTOR_MODEL",
-          "link": 1
-        },
-        {
           "localized_name": "chain",
           "name": "chain",
-          "shape": 7,
           "type": "REACTOR_CHAIN",
-          "link": null
+          "link": 4
         },
         {
           "localized_name": "image_0",
@@ -137,12 +85,6 @@
         {
           "beats": [
             {
-              "prompt": "A majestic lion named Leo stands regally in the heart of a dense jungle, embodying the essence of a king. Leo has a golden mane that flows gracefully around his broad shoulders, and his piercing amber eyes survey the landscape with confidence and authority. He is positioned on a rocky outcrop, towering over the lush greenery below. The background showcases a vibrant jungle scene with tall trees, cascading vines, and dappled sunlight filtering through the canopy. Leo's posture is proud and commanding, with his tail held high. The scene is captured from a medium close-up perspective, emphasizing Leo's powerful stance and the regal aura surrounding him.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            },
-            {
               "prompt": "Leo shifts his powerful weight slightly on the rocky outcrop, his golden mane rippling as he does so. Suddenly, he opens his massive jaws to release a deep, resonant roar that vibrates through the humid air, revealing his formidable white teeth. The dappled sunlight filtering through the canopy dances across his fur as his chest expands with the effort. The vibrant jungle remains lush and green around him, with tall trees and cascading vines framing his commanding figure. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
               "frames": 198,
               "cut": false,
@@ -160,12 +102,6 @@
       "widgets_values_named": {
         "beats": {
           "beats": [
-            {
-              "prompt": "A majestic lion named Leo stands regally in the heart of a dense jungle, embodying the essence of a king. Leo has a golden mane that flows gracefully around his broad shoulders, and his piercing amber eyes survey the landscape with confidence and authority. He is positioned on a rocky outcrop, towering over the lush greenery below. The background showcases a vibrant jungle scene with tall trees, cascading vines, and dappled sunlight filtering through the canopy. Leo's posture is proud and commanding, with his tail held high. The scene is captured from a medium close-up perspective, emphasizing Leo's powerful stance and the regal aura surrounding him.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            },
             {
               "prompt": "Leo shifts his powerful weight slightly on the rocky outcrop, his golden mane rippling as he does so. Suddenly, he opens his massive jaws to release a deep, resonant roar that vibrates through the humid air, revealing his formidable white teeth. The dappled sunlight filtering through the canopy dances across his fur as his chest expands with the effort. The vibrant jungle remains lush and green around him, with tall trees and cascading vines framing his commanding figure. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
               "frames": 198,
@@ -186,7 +122,7 @@
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1260,
+        1410,
         240
       ],
       "size": [
@@ -239,7 +175,7 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1260,
+        1410,
         580
       ],
       "size": [
@@ -315,17 +251,77 @@
         "format.codec": "auto",
         "codec": "auto"
       }
+    },
+    {
+      "id": 6,
+      "type": "ReactorHeliosChain",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image_strength",
+          "name": "image_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "image_strength"
+          },
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorHeliosChain"
+      },
+      "widgets_values": [
+        "A majestic lion named Leo stands regally in the heart of a dense jungle, embodying the essence of a king. Leo has a golden mane that flows gracefully around his broad shoulders, and his piercing amber eyes survey the landscape with confidence and authority. He is positioned on a rocky outcrop, towering over the lush greenery below. The background showcases a vibrant jungle scene with tall trees, cascading vines, and dappled sunlight filtering through the canopy. Leo's posture is proud and commanding, with his tail held high. The scene is captured from a medium close-up perspective, emphasizing Leo's powerful stance and the regal aura surrounding him.",
+        198,
+        1.0
+      ],
+      "widgets_values_named": {
+        "prompt": "A majestic lion named Leo stands regally in the heart of a dense jungle, embodying the essence of a king. Leo has a golden mane that flows gracefully around his broad shoulders, and his piercing amber eyes survey the landscape with confidence and authority. He is positioned on a rocky outcrop, towering over the lush greenery below. The background showcases a vibrant jungle scene with tall trees, cascading vines, and dappled sunlight filtering through the canopy. Leo's posture is proud and commanding, with his tail held high. The scene is captured from a medium close-up perspective, emphasizing Leo's powerful stance and the regal aura surrounding him.",
+        "frames": 198,
+        "image_strength": 1.0
+      }
     }
   ],
   "links": [
-    [
-      1,
-      2,
-      0,
-      3,
-      0,
-      "REACTOR_MODEL"
-    ],
     [
       2,
       3,
@@ -341,6 +337,14 @@
       5,
       0,
       "VIDEO"
+    ],
+    [
+      4,
+      6,
+      0,
+      3,
+      0,
+      "REACTOR_CHAIN"
     ]
   ],
   "groups": [],

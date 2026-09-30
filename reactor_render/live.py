@@ -7,12 +7,14 @@ import threading
 import time
 import urllib.request
 import uuid
+from dataclasses import replace
 import numpy as np
 
 from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
 
 from .encode import FrameWriter
-from .session import CONNECT_SETTLE_SECONDS, closing_session, connect_with_retry
+from .session import (CALL_PHASES, CALL_SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, call_phase,
+                      closing_session, connect_with_retry)
 from .timeline import MODELS, Beat, ModelSpec, compile_timeline
 
 # A live take is capped at half an hour; the SDK ends the session when the token hits this.
@@ -33,7 +35,13 @@ RUNS: dict[str, "LiveRun"] = {}
 
 def model_tracks(spec: ModelSpec) -> list[dict]:
     """The session's media tracks for a model, as the JS SDK's `modelTracks` must list them: its
-    source track, if it takes one, and the video it plays."""
+    source track, if it takes one, and the video it plays. A call lists `webcam` though only a video
+    call reads it; this run publishes only `mic`."""
+    if spec.pattern == "call":
+        return [{"name": "mic", "kind": "audio", "direction": "sendonly"},
+                {"name": "webcam", "kind": "video", "direction": "sendonly"},
+                {"name": "main_video", "kind": "video", "direction": "recvonly"},
+                {"name": "main_audio", "kind": "audio", "direction": "recvonly"}]
     source = [{"name": spec.source_track, "kind": "video", "direction": "sendonly"}] if spec.source_track else []
     return source + [{"name": "main_video", "kind": "video", "direction": "recvonly"}]
 
@@ -76,9 +84,9 @@ def drive_lanes(spec: ModelSpec) -> list[dict]:
     return lanes + [lane(field, tuple(axis)) for field, *axis in AXES if field in camera]
 
 
-def drive_setup(model: str, prompt: str, seed: int, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
-    """The commands that open a live drive run: a one-chunk timeline's setup."""
-    return compile_timeline(model, [Beat(prompt, frames=MODELS[model].frames_in(1), image=image)], seed, settings).setup
+def drive_setup(model: str, beat: Beat, seed: int, settings: dict[str, object]) -> list[tuple[str, dict]]:
+    """The commands that open a live drive run from `beat`: its setup as a one-chunk timeline, without its camera moves."""
+    return compile_timeline(model, [replace(beat, frames=MODELS[model].frames_in(1), moves=())], seed, settings).setup
 
 
 def style_setup(spec: ModelSpec, prompt: str, seed: int, image: bytes | None) -> list[tuple[str, dict]]:
@@ -97,7 +105,8 @@ class LiveRun:
 
     The server opens the session, sends its commands, and records the model's output. The browser
     joins the same session with a token bound to it, plays the output as the preview, and
-    publishes its camera when that is the source. The websocket carries only control messages.
+    publishes its camera when that is the source, or its microphone on a call. The websocket
+    carries only control messages.
 
     The node awaits `run` on its own event loop, which `__init__` captures; the websocket
     handler calls `connected`/`receive`/`disconnected` from the server thread. The SDK's media
@@ -128,6 +137,9 @@ class LiveRun:
         self._reactor = None
         self._writer: FrameWriter | None = None
         self._published = asyncio.Event()
+        # The model's messages, which a call's setup waits on for its phases.
+        self._messages: asyncio.Queue[dict] = asyncio.Queue()
+        self._frame_shape: tuple[int, ...] | None = None
         # True from connect until the run starts closing: a disconnect then is a drop, not ours.
         self._watching = False
 
@@ -156,8 +168,10 @@ class LiveRun:
         """
         try:
             await self._poll(self._connected, BROWSER_TIMEOUT_SECONDS, OPEN_TAB_ERROR, check_interrupt)
+            # On a call, the text box sends the character a message, as if spoken, instead of a new prompt.
+            command, field = ("say", "text") if self.mode == "call" else (self.spec.prompt_command, "prompt")
             self._send_json({"type": "config", "mode": self.mode, "prompt": self.prompt,
-                             "lanes": drive_lanes(self.spec), "prompt_command": self.spec.prompt_command,
+                             "lanes": drive_lanes(self.spec), "prompt_command": command, "prompt_field": field,
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else
                                       {"width": self.input_size[0], "height": self.input_size[1], "fps": INPUT_FPS}})
@@ -185,9 +199,15 @@ class LiveRun:
         writer = self._writer = FrameWriter(self.path, self.spec.fps)
 
         @reactor.on_track
-        def capture_video(track) -> None:
+        def capture(track) -> None:
             if track.kind == "video" and track.direction == "recvonly":
-                track.on_frame(lambda frame: self.capturing and writer.push(frame))
+                track.on_frame(self._push_video)
+            if track.kind == "audio" and track.direction == "recvonly":
+                track.on_frame(lambda pcm, sample_rate: self.capturing and writer.push_audio(pcm, sample_rate))
+
+        @reactor.on_message
+        def queue_message(msg: dict) -> None:
+            self._loop.call_soon_threadsafe(self._messages.put_nowait, msg)
 
         @reactor.on_status(ReactorStatus.DISCONNECTED)
         def dropped(_) -> None:
@@ -201,20 +221,28 @@ class LiveRun:
                 try:
                     await asyncio.sleep(CONNECT_SETTLE_SECONDS)
                     camera = self.mode == "style" and self.clip is None
+                    publish = self.spec.source_track if camera else "mic" if self.mode == "call" else None
                     # A local runtime takes no token.
                     jwt = None if "api_key" not in self.connect else await asyncio.to_thread(
                         session_token, self.connect["api_key"], self.spec.slug, reactor.session_id)
                     self._send_json({"type": "join", "model": self.spec.slug, "session_id": reactor.session_id, "jwt": jwt,
                                      "local": "api_key" not in self.connect, "tracks": model_tracks(self.spec),
-                                     "publish": self.spec.source_track if camera else None})
+                                     "publish": publish})
                     source = None
-                    if camera:
+                    if publish:
                         await self._poll(self._published, PUBLISH_TIMEOUT_SECONDS,
-                                         "The browser did not start its camera in time.", check_interrupt)
+                                         f"The browser did not start its {'microphone' if self.mode == 'call' else 'camera'} in time.",
+                                         check_interrupt)
                     elif self.mode == "style":
                         source = await reactor.publish_track(self.spec.source_track)
                     for command, data in self.setup:
                         await self._send_command(command, data)
+                        if command in CALL_PHASES:
+                            self._status("Starting the call…")
+                            await self._wait_for_phase(CALL_PHASES[command], check_interrupt)
+                    if self.mode == "call":
+                        await self._wait_for_character(check_interrupt)
+                        writer.fill_gaps = True
                     self.capturing = True
                     if source is not None:
                         push = asyncio.create_task(self._push_clip(source))
@@ -264,10 +292,44 @@ class LiveRun:
             await asyncio.gather(task, return_exceptions=True)
 
     async def _pump(self, check_interrupt) -> None:
-        """Wait out the run: nothing but an interrupt wakes it, so poll for one."""
+        """Wait out the run: nothing but an interrupt, or a call ending, wakes it, so poll for those."""
         while not self._finished.is_set():
             check_interrupt()
+            while not self._messages.empty():
+                call_phase(self._messages.get_nowait())
             await asyncio.sleep(0.1)
+
+    async def _wait_for_phase(self, phase: str, check_interrupt) -> None:
+        give_up = time.monotonic() + CALL_SETUP_SECONDS
+        while True:
+            check_interrupt()
+            if self._finished.is_set():
+                raise RuntimeError(self._error or "Cancelled.")
+            if time.monotonic() > give_up:
+                raise RuntimeError(f"The avatar call never reached {phase}.")
+            try:
+                msg = await asyncio.wait_for(self._messages.get(), timeout=0.25)
+            except asyncio.TimeoutError:
+                continue
+            if call_phase(msg) == phase:
+                return
+
+    async def _wait_for_character(self, check_interrupt) -> None:
+        """Wait out the connect placeholder, which a live call keeps streaming until the character appears."""
+        placeholder = self._frame_shape
+        give_up = time.monotonic() + REPLY_TIMEOUT_SECONDS
+        while self._frame_shape == placeholder:
+            check_interrupt()
+            if self._finished.is_set():
+                raise RuntimeError(self._error or "Cancelled.")
+            if time.monotonic() > give_up:
+                raise RuntimeError("The avatar never appeared.")
+            await asyncio.sleep(0.05)
+
+    def _push_video(self, frame: np.ndarray) -> None:
+        self._frame_shape = frame.shape
+        if self.capturing:
+            self._writer.push(frame)
 
     async def _push_clip(self, track) -> None:
         """Push the source clip at the model's frame rate, looping until the run ends."""

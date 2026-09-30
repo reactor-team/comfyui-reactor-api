@@ -82,3 +82,20 @@ def test_silent_audio_is_left_out(tmp_path):
     writer.close()
     with av.open(str(out)) as c:
         assert not c.streams.audio
+
+
+def test_fill_gaps_puts_sound_the_stream_never_sent_back_as_silence(tmp_path):
+    out = tmp_path / "out.mp4"
+    writer = FrameWriter(str(out), 10.0)
+    writer.fill_gaps = True
+    # Two seconds of frames, with sound for only the first and last half second.
+    for i in range(20):
+        writer.push(np.full((32, 32, 3), 200, dtype=np.uint8))
+        if i < 5 or i >= 15:
+            writer.push_audio(tone(0.1), 48000)
+    writer.close()
+    with av.open(str(out)) as c:
+        pcm = np.concatenate([f.to_ndarray().reshape(-1) for f in c.decode(audio=0)])
+    assert len(pcm) == pytest.approx(2 * 48000, abs=2048)
+    assert np.abs(pcm[round(1.0 * 48000):round(1.3 * 48000)]).max() < 0.01
+    assert np.abs(pcm[round(1.7 * 48000):round(1.9 * 48000)]).max() > 0.05

@@ -69,8 +69,7 @@
         "Node name for S&R": "ReactorModel"
       },
       "widgets_values": [
-        "Visko Orbis Stable",
-        "2k"
+        "Visko Orbis Stable"
       ],
       "widgets_values_named": {
         "model": "Visko Orbis Stable"

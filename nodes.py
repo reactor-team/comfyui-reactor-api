@@ -20,7 +20,7 @@ from server import PromptServer
 
 from .reactor_render import live
 from .reactor_render.session import render
-from .reactor_render.timeline import MODELS, Beat, Timeline, compile_timeline, editor_beats, editor_moves, model_facts, join_chains
+from .reactor_render.timeline import MODELS, Beat, Setting, Timeline, compile_timeline, editor_beats, editor_moves, model_facts, join_chains
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
 
@@ -64,6 +64,16 @@ def video_to_mp4(video) -> bytes:
     return buf.getvalue()
 
 
+def setting_input(key: str, setting: Setting):
+    if setting.options:
+        return io.Combo.Input(key, options=list(setting.options), default=setting.default, optional=True)
+    if isinstance(setting.default, bool):
+        return io.Boolean.Input(key, default=setting.default, optional=True)
+    if setting.maximum is not None:
+        return io.Float.Input(key, default=setting.default, min=0.0, max=setting.maximum, step=0.05, optional=True)
+    return io.String.Input(key, default=setting.default, optional=True)
+
+
 class ReactorModel(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -73,8 +83,7 @@ class ReactorModel(io.ComfyNode):
             category="Reactor",
             description="Picks the Reactor model a render runs on, and that model's settings.",
             inputs=[io.DynamicCombo.Input("model", options=[
-                io.DynamicCombo.Option(name, [io.Combo.Input(key, options=list(setting.options), default=setting.default, optional=True)
-                                              for key, setting in spec.settings.items()])
+                io.DynamicCombo.Option(name, [setting_input(key, setting) for key, setting in spec.settings.items()])
                 for name, spec in MODELS.items()],
                 extra_dict={"model_facts": {name: model_facts(spec) for name, spec in MODELS.items()}})],
             outputs=[ReactorModelType.Output()],
@@ -84,7 +93,7 @@ class ReactorModel(io.ComfyNode):
     def execute(cls, model) -> io.NodeOutput:
         # A setting missing from an older saved prompt is left to the model's own default.
         name = model["model"]
-        return io.NodeOutput((name, {key: model[key] for key in MODELS[name].settings if key in model}))
+        return io.NodeOutput((name, {key: model[key] for key in MODELS[name].settings if model.get(key) is not None}))
 
 
 class ReactorChain(io.ComfyNode):

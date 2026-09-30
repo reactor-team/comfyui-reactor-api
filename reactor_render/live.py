@@ -76,7 +76,7 @@ def drive_lanes(spec: ModelSpec) -> list[dict]:
     return lanes + [lane(field, tuple(axis)) for field, *axis in AXES if field in camera]
 
 
-def drive_setup(model: str, prompt: str, seed: int, image: bytes | None, settings: dict[str, str]) -> list[tuple[str, dict]]:
+def drive_setup(model: str, prompt: str, seed: int, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
     """The commands that open a live drive run: a one-chunk timeline's setup."""
     return compile_timeline(model, [Beat(prompt, frames=MODELS[model].frames_in(1), image=image)], seed, settings).setup
 

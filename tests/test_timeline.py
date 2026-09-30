@@ -79,6 +79,7 @@ def test_helios_schedules_prompts_and_sends_image_beats_live():
         ("set_seed", {"seed": 3}),
         ("set_conditioning", {"prompt": "a", "image": b"first"}),
         ("schedule_prompt", {"prompt": "b", "chunk": 2}),
+        ("set_sr_scale", {"sr_scale": "off"}),
         ("start", {}),
     ]
     assert plan.timed == [(3, "set_conditioning", {"prompt": "c", "image": b"third"})]
@@ -112,6 +113,7 @@ def test_live_models_open_with_image_then_prompt_then_start():
         ("set_seed", {"seed": 7}),
         ("set_image", {"image": b"png"}),
         ("set_prompt", {"prompt": "a"}),
+        ("set_resolution", {"resolution": "native"}),
         ("start", {}),
     ]
     assert plan.chunks == 6
@@ -234,14 +236,23 @@ def test_a_cut_restarts_the_short_first_chunk():
     assert plan.chunks == 5
 
 
-def test_a_model_setting_goes_out_before_start():
-    plan = compile_timeline("Visko Orbis Stable", [Beat("a", 99)], seed=0, settings={"resolution": "4k"})
-    assert plan.setup[-2:] == [("set_resolution", {"resolution": "4k"}), ("start", {})]
+def test_upscaling_is_turned_off_before_start():
+    plan = compile_timeline("Visko Orbis Stable", [Beat("a", 99)], seed=0)
+    assert plan.setup[-2:] == [("set_resolution", {"resolution": "1080p"}), ("start", {})]
+    plan = compile_timeline("Helios", [Beat("a", 72)], seed=0)
+    assert plan.setup[-2:] == [("set_sr_scale", {"sr_scale": "off"}), ("start", {})]
 
 
-def test_a_helios_setting_goes_out_before_start():
-    plan = compile_timeline("Helios", [Beat("a", 72)], seed=0, settings={"sr_scale": "4x"})
-    assert plan.setup[-2:] == [("set_sr_scale", {"sr_scale": "4x"}), ("start", {})]
+def test_visko_sound_settings_go_out_as_their_values():
+    plan = compile_timeline("Visko Orbis Dynamic", [Beat("a", 99)], seed=0,
+                            settings={"audio": False, "audio_prompt": "rain on a tin roof"})
+    assert plan.setup[-3:] == [("set_audio_enabled", {"audio_enabled": False}),
+                               ("set_audio_prompt", {"prompt": "rain on a tin roof"}), ("start", {})]
+
+
+def test_helios_image_strength_goes_out_as_a_number():
+    plan = compile_timeline("Helios", [Beat("a", 72)], seed=0, settings={"image_strength": 0.6})
+    assert plan.setup[-2:] == [("set_image_strength", {"image_strength": 0.6}), ("start", {})]
 
 
 # LingBot: chunk n of a run ends at 17 + 24(n - 1) frames, so chunk edges fall at frames 17, 41,
@@ -380,8 +391,8 @@ def test_joined_chains_play_in_order_with_later_moves_from_where_their_chain_sta
 
 
 def test_joining_chains_for_different_models_or_settings_is_an_error():
-    chain = Timeline("Visko Orbis Stable", (Beat("a", 48),), {"resolution": "2k"})
+    chain = Timeline("Visko Orbis Stable", (Beat("a", 48),), {"audio": True})
     with pytest.raises(ValueError, match="Chain 2 is for a different Reactor Model or settings"):
-        join_chains([chain, Timeline("Visko Orbis Stable", (Beat("b", 48),), {"resolution": "1080p"})])
+        join_chains([chain, Timeline("Visko Orbis Stable", (Beat("b", 48),), {"audio": False})])
     with pytest.raises(ValueError, match="Chain 2 is for a different Reactor Model"):
         join_chains([chain, Timeline("Helios", (Beat("b", 48),))])

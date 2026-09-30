@@ -32,7 +32,7 @@ fresh, or leave it as a shot to keep the same world and move the story on.
 ### Helios
 
 Generate one continuous scene and steer it with a new prompt on each beat. Any beat can take a
-reference image to guide it. The `sr_scale` setting upscales the output 2x or 4x.
+reference image to guide it. `image_strength` sets how closely the scene holds to a beat's image.
 [Overview](https://docs.reactor.inc/model-api-reference/helios/overview) ·
 [Prompt guide](https://docs.reactor.inc/model-api-reference/helios/prompt-guide)
 
@@ -55,7 +55,9 @@ between beats to restyle the weather, lighting, or events while the reference im
 
 Film one uninterrupted shot that changes as it plays. Each new beat's prompt morphs the picture
 instead of cutting. Start from text, or anchor the opening frame with an image on the first beat.
-Output goes up to 4k: Stable offers 1080p, 2k and 4k, and Dynamic also offers native resolution.
+Dynamic renders at its native 832x480 and Stable at its smallest size, 1080p.
+The video has sound, made from the picture or described by `audio_prompt`; turn `audio` off to
+leave it out, which makes each chunk cheaper to generate.
 [Stable overview](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/overview) ·
 [Stable prompt guide](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/prompt-guide) ·
 [Dynamic overview](https://docs.reactor.inc/model-api-reference/visko-orbis-dynamic/overview) ·

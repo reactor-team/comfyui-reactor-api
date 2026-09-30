@@ -43,16 +43,22 @@ class Timeline:
     """A whole render request: the model, its settings, its beats in play order, and its camera moves."""
     model: str
     beats: tuple[Beat, ...]
-    settings: dict[str, str] = field(default_factory=dict)
+    settings: dict[str, object] = field(default_factory=dict)
     moves: tuple[Move, ...] = ()
 
 
 @dataclass(frozen=True)
 class Setting:
-    """A model option picked on Reactor Model and sent before `start` as `command` with one field."""
+    """A model option picked on Reactor Model and sent before `start` as `command` with one field.
+
+    `field` is that field's name, when it differs from the setting's. A setting with no `options`
+    takes a value of its `default`'s type: a toggle, a number from 0 to `maximum`, or text.
+    """
     command: str
     options: tuple[str, ...]
-    default: str
+    default: str | float | bool
+    field: str | None = None
+    maximum: float | None = None
 
 
 @dataclass(frozen=True)
@@ -87,6 +93,7 @@ class ModelSpec:
     frames are fitted to; with `keeps_aspect`, only its short side is fixed and the source's aspect holds.
     `starts` is whether the model waits for a `start` command before generating. `live` is whether
     Reactor Realtime offers the model.
+    `native` is the commands, sent before `start`, that keep the video at the model's native size, or its nearest.
     `settings` maps each setting's command field to the setting. `camera` maps each camera lane,
     named by its command's field, to the lane. `prompt_command` changes the prompt mid-run.
     """
@@ -107,6 +114,7 @@ class ModelSpec:
     keeps_aspect: bool = False
     starts: bool = True
     live: bool = True
+    native: tuple[tuple[str, dict], ...] = ()
     settings: dict[str, Setting] = field(default_factory=dict)
     camera: dict[str, Lane] = field(default_factory=dict)
     prompt_command: str = "set_prompt"
@@ -137,9 +145,6 @@ class ModelSpec:
         return 0 if chunks == 0 else (self.first_chunk_frames or self.frames_per_chunk) + (chunks - 1) * self.frames_per_chunk
 
 
-VISKO_RESOLUTION = ("native", "1080p", "2k", "4k")
-
-
 def choices(*values: str) -> dict[str, str]:
     return {v: v for v in values}
 
@@ -165,6 +170,10 @@ LINGBOT_WORLD_2_CAMERA = {"camera_pose": Lane("set_camera_pose", POSES, []),
                           **LOOK}
 
 
+VISKO_SETTINGS = {"audio": Setting("set_audio_enabled", (), True, field="audio_enabled"),
+                  "audio_prompt": Setting("set_audio_prompt", (), "", field="prompt")}
+
+
 MODELS = {
     # Measured on cloud sessions: a scene's first chunk is 29 frames and every later one 32, where the docs say 29,
     # and `frames_emitted` counts the whole session.
@@ -172,7 +181,8 @@ MODELS = {
                               session_frames=True, first_chunk_frames=29, size=(1280, 704), prompt_command="set_shot"),
     # TODO: Helios publishes no frame rate, so the 24 the output file plays at is a placeholder.
     "Helios": ModelSpec("reactor/helios", "chunked", 24.0, "any", False, frames_per_chunk=33, size=(640, 384),
-                        settings={"sr_scale": Setting("set_sr_scale", ("off", "2x", "4x"), "2x")}),
+                        native=(("set_sr_scale", {"sr_scale": "off"}),),
+                        settings={"image_strength": Setting("set_image_strength", (), 1.0, maximum=1.0)}),
     # Measured on cloud sessions, for both LingBots: a run's first chunk is 17 frames and every later one 24.
     # `max_scene_chunks` is a run, after which the model restarts from its image.
     # TODO: LingBot's docs say 16 fps, but frames arrive at about 38, so the output file's rate is unsettled.
@@ -184,9 +194,12 @@ MODELS = {
                                  camera=LINGBOT_WORLD_2_CAMERA),
     # `max_scene_chunks` is `generation_started.max_chunks` on cloud sessions at `2k`; the Dynamic docs say 229.
     "Visko Orbis Dynamic": ModelSpec("reactor/visko-orbis-dynamic", "chunked", 18.0, "first", False, frames_per_chunk=33,
-                                     max_scene_chunks=2000, size=(832, 480), settings={"resolution": Setting("set_resolution", VISKO_RESOLUTION, "2k")}),
+                                     max_scene_chunks=2000, size=(832, 480), settings=VISKO_SETTINGS,
+                                     native=(("set_resolution", {"resolution": "native"}),)),
+    # Stable offers no native tier, so it delivers its smallest, 1080p.
     "Visko Orbis Stable": ModelSpec("reactor/visko-orbis-stable", "chunked", 18.0, "first", False, frames_per_chunk=33,
-                                    max_scene_chunks=2000, size=(832, 480), settings={"resolution": Setting("set_resolution", VISKO_RESOLUTION[1:], "2k")}),
+                                    max_scene_chunks=2000, size=(832, 480), settings=VISKO_SETTINGS,
+                                    native=(("set_resolution", {"resolution": "1080p"}),)),
     # TODO: SANA-Streaming's docs publish no frame rate, so the 24 the output file plays at is
     # a placeholder.
     "Sana Streaming": ModelSpec("reactor/sana-streaming", "source", 24.0, "none", False, videos="first", video_required=True,
@@ -249,7 +262,7 @@ class Plan:
     source: bytes | None = None
 
 
-def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[str, str] | None = None,
+def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[str, object] | None = None,
                      moves: list[Move] | None = None) -> Plan:
     spec = MODELS[model]
     if not beats:
@@ -295,7 +308,8 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
     def at_start() -> int:
         return plan.setup.index(("start", {})) if ("start", {}) in plan.setup else len(plan.setup)
 
-    plan.setup[at_start():at_start()] = [(spec.settings[name].command, {name: value}) for name, value in (settings or {}).items()]
+    plan.setup[at_start():at_start()] = [*spec.native] + [(spec.settings[name].command, {spec.settings[name].field or name: value})
+                                            for name, value in (settings or {}).items()]
     for chunk, command, data in camera_commands(model, spec, moves, plan.chunks):
         if chunk == 0:
             plan.setup.insert(at_start(), (command, data))

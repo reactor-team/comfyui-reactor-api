@@ -22,7 +22,20 @@ const STYLE = `
 .reactor-live-key.up { grid-row: 1; }
 .reactor-live-key.on { opacity: 1; background: var(--p-primary-color, #3b82f6); border-color: var(--p-primary-color, #3b82f6); color: #fff; }
 .reactor-live-stats { opacity: 0.6; font-variant-numeric: tabular-nums; }
-.reactor-live-switch { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.reactor-live-look { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.reactor-live-figure { display: flex; flex-direction: column; gap: 4px; width: 112px; text-align: center; }
+.reactor-live-tile { box-sizing: border-box; width: 112px; height: 112px; display: flex; align-items: center; justify-content: center; padding: 0; overflow: hidden; border: 1px solid var(--border-color); border-radius: 4px; background: var(--comfy-input-bg); }
+.reactor-live-tile img { width: 100%; height: 100%; object-fit: cover; }
+.reactor-live .reactor-live-tile.new { border-style: dashed; padding: 8px; }
+.reactor-live-tile.new.over { border-color: var(--p-primary-color, #3b82f6); }
+.reactor-live-tile.new:has(img:not([hidden])) { padding: 0; border-style: solid; }
+.reactor-live-caption { opacity: 0.7; }
+.reactor-live-look-side { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 220px; }
+.reactor-live-segment { display: flex; flex-wrap: wrap; }
+.reactor-live .reactor-live-segment button { border-radius: 0; margin-left: -1px; }
+.reactor-live .reactor-live-segment button:first-child { border-radius: 3px 0 0 3px; margin-left: 0; }
+.reactor-live .reactor-live-segment button:last-child { border-radius: 0 3px 3px 0; }
+.reactor-live .reactor-live-segment button.on { position: relative; background: var(--p-primary-color, #3b82f6); border-color: var(--p-primary-color, #3b82f6); color: #fff; }
 .reactor-live textarea, .reactor-live button, .reactor-live select { background: var(--comfy-input-bg); color: var(--input-text); border: 1px solid var(--border-color); border-radius: 3px; font: inherit; }
 .reactor-live textarea { min-height: 52px; resize: vertical; }
 .reactor-live button { padding: 4px 12px; cursor: pointer; }
@@ -61,14 +74,14 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                       pad([null, ["ArrowUp", "↑"], null], [["ArrowLeft", "←"], ["ArrowDown", "↓"], ["ArrowRight", "→"]]));
     const stats = el("div", { className: "reactor-live-stats" });
     const prompt = el("textarea");
-    // Controls for a model steered by an image and settings instead of a prompt, filled from the config.
-    const switcher = el("div", { className: "reactor-live-switch", hidden: true });
+    // The Look panel, for a model steered by an image and settings instead of a prompt, filled from the config.
+    const switcher = el("div", { className: "reactor-live-look", hidden: true });
     const apply = el("button", { textContent: "Apply", disabled: true });
+    const applyRow = el("div", { className: "reactor-live-row end" }, apply);
     const done = el("button", { textContent: "Done" });
     const cancel = el("button", { textContent: "Cancel" });
     const buttons = el("div", { className: "reactor-live-row" }, done, cancel);
-    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, prompt, switcher,
-                         el("div", { className: "reactor-live-row end" }, apply), buttons, stats));
+    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, prompt, switcher, applyRow, buttons, stats));
     document.body.append(backdrop);
 
     const url = new URL(api.apiURL(`/reactor/live/${run_id}`), location.href);
@@ -80,7 +93,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let lanes = [];          // the model's drive lanes, from the config
     let promptCommand = null;
     let promptField = null;
-    let switchControls = null;   // the switch's image field and setting pickers, for a model without a prompt
+    let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
     const lastSent = new Map();  // each lane's field to the value last sent
     let reactor = null;      // this browser's own client in the session
@@ -105,6 +118,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         if (tornDown) return;
         tornDown = true;
         stopKeys();
+        window.removeEventListener("paste", onPaste);
         if (stream) for (const track of stream.getTracks()) track.stop();
         reactor?.disconnect().catch(() => {});
         socket.close();
@@ -326,15 +340,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             prompt.value = message.prompt;
             if (message.switch) {
                 prompt.hidden = true;
-                const file = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", title: "A new reference image" });
-                const pickers = message.switch.settings.map((setting) => {
-                    const select = el("select", { title: setting.field },
-                                      ...setting.options.map((option) => el("option", { value: option, textContent: option, selected: option === setting.value })));
-                    return { setting, select, sent: setting.value };
-                });
-                switchControls = { image: message.switch.image, file, pickers };
-                switcher.append(...pickers.map(({ select }) => select), el("label", { textContent: "New image " }, file));
-                switcher.hidden = false;
+                applyRow.hidden = true;
+                look = buildLook(message.switch);
             }
             if (caps.size) {
                 legend.hidden = false;
@@ -357,6 +364,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         } else if (message.type === "started") {
             started = true;
             apply.disabled = false;
+            look?.refresh();
             if (held) drive();
         } else if (message.type === "stats") {
             const mbps = (bps) => `${(bps / 1e6).toFixed(1)} Mbps`;
@@ -386,28 +394,105 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     });
 
     apply.onclick = async () => {
-        if (switchControls) return void switchTo(switchControls);
+        if (look) return void switchTo();
         command(promptCommand, { [promptField]: prompt.value });
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
     };
-    // Sends only what changed, once: the model keeps the previous look when a switch fails.
-    async function switchTo({ image, file, pickers }) {
+    // Each option value reads as its label: `style_transfer` is "Style transfer".
+    const optionLabel = (option) => option.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
+
+    // The reference in use, a tile for the next one (dropped, pasted or picked), and each setting's options.
+    function buildLook({ image, reference, settings }) {
+        const current = el("img", { alt: "", hidden: !reference, src: reference ?? "" });
+        const chosen = el("img", { alt: "", hidden: true });
+        const hint = el("span", { textContent: "Drop, paste or click for a new image" });
+        const file = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true });
+        const tile = el("button", { className: "reactor-live-tile new", title: "A new reference image" }, chosen, hint);
+        const panel = { image, next: null, busy: false };
+        panel.choose = (next) => {
+            if (!next?.type.startsWith("image/") || panel.busy) return;
+            if (chosen.src) URL.revokeObjectURL(chosen.src);
+            panel.next = next;
+            chosen.src = URL.createObjectURL(next);
+            chosen.hidden = false;
+            hint.hidden = true;
+            panel.refresh();
+        };
+        panel.pickers = settings.map((setting) => {
+            const picker = { setting, value: setting.value, sent: setting.value };
+            picker.buttons = setting.options.map((option) => el("button", {
+                textContent: optionLabel(option), title: option,
+                onclick: () => { picker.value = option; panel.refresh(); },
+            }));
+            return picker;
+        });
+        panel.refresh = () => {
+            for (const picker of panel.pickers) picker.buttons.forEach((button, i) => button.classList.toggle("on", picker.setting.options[i] === picker.value));
+            const changed = panel.next || panel.pickers.some((picker) => picker.value !== picker.sent);
+            apply.disabled = !started || panel.busy || !changed;
+        };
+        // After a switch the chosen image becomes the one in use.
+        panel.commit = () => {
+            for (const picker of panel.pickers) picker.sent = picker.value;
+            if (panel.next) {
+                if (current.src.startsWith("blob:")) URL.revokeObjectURL(current.src);
+                current.src = chosen.src;
+                current.hidden = false;
+                chosen.removeAttribute("src");
+                chosen.hidden = true;
+                hint.hidden = false;
+                panel.next = null;
+            }
+            file.value = "";
+            panel.refresh();
+        };
+        tile.onclick = () => file.click();
+        file.onchange = () => panel.choose(file.files[0]);
+        tile.ondragover = (e) => { e.preventDefault(); tile.classList.add("over"); };
+        tile.ondragleave = () => tile.classList.remove("over");
+        tile.ondrop = (e) => {
+            e.preventDefault();
+            tile.classList.remove("over");
+            panel.choose(e.dataTransfer.files[0]);
+        };
+        window.addEventListener("paste", onPaste);
+        const figure = (node, caption) => el("div", { className: "reactor-live-figure" }, node, el("div", { className: "reactor-live-caption", textContent: caption }));
+        switcher.append(figure(el("div", { className: "reactor-live-tile" }, current), "In use"), figure(tile, "Next"), file,
+                        el("div", { className: "reactor-live-look-side" },
+                           ...panel.pickers.map(({ buttons }) => el("div", { className: "reactor-live-segment" }, ...buttons)),
+                           el("div", { className: "reactor-live-row" }, apply)));
+        switcher.hidden = false;
+        panel.refresh();
+        return panel;
+    }
+    function onPaste(e) {
+        const next = [...(e.clipboardData?.files ?? [])].find((file) => file.type.startsWith("image/"));
+        if (!next || !look) return;
+        e.preventDefault();
+        look.choose(next);
+    }
+
+    // Sends only what changed, once, and waits for the model's reply: it keeps the previous look when a switch fails.
+    async function switchTo() {
         const data = {};
-        for (const picker of pickers) if (picker.select.value !== picker.sent) data[picker.setting.field] = picker.select.value;
-        apply.disabled = true;
+        for (const picker of look.pickers) if (picker.value !== picker.sent) data[picker.setting.field] = picker.value;
+        look.busy = true;
+        apply.textContent = "Switching…";
+        look.refresh();
         try {
-            if (file.files[0]) data[image] = await reactor.uploadFile(file.files[0]);
+            if (look.next) data[look.image] = await reactor.uploadFile(look.next);
+            const reply = await reactor.sendCommand(promptCommand, data);
+            if (reply?.type === "command_error") throw new Error(reply.data?.reason ?? "no reason given");
+            look.commit();
+            status.textContent = "Switched; the new look shows in a moment.";
         } catch (e) {
-            status.textContent = `That image could not be uploaded: ${e?.message ?? e}`;
-            return;
+            status.textContent = `The switch failed: ${e?.message ?? e}`;
         } finally {
-            apply.disabled = false;
+            look.busy = false;
+            apply.textContent = "Apply";
+            look.refresh();
         }
-        if (!Object.keys(data).length) return;
-        command(promptCommand, data);
-        for (const picker of pickers) picker.sent = picker.select.value;
-        file.value = "";
     }
     done.onclick = () => {
         done.disabled = true;

@@ -1,10 +1,12 @@
 import asyncio
+import io
 import json
 from types import SimpleNamespace
 
 import av
 import numpy as np
 import pytest
+from PIL import Image
 
 from reactor_render import live, timeline
 from reactor_render.timeline import MODELS, POSES
@@ -400,10 +402,13 @@ def test_an_edit_starts_from_its_image_and_offers_its_switch_controls():
     spec = MODELS["Vidu S2-Editing"]
     assert live.style_setup(spec, "", 0, b"clay", {"editing_type": "virtual_tryon"}) == [
         ("start_edit", {"reference_image": b"clay", "editing_type": "virtual_tryon"})]
-    assert live.switch_controls(spec, {"editing_type": "virtual_tryon"}) == {
-        "image": "reference_image",
+    buf = io.BytesIO()
+    Image.new("RGB", (4, 4), "orange").save(buf, format="PNG")
+    setup = live.style_setup(spec, "", 0, buf.getvalue(), {"editing_type": "virtual_tryon"})
+    assert live.switch_controls(spec, {"editing_type": "virtual_tryon"}, setup) == {
+        "image": "reference_image", "reference": timeline.data_url(buf.getvalue()),
         "settings": [{"field": "editing_type", "options": list(timeline.EDIT_TYPES), "value": "virtual_tryon"}]}
-    assert live.switch_controls(MODELS["X2"], {}) is None
+    assert live.switch_controls(MODELS["X2"], {}, []) is None
 
 
 async def test_a_source_clip_loops_in_place_of_the_camera(tmp_path, monkeypatch):

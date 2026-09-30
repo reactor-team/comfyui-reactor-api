@@ -15,7 +15,7 @@ from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
 from .encode import FrameWriter
 from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       closing_session, connect_with_retry)
-from .timeline import MODELS, Beat, ModelSpec, compile_timeline, edit_setup
+from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_setup
 
 # A live take is capped at half an hour; the SDK ends the session when the token hits this.
 LIVE_SESSION_LIMIT_SECONDS = 1800
@@ -103,15 +103,16 @@ def style_setup(spec: ModelSpec, prompt: str, seed: int, image: bytes | None, se
     return [("set_seed", {"seed": seed}), ("set_prompt", {"prompt": prompt}), ("start", {})]
 
 
-def switch_controls(spec: ModelSpec, settings: dict[str, object]) -> dict | None:
+def switch_controls(spec: ModelSpec, settings: dict[str, object], setup: list[tuple[str, dict]]) -> dict | None:
     """What the modal's switch controls send mid-take, for a model steered by an image and settings instead of a prompt.
 
-    `image` is the field of `prompt_command` a new image goes in, and each of `settings` is a setting of
-    that command with its options and the value the take starts at.
+    `image` is the field of `prompt_command` a new image goes in, `reference` the image the take starts from, and
+    each of `settings` is a setting of that command with its options and the value the take starts at.
     """
     if spec.prompted:
         return None
-    return {"image": spec.switch_image,
+    reference = next((data[spec.switch_image] for _, data in setup if spec.switch_image in data), None)
+    return {"image": spec.switch_image, "reference": reference and data_url(reference),
             "settings": [{"field": setting.field or name, "options": list(setting.options), "value": settings.get(name, setting.default)}
                          for name, setting in spec.beat_settings.items() if setting.command == spec.prompt_command and setting.options]}
 
@@ -191,7 +192,7 @@ class LiveRun:
             command, field = ("say", "text") if self.mode == "call" else (self.spec.prompt_command, "prompt" if self.spec.prompted else None)
             self._send_json({"type": "config", "mode": self.mode, "prompt": self.prompt,
                              "lanes": drive_lanes(self.spec), "prompt_command": command, "prompt_field": field,
-                             "switch": switch_controls(self.spec, self.settings),
+                             "switch": switch_controls(self.spec, self.settings, self.setup),
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else
                                       {"width": self.input_size[0], "height": self.input_size[1], "fps": INPUT_FPS}})

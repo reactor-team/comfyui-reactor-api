@@ -208,35 +208,22 @@ async def live_socket(request):
         await ws.close(code=4404)
         return ws
     loop = asyncio.get_running_loop()
-    previews = live.PreviewSender(ws.send_bytes, run.request_keyframe)
 
     async def relay(message):
-        if isinstance(message, bytes):
-            await previews.push(message)
-        else:
-            await ws.send_str(message)
-            if run.ended:
-                await ws.close()
+        await ws.send_str(message)
+        if run.ended:
+            await ws.close()
 
     def send(message):
         """The thread-safe sender the run emits through; a dead socket is silent."""
         future = asyncio.run_coroutine_threadsafe(relay(message), loop)
         future.add_done_callback(lambda f: f.cancelled() or f.exception())
 
-    try:
-        kbps = min(max(int(float(request.query["preview_mbps"]) * 1000), 500), 20000)
-    except (KeyError, ValueError):
-        kbps = live.PREVIEW_KBPS
-    try:
-        width = int(request.query["preview_width"])
-    except (KeyError, ValueError):
-        width = live.PREVIEW_MAX_WIDTH
-    width = max(width, 160) if width else None
-    if not run.connected(send, kbps, width):
+    if not run.connected(send):
         await ws.close(code=4409)
         return ws
     async for msg in ws:
-        if msg.type in (WSMsgType.TEXT, WSMsgType.BINARY):
+        if msg.type == WSMsgType.TEXT:
             run.receive(msg.data)
     run.disconnected()
     return ws
@@ -252,8 +239,8 @@ async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str,
     file = f"{filename}_{counter:05}_.mp4"
     path = os.path.join(folder, file)
     spec = MODELS[model]
-    # The browser encodes its camera at exactly this size, a 16:9 frame at the model's native size:
-    # a live session dies on a resolution change mid-chunk.
+    # The browser asks its camera for this size, a 16:9 frame at the model's native size, and holds
+    # it: a live session dies on a resolution change mid-chunk.
     input_size = spec.frame_size(1920, 1080) if mode == "style" and clip is None else None
     run = live.LiveRun(mode, spec, path, prompt, setup, input_size, connect_args(), clip)
     live.RUNS[run.run_id] = run
@@ -264,7 +251,6 @@ async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str,
         await run.run(comfy.model_management.throw_exception_if_processing_interrupted)
     finally:
         live.RUNS.pop(run.run_id, None)
-        run.close()
     return io.NodeOutput(InputImpl.VideoFromFile(path), ui=ui.PreviewVideo([ui.SavedResult(file, subfolder, io.FolderType.output)]))
 
 

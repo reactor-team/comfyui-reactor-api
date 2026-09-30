@@ -10,8 +10,8 @@ const STYLE = `
 .reactor-live-preview.drive:focus { outline: 2px solid var(--p-primary-color, #3b82f6); outline-offset: 2px; cursor: default; }
 .reactor-live-hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 3px 10px; border-radius: 3px; background: rgb(0 0 0 / 0.65); color: #fff; pointer-events: none; }
 .reactor-live-preview:focus .reactor-live-hint { display: none; }
-.reactor-live-preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.reactor-live-preview video { position: absolute; right: 6px; bottom: 6px; width: 22%; min-width: 120px; border: 1px solid var(--border-color); border-radius: 3px; }
+.reactor-live-output { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.reactor-live-self { position: absolute; right: 6px; bottom: 6px; width: 22%; min-width: 120px; border: 1px solid var(--border-color); border-radius: 3px; }
 .reactor-live-status { min-height: 15px; opacity: 0.8; }
 .reactor-live-status:empty { display: none; }
 .reactor-live-status.error { color: #e05252; opacity: 1; }
@@ -40,10 +40,10 @@ function el(tag, attrs = {}, ...children) {
 function openLive({ run_id, mode, title, camera }) {
     const backdrop = el("div", { className: "reactor-live-backdrop" });
     const header = el("div", { className: "reactor-live-title", textContent: title });
-    const canvas = el("canvas");
-    const preview = el("div", { className: "reactor-live-preview" }, canvas);
+    const output = el("video", { className: "reactor-live-output", autoplay: true, muted: true, playsInline: true });
+    const preview = el("div", { className: "reactor-live-preview" }, output);
     const status = el("div", { className: "reactor-live-status", textContent: "Connecting…" });
-    // Keycaps for the drive keys, lit while the server reports driving the model with them.
+    // Keycaps for the drive keys, lit while held.
     const caps = new Map();
     // Each pad is a top row at columns 1-3, where null leaves a gap, over a full bottom row.
     const pad = (top, bottom) => el("div", { className: "reactor-live-pad" },
@@ -63,33 +63,27 @@ function openLive({ run_id, mode, title, camera }) {
     const done = el("button", { textContent: "Done" });
     const cancel = el("button", { textContent: "Cancel" });
     const buttons = el("div", { className: "reactor-live-row" }, done, cancel);
-    const view = canvas.getContext("2d");
     backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, prompt,
                          el("div", { className: "reactor-live-row end" }, apply), buttons, stats));
     document.body.append(backdrop);
 
     const url = new URL(api.apiURL(`/reactor/live/${run_id}`), location.href);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    url.searchParams.set("preview_mbps", app.extensionManager.setting.get(PREVIEW_BITRATE));
-    url.searchParams.set("preview_width", app.extensionManager.setting.get(PREVIEW_WIDTH));
     const socket = new WebSocket(url);
-    socket.binaryType = "arraybuffer";
 
-    let decoder = null;      // null until config, and after a decode error until the next keyframe
-    let previewSize = null;
-    let needKey = true;
-    let requestedKey = 0;
-    let encoder = null;
-    let stream = null;
-    let video = null;
-    let wantKey = true;      // the next webcam frame goes out as a keyframe
+    let stream = null;       // the camera, when this browser publishes it
     let held = null;
+    let lanes = [];          // the model's drive lanes, from the config
+    let promptCommand = null;
+    let started = false;     // setup is done, and this browser sends the model its commands
+    const lastSent = new Map();  // each lane's field to the value last sent
+    let reactor = null;      // this browser's own client in the session
+    let input = null;        // the camera size and rate the server asked for
+    let own = null;          // this browser's connection stats: the preview it receives, the camera it sends
     let ended = false;       // an "ended" message arrived; the socket close after it is expected
     let staying = false;     // the modal stays open on an error or a take that needs pasting
     let closed = false;
     let tornDown = false;
-    let drawn = 0;           // preview frames drawn since the last stats message
-    let statsAt = performance.now();
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
 
@@ -105,10 +99,8 @@ function openLive({ run_id, mode, title, camera }) {
         if (tornDown) return;
         tornDown = true;
         stopKeys();
-        video = null;
         if (stream) for (const track of stream.getTracks()) track.stop();
-        if (encoder?.state === "configured") encoder.close();
-        if (decoder?.state === "configured") decoder.close();
+        reactor?.disconnect().catch(() => {});
         socket.close();
     }
 
@@ -134,7 +126,30 @@ function openLive({ run_id, mode, title, camera }) {
 
     // While the modal is open, keys outside its text fields stop here so ComfyUI's hotkeys never
     // fire; the drive keys drive only while the preview has focus, and a blur releases them all.
-    const sendKeys = () => send({ type: "keys", held: [...held] });
+    function command(name, data) {
+        reactor?.sendCommand(name, data).then((reply) => {
+            if (reply?.type === "command_error") status.textContent = `Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`;
+        });
+    }
+
+    // Each lane follows the first of its key pairs with exactly one key held, and rests at idle otherwise.
+    function drive() {
+        for (const [code, cap] of caps) cap.classList.toggle("on", held.has(code));
+        if (!started) return;
+        for (const lane of lanes) {
+            let value = lane.idle;
+            for (const [low, high, negative, positive] of lane.axes) {
+                const axis = held.has(high) - held.has(low);
+                if (axis) {
+                    value = axis > 0 ? positive : negative;
+                    break;
+                }
+            }
+            if (JSON.stringify(lastSent.get(lane.field) ?? lane.idle) === JSON.stringify(value)) continue;
+            lastSent.set(lane.field, value);
+            command(lane.command, { [lane.field]: value });
+        }
+    }
     function onKeyDown(e) {
         if (e.key === "Escape") {
             e.preventDefault();
@@ -148,202 +163,128 @@ function openLive({ run_id, mode, title, camera }) {
         e.preventDefault();
         if (e.repeat || held.has(e.code)) return;
         held.add(e.code);
-        sendKeys();
+        drive();
     }
     function onKeyUp(e) {
         if (!e.target?.closest?.("textarea, input")) e.stopImmediatePropagation();
-        if (held?.delete(e.code)) sendKeys();
+        if (held?.delete(e.code)) drive();
     }
     function releaseKeys() {
         if (!held?.size) return;
         held.clear();
-        sendKeys();
+        drive();
     }
     window.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("keyup", onKeyUp, true);
 
-    // Preview, server to browser.
+    // The session, joined from this browser: it plays the model's output as the preview and, for
+    // a camera source, publishes the camera itself.
 
-    const requestKey = () => {
-        if (performance.now() - requestedKey < 500) return;
-        requestedKey = performance.now();
-        send({ type: "keyframe" });
-    };
+    const openCamera = (deviceId) => navigator.mediaDevices.getUserMedia({
+        video: { deviceId: deviceId && { exact: deviceId }, width: { ideal: input.width }, height: { ideal: input.height },
+                 frameRate: { ideal: input.fps } },
+        audio: false,
+    });
 
-    function newDecoder() {
-        const next = new VideoDecoder({
-            output: (frame) => {
-                try { view.drawImage(frame, 0, 0, canvas.width, canvas.height); drawn++; } finally { frame.close(); }
-            },
-            error: () => {
-                if (decoder !== next) return;
-                // An errored decoder never recovers; resync from the next keyframe instead.
-                decoder = null;
-                needKey = true;
-                requestKey();
-            },
-        });
-        next.configure({ codec: "avc1.42E01F", optimizeForLatency: true });
-        return next;
-    }
-
-    function decodePreview(data) {
-        const header = new DataView(data);
-        if (header.byteLength < 9) return;
-        const key = header.getUint8(0) === 1;
-        if (!decoder) {
-            if (!previewSize) return;
-            if (!key) { requestKey(); return; }
-            decoder = newDecoder();
-        }
-        if (!key && (needKey || decoder.decodeQueueSize > 2)) {
-            // Behind on deltas: every delta until the next keyframe is undecodable anyway.
-            needKey = true;
-            requestKey();
-            return;
-        }
-        // The frame timestamp is 8 bytes of unsigned big-endian microseconds.
-        let timestamp = 0;
-        for (let i = 1; i <= 8; i++) timestamp = timestamp * 256 + header.getUint8(i);
-        try {
-            decoder.decode(new EncodedVideoChunk({ type: key ? "key" : "delta", timestamp, data: new Uint8Array(data, 9) }));
-            if (key) needKey = false;
-        } catch {
-            needKey = true;
-            requestKey();
-        }
-    }
-
-    // Webcam, browser to server (style mode only).
-
-    async function startCamera(input) {
-        const grab = el("canvas", { width: input.width, height: input.height }).getContext("2d");
-        let keyAt = 0;
-        let frames = 0;
-        let nextFrame = -Infinity;
-        encoder = new VideoEncoder({
-            output: (chunk) => {
-                const data = new Uint8Array(9 + chunk.byteLength);
-                const header = new DataView(data.buffer);
-                header.setUint8(0, chunk.type === "key" ? 1 : 0);
-                let t = BigInt(chunk.timestamp);
-                for (let i = 8; i >= 1; i--) {
-                    header.setUint8(i, Number(t & 0xffn));
-                    t >>= 8n;
-                }
-                chunk.copyTo(data.subarray(9));
-                if (socket.readyState === WebSocket.OPEN) socket.send(data);
-            },
-            error: () => {
-                teardown();
-                stay("The webcam encoder failed.", true);
-            },
-        });
-        encoder.configure({
-            // Baseline level 4.0: X2's 1472x832 input is past level 3.1's 1280x720 ceiling.
-            codec: "avc1.42E028",
-            width: input.width,
-            height: input.height,
-            framerate: input.fps,
-            bitrate: 2_500_000,
-            latencyMode: "realtime",
-            avc: { format: "annexb" },
-        });
-        const open = (deviceId) => navigator.mediaDevices.getUserMedia({
-            video: { deviceId: deviceId && { exact: deviceId }, width: { ideal: input.width }, height: { ideal: input.height },
-                     frameRate: { ideal: input.fps } },
-            audio: false,
-        });
+    async function startCamera() {
         // The node names its camera by label; an unknown label falls back to the default camera.
         const wanted = camera && camera !== DEFAULT_CAMERA
             && (await navigator.mediaDevices.enumerateDevices()).find((device) => device.kind === "videoinput" && device.label === camera);
-        const media = await open(wanted?.deviceId);
-        if (closed) {
-            for (const track of media.getTracks()) track.stop();
-            return;
-        }
+        const media = await openCamera(wanted?.deviceId);
+        if (closed) return media.getTracks().forEach((track) => track.stop());
         stream = media;
-        video = el("video", { autoplay: true, muted: true, playsInline: true, srcObject: stream });
-        preview.append(video);
+        preview.append(el("video", { className: "reactor-live-self", autoplay: true, muted: true, playsInline: true, srcObject: stream }));
+    }
+
+    async function addPicker(sender) {
         // Device labels are only readable once camera access is granted, so the picker comes after the first open.
         const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
-        if (cameras.length > 1) {
-            const current = stream.getVideoTracks()[0]?.getSettings().deviceId;
-            const picker = el("select", { className: "reactor-live-camera", title: "Camera" },
-                              ...cameras.map((camera, i) => el("option", { value: camera.deviceId, textContent: camera.label || `Camera ${i + 1}`,
-                                                                             selected: camera.deviceId === current })));
-            picker.addEventListener("change", async () => {
-                const next = await open(picker.value).catch(() => null);
-                if (!next) return void (status.textContent = "That camera is unavailable.");
-                if (closed) return next.getTracks().forEach((track) => track.stop());
-                for (const track of stream.getTracks()) track.stop();
-                stream = next;
-                video.srcObject = next;
-                wantKey = true;
-            });
-            buttons.prepend(picker);
-        }
-        const onFrame = (cb) => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(cb) : requestAnimationFrame(cb));
-        const pump = () => {
-            if (!video) return;
-            encode(performance.now());
-            onFrame(pump);
-        };
-        onFrame(pump);
+        if (cameras.length < 2) return;
+        const current = stream.getVideoTracks()[0]?.getSettings().deviceId;
+        const picker = el("select", { className: "reactor-live-camera", title: "Camera" },
+                          ...cameras.map((camera, i) => el("option", { value: camera.deviceId, textContent: camera.label || `Camera ${i + 1}`,
+                                                                         selected: camera.deviceId === current })));
+        picker.addEventListener("change", async () => {
+            const next = await openCamera(picker.value).catch(() => null);
+            if (!next) return void (status.textContent = "That camera is unavailable.");
+            if (closed) return next.getTracks().forEach((track) => track.stop());
+            await sender.replaceTrack(next.getVideoTracks()[0]);
+            for (const track of stream.getTracks()) track.stop();
+            stream = next;
+            preview.querySelector(".reactor-live-self").srcObject = next;
+        });
+        buttons.prepend(picker);
+    }
 
-        function encode(now) {
-            if (encoder.state !== "configured") return;
-            // rVFC fires at the camera's or display's rate, with jitter; feed the encoder on a
-            // schedule at the rate the server asked for, so a frame a hair early is not dropped.
-            if (now < nextFrame - 1) return;
-            nextFrame = Math.max(nextFrame + 1000 / input.fps, now);
-            // Drop before encoding, never after: a skipped frame leaves the stream decodable.
-            if (encoder.encodeQueueSize >= 2 || socket.bufferedAmount >= 1048576) return;
-            const { videoWidth: vw, videoHeight: vh } = video;
-            if (!vw || !vh) return;
-            // Cover-crop: the server gets a constant width×height whatever the camera sends.
-            const scale = Math.max(input.width / vw, input.height / vh);
-            const sw = input.width / scale, sh = input.height / scale;
-            grab.drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, input.width, input.height);
-            // This timestamp counts encoded frames, so a dropped frame leaves a gap; the
-            // preview's comes from the server.
-            const timestamp = Math.round((frames * 1e6) / input.fps);
-            const key = wantKey || timestamp - keyAt >= 2e6;
-            const frame = new VideoFrame(grab.canvas, { timestamp });
-            encoder.encode(frame, { keyFrame: key });
-            frame.close();
-            if (key) {
-                wantKey = false;
-                keyAt = timestamp;
+    async function joinSession(join) {
+        if (join.publish) {
+            try {
+                await startCamera();
+            } catch {
+                throw new Error("The camera is unavailable; allow camera access and run again.");
             }
-            frames++;
+            if (closed) return;
         }
+        const { Reactor } = await import("./vendor/reactor-sdk.mjs");
+        if (closed) return;
+        reactor = new Reactor({ modelName: join.model, local: join.local, ...(join.publish ? {} : { modelTracks: [{ name: "main_video", kind: "video", direction: "recvonly" }] }) });
+        reactor.on("trackReceived", (name, track, media) => {
+            if (name !== join.publish && track.kind === "video") output.srcObject = media;
+        });
+        reactor.on("statsUpdate", (stats) => { own = stats; });
+        let joined = false;
+        const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
+            if (s === "ready") resolve();
+            // This browser's side dropped: end the run on the server too, so neither side outlives the other.
+            if (s === "disconnected" && joined && !tornDown) {
+                const error = "This browser lost its connection to the Reactor session.";
+                send({ type: "cancel", error });
+                teardown();
+                stay(error, true);
+            }
+        }));
+        try {
+            await reactor.connect(join.jwt ?? undefined, { sessionId: join.session_id });
+            await ready;
+            joined = true;
+        } catch (e) {
+            console.error("Reactor: this browser could not join the session.", e);
+            throw new Error(`This browser could not join the Reactor session: ${e?.message ?? e}`);
+        }
+        if (!join.publish || closed) return;
+        const track = stream.getVideoTracks()[0];
+        await reactor.publishTrack(join.publish, track);
+        const sender = reactor.getPeerConnection()?.getSenders().find((s) => s.track === track);
+        if (sender) {
+            // The model's input size is fixed for the session: drop frames on a slow link, never resolution.
+            const params = sender.getParameters();
+            params.degradationPreference = "maintain-resolution";
+            await sender.setParameters(params).catch(() => {});
+            addPicker(sender).catch(() => {});
+        }
+        send({ type: "published" });
     }
 
     // Message flow.
 
     socket.addEventListener("message", (event) => {
-        if (typeof event.data !== "string") {
-            decodePreview(event.data);
-            return;
-        }
         const message = JSON.parse(event.data);
         if (message.type === "config") {
-            previewSize = message.preview;
-            canvas.width = previewSize.width;
-            canvas.height = previewSize.height;
-            // The spacer holds the aspect ratio; the canvas stretches over it.
-            preview.append(el("div", { style: `width:100%;aspect-ratio:${previewSize.width}/${previewSize.height}` }));
-            preview.style.maxWidth = `${previewSize.width}px`;
-            decoder = newDecoder();
+            input = message.input;
+            const { width, height } = message.preview;
+            // The spacer holds the aspect ratio; the video stretches over it.
+            preview.append(el("div", { style: `width:100%;aspect-ratio:${width}/${height}` }));
+            preview.style.maxWidth = `${width}px`;
             // Only the keys this model's camera lanes answer to are shown, and a pad left empty goes too.
-            for (const [code, node] of caps) if (!message.keys.includes(code)) {
+            lanes = message.lanes;
+            promptCommand = message.prompt_command;
+            const keys = new Set(lanes.flatMap((lane) => lane.axes.flatMap(([low, high]) => [low, high])));
+            for (const [code, node] of caps) if (!keys.has(code)) {
                 node.remove();
                 caps.delete(code);
             }
             for (const pad of [...legend.children]) if (!pad.children.length) pad.remove();
             prompt.value = message.prompt;
-            apply.disabled = false;
             if (caps.size) {
                 legend.hidden = false;
                 preview.tabIndex = 0;
@@ -353,35 +294,30 @@ function openLive({ run_id, mode, title, camera }) {
                 preview.addEventListener("blur", releaseKeys);
                 preview.focus();
             }
-            if (mode === "style" && message.input)
-                startCamera(message.input).catch(() => {
-                    if (!closed) {
-                        teardown();
-                        stay("The camera is unavailable; allow camera access and run again.", true);
-                    }
-                });
+        } else if (message.type === "join") {
+            joinSession(message).catch((e) => {
+                if (!closed) {
+                    teardown();
+                    stay(e.message, true);
+                }
+            });
         } else if (message.type === "status") {
             status.textContent = message.text;
-        } else if (message.type === "keys") {
-            const lit = new Set(message.held);
-            for (const [code, cap] of caps) cap.classList.toggle("on", lit.has(code));
+        } else if (message.type === "started") {
+            started = true;
+            apply.disabled = false;
+            if (held) drive();
         } else if (message.type === "stats") {
-            const now = performance.now();
-            const previewFps = Math.round((drawn * 1000) / (now - statsAt));
-            drawn = 0;
-            statsAt = now;
             const mbps = (bps) => `${(bps / 1e6).toFixed(1)} Mbps`;
             stats.textContent = [
                 message.rtt_ms != null && `RTT ${Math.round(message.rtt_ms)} ms`,
                 message.fps != null && `model ${Math.round(message.fps)} fps`,
-                `preview ${previewFps} fps`,
+                own?.framesPerSecond != null && `preview ${Math.round(own.framesPerSecond)} fps`,
                 message.in_bps != null && `in ${mbps(message.in_bps)}`,
-                mode === "style" && message.out_bps != null && `out ${mbps(message.out_bps)}`,
+                mode === "style" && (stream ? own?.outgoingBitrate : message.out_bps) != null
+                    && `out ${mbps(stream ? own.outgoingBitrate : message.out_bps)}`,
                 message.loss != null && `loss ${(message.loss * 100).toFixed(1)}%`,
             ].filter(Boolean).join(" · ");
-        } else if (message.type === "keyframe") {
-            // The server lost sync; the next webcam frame goes out as a keyframe.
-            wantKey = true;
         } else if (message.type === "ended") {
             ended = true;
             teardown();
@@ -391,12 +327,14 @@ function openLive({ run_id, mode, title, camera }) {
     });
     socket.addEventListener("close", (event) => {
         if (ended || closed || staying) return;
+        // The server cancels the run on a closed socket; leave the session with it.
+        teardown();
         if (event.code === 4404) stay("This run is unknown to the server.", true);
         else if (event.code === 4409) stay("This run already has another browser connected.", true);
         else stay("Connection lost.", true);
     });
 
-    apply.onclick = () => send({ type: "prompt", prompt: prompt.value });
+    apply.onclick = () => command(promptCommand, { prompt: prompt.value });
     done.onclick = () => {
         done.disabled = true;
         send({ type: "done" });
@@ -404,22 +342,9 @@ function openLive({ run_id, mode, title, camera }) {
     };
     cancel.onclick = cancelRun;
 
-    // No WebCodecs, no run: cancel as soon as the socket will take it, and say why.
-    if (typeof VideoDecoder === "undefined" || (mode === "style" && typeof VideoEncoder === "undefined")) {
-        stay("This browser can't stream H.264 with WebCodecs; use Chrome, Edge or Safari.", true);
-        const abandon = () => {
-            send({ type: "cancel" });
-            teardown();
-        };
-        if (socket.readyState === WebSocket.OPEN) abandon();
-        else socket.addEventListener("open", abandon, { once: true });
-    }
-
     return { cancel: cancelRun };
 }
 
-const PREVIEW_BITRATE = "Reactor.Realtime.PreviewBitrate";
-const PREVIEW_WIDTH = "Reactor.Realtime.PreviewWidth";
 const DEFAULT_CAMERA = "Default";
 let current = null;
 
@@ -448,24 +373,6 @@ function cameraWidget(node, inputName) {
 
 app.registerExtension({
     name: "reactor.live",
-    settings: [{
-        id: PREVIEW_BITRATE,
-        category: ["Reactor", "Realtime", "Preview bitrate"],
-        name: "Realtime preview bitrate (Mbps)",
-        tooltip: "The most the live preview uses between ComfyUI and this browser. Lower it on a slow link to a remote ComfyUI. Saved takes are unaffected.",
-        type: "number",
-        defaultValue: 3,
-        attrs: { min: 0.5, max: 20, step: 0.5 },
-    }, {
-        id: PREVIEW_WIDTH,
-        category: ["Reactor", "Realtime", "Preview resolution"],
-        name: "Realtime preview resolution",
-        tooltip: "The widest the live preview is sent; larger model output is scaled down to it. Full sends the model's own size, at more CPU and bandwidth. Saved takes are unaffected.",
-        type: "combo",
-        defaultValue: 832,
-        options: [{ value: 0, text: "Full" }, { value: 1280, text: "1280 px" }, { value: 832, text: "832 px" },
-                  { value: 640, text: "640 px" }, { value: 480, text: "480 px" }],
-    }],
     getCustomWidgets() {
         return { REACTOR_CAMERA_DEVICE: cameraWidget };
     },

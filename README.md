@@ -128,9 +128,9 @@ Live prompts work best written to each model's prompt guide:
 [X2](https://docs.reactor.inc/model-api-reference/x2/prompt-guide) ·
 [LingBot World 2](https://docs.reactor.inc/model-api-reference/lingbot-world-2/prompt-guide).
 
-The preview plays at the model's frame rate, at most 832 px wide and 3 Mbps by default. Change either
-under **Reactor › Realtime** in ComfyUI's settings: raise the resolution to see full detail, or lower
-both if ComfyUI runs on another machine over a slow link. Saved takes are unaffected.
+The window joins the take's Reactor session from this browser over WebRTC, so the preview is the
+model's own output at full size, and a camera streams straight from this browser to Reactor. ComfyUI
+records the take from the same session.
 
 ## Examples
 

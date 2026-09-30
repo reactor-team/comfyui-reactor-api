@@ -404,6 +404,7 @@ function createEditor(node, inputName, inputData) {
     let signature = "";
     // Measured on each draw, since the editor may not be laid out when it renders; the default fits an empty editor until then.
     let height = 120;
+    let laidOut = false;
 
     const root = el("div", { className: "reactor-tl" });
     const ruler = el("div", { className: "reactor-tl-ruler" });
@@ -603,11 +604,14 @@ function createEditor(node, inputName, inputData) {
                 signature = next;
                 render();
             }
-            // Refit on every draw, not only when the content changes: a load or a drag can resize the node too, and the editor is all it holds.
+            // Fit the node when its content changes, and leave a size the user dragged alone; the first
+            // measure only grows the node, so a loaded workflow keeps its saved height.
             const measured = contentHeight(root);
-            if (measured !== null) {
+            if (measured !== null && measured !== height) {
                 height = measured;
-                fitNode(node);
+                if (laidOut) fitNode(node);
+                else node.expandToFitContent();
+                laidOut = true;
             }
         },
     });
@@ -644,6 +648,7 @@ function createMoveEditor(node, inputName) {
     let signature = "";
     // Measured on each draw, since the editor may not be laid out when it renders; the default fits an empty editor until then.
     let height = 120;
+    let laidOut = false;
     const root = el("div", { className: "reactor-tl" });
     const ruler = el("div", { className: "reactor-tl-ruler" });
     const lanes = el("div", { className: "reactor-tl" });
@@ -726,10 +731,14 @@ function createMoveEditor(node, inputName) {
                 signature = next;
                 render();
             }
+            // Fit the node when its content changes, and leave a size the user dragged alone; the first
+            // measure only grows the node, so a loaded workflow keeps its saved height.
             const measured = contentHeight(root);
             if (measured !== null && measured !== height) {
                 height = measured;
-                fitNode(node);
+                if (laidOut) fitNode(node);
+                else node.expandToFitContent();
+                laidOut = true;
             }
         },
     });

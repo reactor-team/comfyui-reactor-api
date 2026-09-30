@@ -1,10 +1,11 @@
 import io
+from dataclasses import replace
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render.timeline import MODELS, POSES, Beat, Move, Reference, Timeline, compile_timeline, editor_beats, editor_moves, join_chains, model_facts
+from reactor_render.timeline import MODELS, POSES, Beat, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts
 
 # LongLive: a scene opens with a 29-frame chunk, then 32 frames a chunk. A beat's start is the chunk
 # whose video comes nearest its running total of frames: 96 -> 3, 175 -> 6.
@@ -102,13 +103,6 @@ def test_helios_ignores_a_cut_on_the_first_beat():
     assert plan.setup[1] == ("set_prompt", {"prompt": "a"})
 
 
-def editor(*beats):
-    return {"beats": [{"prompt": p, "frames": d, "cut": cut, "image": image} for p, d, cut, image in beats]}
-
-
-# Visko: 33 frames a chunk: 99 frames -> 3, 198 -> 6.
-
-
 def test_live_models_open_with_image_then_prompt_then_start():
     plan = compile_timeline("Visko Orbis Dynamic", [Beat("a", 99, image=b"png"), Beat("b", 99)], seed=7)
     assert plan.setup == [
@@ -143,24 +137,14 @@ def test_a_live_render_longer_than_one_run_raises():
         compile_timeline("LingBot", [Beat("a", 7216, image=b"one")], seed=0)
 
 
-def test_editor_beats_play_in_the_order_they_are_stored():
-    beats = editor_beats(editor(("first", 96, False, None), ("middle", 79, False, None), ("late", 79, True, None)), {}, {})
+def test_beats_play_in_chain_order():
+    beats = [Beat("first", 96), Beat("middle", 79), Beat("late", 79, cut=True)]
     plan = compile_timeline("LongLive-2.0", beats, seed=0)
     assert plan.setup[1:4] == [
         ("set_shot", {"prompt": "first"}),
         ("schedule_shot", {"prompt": "middle", "at_session_chunk": 3}),
         ("schedule_scene_cut", {"prompt": "late", "at_session_chunk": 6}),
     ]
-
-
-def test_an_editor_beat_takes_the_image_from_its_named_slot():
-    beats = editor_beats(editor(("a", 2, False, "image_1"), ("b", 2, False, None)), {"image_0": b"zero", "image_1": b"one"}, {})
-    assert [b.image for b in beats] == [b"one", None]
-
-
-def test_an_editor_beat_naming_an_unconnected_slot_raises():
-    with pytest.raises(ValueError, match="Beat 1 uses image_2, which has no image connected"):
-        editor_beats(editor(("a", 72, False, "image_2")), {"image_0": b"zero"}, {})
 
 
 def test_sana_streams_the_clip_and_sends_later_beats_on_their_frame():
@@ -272,6 +256,11 @@ def test_a_beat_setting_the_model_does_not_take_is_rejected():
 LINGBOT_BEAT = [Beat("a", 144, image=b"one")]
 
 
+def moving(moves):
+    """LINGBOT_BEAT with `moves` on its one beat."""
+    return [replace(LINGBOT_BEAT[0], moves=tuple(moves))]
+
+
 def camera(plan):
     """The camera commands of a plan: those before `start`, and the timed ones."""
     lanes = {lane.command for spec in MODELS.values() for lane in spec.camera.values()}
@@ -279,32 +268,32 @@ def camera(plan):
 
 
 def test_a_move_holds_its_lane_from_its_first_chunk_then_idles():
-    plan = compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=[Move("movement", "forward", 41, 48)])
+    plan = compile_timeline("LingBot", moving([Move("movement", "forward", 41, 48)]), seed=0)
     assert camera(plan) == ([], [(1, "set_movement", {"movement": "forward"}), (3, "set_movement", {"movement": "idle"})])
 
 
 def test_moves_on_different_lanes_overlap_and_go_out_a_chunk_early():
     moves = [Move("movement", "forward", 17, 48), Move("look_horizontal", "left", 41, 48)]
-    plan = compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=moves)
+    plan = compile_timeline("LingBot", moving(moves), seed=0)
     assert camera(plan)[1] == [(0, "set_movement", {"movement": "forward"}), (1, "set_look_horizontal", {"look_horizontal": "left"}),
                                (2, "set_movement", {"movement": "idle"}), (3, "set_look_horizontal", {"look_horizontal": "idle"})]
 
 
 def test_a_move_from_zero_goes_out_before_start():
-    plan = compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=[Move("look_vertical", "up", 0, 41)])
+    plan = compile_timeline("LingBot", moving([Move("look_vertical", "up", 0, 41)]), seed=0)
     assert plan.setup[-2:] == [("set_look_vertical", {"look_vertical": "up"}), ("start", {})]
     assert camera(plan)[1] == [(1, "set_look_vertical", {"look_vertical": "idle"})]
 
 
 def test_an_unchanged_lane_sends_nothing():
     moves = [Move("movement", "forward", 0, 41), Move("movement", "forward", 41, 24)]
-    plan = compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=moves)
+    plan = compile_timeline("LingBot", moving(moves), seed=0)
     assert camera(plan) == ([("set_movement", {"movement": "forward"})], [(2, "set_movement", {"movement": "idle"})])
 
 
 def test_a_look_move_sends_its_speed_which_holds_until_the_next_look_move():
     moves = [Move("look_horizontal", "right", 17, 24, speed=12), Move("look_vertical", "up", 65, 24)]
-    plan = compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=moves)
+    plan = compile_timeline("LingBot", moving(moves), seed=0)
     assert [t for t in camera(plan)[1] if t[1] == "set_rotation_speed_deg"] == [
         (0, "set_rotation_speed_deg", {"rotation_speed_deg": 12.0}), (2, "set_rotation_speed_deg", {"rotation_speed_deg": 5.0})]
 
@@ -312,35 +301,35 @@ def test_a_look_move_sends_its_speed_which_holds_until_the_next_look_move():
 def test_overlapping_look_moves_at_different_speeds_raise():
     moves = [Move("look_horizontal", "right", 17, 48, speed=12), Move("look_vertical", "up", 41, 24, speed=20)]
     with pytest.raises(ValueError, match="turn at different speeds"):
-        compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=moves)
+        compile_timeline("LingBot", moving(moves), seed=0)
 
 
 def test_a_move_past_the_end_is_cut_at_the_last_chunk():
-    plan = compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=[Move("look_horizontal", "right", 89, 1600)])
+    plan = compile_timeline("LingBot", moving([Move("look_horizontal", "right", 89, 1600)]), seed=0)
     assert camera(plan)[1] == [(3, "set_look_horizontal", {"look_horizontal": "right"})]
 
 
 def test_overlapping_moves_on_one_lane_are_refused():
     moves = [Move("movement", "forward", 0, 65), Move("movement", "back", 41, 48)]
     with pytest.raises(ValueError, match="Two movement moves overlap at frame 41"):
-        compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=moves)
+        compile_timeline("LingBot", moving(moves), seed=0)
 
 
 def test_a_move_on_a_lane_the_model_lacks_is_refused():
     with pytest.raises(ValueError, match="LingBot has no camera_pose camera control"):
-        compile_timeline("LingBot", LINGBOT_BEAT, seed=0, moves=[Move("camera_pose", "dolly_in", 0, 48)])
+        compile_timeline("LingBot", moving([Move("camera_pose", "dolly_in", 0, 48)]), seed=0)
     with pytest.raises(ValueError, match="LongLive-2.0 has no camera controls"):
-        compile_timeline("LongLive-2.0", [Beat("a", 120)], seed=0, moves=[Move("movement", "forward", 0, 48)])
+        compile_timeline("LongLive-2.0", [Beat("a", 120, moves=(Move("movement", "forward", 0, 48),))], seed=0)
 
 
 def test_a_pose_preset_goes_out_as_its_deltas():
-    plan = compile_timeline("LingBot World 2", LINGBOT_BEAT, seed=0, moves=[Move("camera_pose", "dolly_in", 0, 41)])
+    plan = compile_timeline("LingBot World 2", moving([Move("camera_pose", "dolly_in", 0, 41)]), seed=0)
     assert camera(plan) == ([("set_camera_pose", {"camera_pose": POSES["dolly_in"]})], [(1, "set_camera_pose", {"camera_pose": []})])
 
 
-def test_a_saved_timeline_without_moves_loads_with_none():
-    assert editor_moves({"beats": []}) == []
-    assert editor_moves({"beats": [], "moves": [{"lane": "movement", "value": "back", "start_frame": 17, "frames": 24}]}) == [
+def test_a_move_editor_value_reads_as_moves():
+    assert editor_moves({"moves": []}) == []
+    assert editor_moves({"moves": [{"lane": "movement", "value": "back", "start_frame": 17, "frames": 24}]}) == [
         Move("movement", "back", 17, 24)]
 
 
@@ -392,14 +381,9 @@ def test_fitting_crops_to_the_models_aspect_instead_of_squashing():
     assert abs(int(height) - int(width)) <= 2
 
 
-def test_joined_chains_play_in_order_with_later_moves_from_where_their_chain_starts():
-    # LingBot's 60-frame beat rounds to 3 chunks, 17 + 24 + 24 = 65 frames, so the second chain starts there.
-    held = Move("movement", "forward", 10, 20)
-    first = Timeline("LingBot", (Beat("a", 60),), {}, (held,))
-    second = Timeline("LingBot", (Beat("b", 48, cut=True),), {}, (Move("movement", "back", 0, 24),))
-    joined = join_chains([first, second])
+def test_joined_chains_play_in_order():
+    joined = join_chains([Timeline("LingBot", (Beat("a", 60),)), Timeline("LingBot", (Beat("b", 48, cut=True),))])
     assert [b.prompt for b in joined.beats] == ["a", "b"] and joined.beats[1].cut
-    assert joined.moves == (held, Move("movement", "back", 65, 24))
 
 
 def test_joined_chains_start_with_the_first_chains_settings():
@@ -460,15 +444,6 @@ def test_an_avatar_reads_a_beat_image_only_as_the_person_and_its_references_go_t
         compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo"), Beat("Hat?", 0, image=b"hat")], seed=0, settings=AVATAR)
     with pytest.raises(ValueError, match="Helios does not take Vidu S2-Avatar references"):
         compile_timeline("Helios", [Beat("a", 48, references=(Reference("Vidu S2-Avatar", b"png", "object"),))], seed=0)
-
-
-def test_editor_beats_pick_their_references_by_slot():
-    value = {"beats": [{"prompt": "a", "frames": 2, "cut": False, "image": None, "references": ["reference_1"]},
-                       {"prompt": "b", "frames": 2, "cut": False, "image": None}]}
-    hat = Reference("Vidu S2-Avatar", b"hat", "garment")
-    assert [b.references for b in editor_beats(value, {}, {"reference_1": hat})] == [(hat,), ()]
-    with pytest.raises(ValueError, match="reference_1, which has no reference connected"):
-        editor_beats(value, {}, {})
 
 
 def test_an_avatar_call_needs_a_persona_a_photo_and_something_to_say():

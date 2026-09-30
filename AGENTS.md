@@ -1,5 +1,21 @@
 # AGENTS.md
 
+## Two ways to use the plugin: live and scripted
+
+The plugin has two front ends. Keep them separate.
+
+- **Reactor Realtime is the live, interactive path.** It stands alone: a `model` picker (a
+  `DynamicCombo` built from `MODELS`) shows only the inputs and settings the picked model takes, and
+  the node outputs the take as a video. It never takes a chain. A model the live window can drive
+  gets its controls from its model data, not from a special case in the node.
+- **Chain nodes and Reactor Render are the scripted, declarative path.** A video is a sequence of
+  beats set up ahead of time, one chain node per beat. Every beat input is an ordinary ComfyUI input,
+  so the rest of the graph can build prompts and images, fork a story, or switch endings, and Render
+  outputs a normal video. Reactor Timeline and Chain Join work on chains only.
+
+A new model capability lands in its model data first, so both paths pick it up; add it to the node
+of a path only when that path can use it.
+
 ## Where a model's capability lives: shared nodes, model data, or a model's own nodes
 
 The plugin drives many Reactor models through a few shared nodes and each model's own nodes. Put
@@ -20,7 +36,7 @@ share its shape.
 3. **A model's chain node**: every beat of a chain is its model's own node, such as Reactor Helios
    Chain, built by `chain_node` from the model's data. It shows only the inputs that model takes,
    including its `settings` and `beat_settings`, and outputs the shared `REACTOR_CHAIN` that Chain
-   Join, Timeline, Render and Realtime read. The first link (nothing on its `chain` input) picks
+   Join, Timeline and Render read. The first link (nothing on its `chain` input) picks
    the model and its settings. Models whose inputs match share a node (`CHAIN_FAMILIES`) with a
    `model` combo, which rejects a model outside its family. Nodes are filed under
    `Reactor/<model>` and carry the search alias "reactor chain". A beat is always built by its model's node, but a node that works on whole
@@ -54,10 +70,13 @@ Nodes change shape with the model, and every change is driven by model data:
   (the model, the start `settings`, and an image or video read at start) on later links, and snaps
   lengths to the chunk grid. A new whole-run option is a `Setting`, never a new node or a new input
   on a shared node.
-- **Timeline and Realtime** read `model_facts`, which each chain node sends to the frontend on its
-  `chain` input, for the model their chain starts with. They use it to show or hide their image,
-  camera and reference sockets. The Timeline also snaps lengths and disables cuts where the model
-  has none. The frontend checks facts, never a model's name. A new capability that a socket
+- **Timeline** reads `model_facts`, which each chain node sends to the frontend on its `chain`
+  input, for the model its chain starts with. It only draws the chain, snapped to the model's
+  chunks, with camera lanes where the model has them. The frontend checks facts, never a model's
+  name.
+- **Realtime's** inputs come from its `model` picker: each live model's option lists the inputs its
+  `ModelSpec` says it takes (`live_option` in `nodes.py`), so ComfyUI swaps them when the model
+  changes, with no frontend code. A new capability that a socket
   depends on gets a `ModelSpec` field and a matching entry in `model_facts`.
 - **Runners** differ by `pattern` (chunked, source, clips, call), which says how a model is driven.
   Code for a pattern may assume that pattern's commands. It must not assume any one model's

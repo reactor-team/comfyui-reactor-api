@@ -6,7 +6,6 @@ import os
 import uuid
 from dataclasses import replace
 
-import av
 import numpy as np
 from aiohttp import WSMsgType, web
 from PIL import Image
@@ -20,7 +19,7 @@ from server import PromptServer
 
 from .reactor_render import live
 from .reactor_render.session import render
-from .reactor_render.timeline import MODELS, Beat, Reference, Setting, Timeline, call_setup, compile_timeline, editor_beats, editor_moves, model_facts, join_chains
+from .reactor_render.timeline import MODELS, Beat, Reference, Setting, Timeline, call_setup, compile_timeline, editor_moves, model_facts, join_chains
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
 
@@ -29,16 +28,6 @@ ReactorReferenceType = io.Custom("REACTOR_REFERENCE")
 # A browser camera, by its label; the widget lists the cameras the browser can see.
 ReactorCameraType = io.Custom("REACTOR_CAMERA")
 ReactorCameraDeviceType = io.Custom("REACTOR_CAMERA_DEVICE")
-
-
-@io.comfytype(io_type="REACTOR_BEAT_EDITOR")
-class BeatEditor(io.ComfyTypeIO):
-    """The timeline editor widget. Its value is `{"beats": [...], "moves": [...]}`: a list value would read as a link."""
-    Type = dict
-
-    class Input(io.WidgetInput):
-        def __init__(self, id: str, tooltip: str = None):
-            super().__init__(id, tooltip=tooltip, default={"beats": [], "moves": []}, socketless=True)
 
 
 @io.comfytype(io_type="REACTOR_MOVE_EDITOR")
@@ -98,7 +87,7 @@ def chain_node(family: str) -> type[io.ComfyNode]:
                 category=f"Reactor/{family}",
                 search_aliases=["reactor chain", "beat"],
                 description=f"One beat of a {family} chain. The first link sets the model and its settings; chain the others after it, "
-                            "and feed the last one to Reactor Render, Reactor Timeline or Reactor Realtime.",
+                            "and feed the last one to Reactor Render, and to a Reactor Timeline to see it.",
                 inputs=[
                     *([io.Combo.Input("model", options=models, tooltip="The model the chain runs on. Read on the first link.")] if len(models) > 1 else []),
                     io.String.Input("prompt", multiline=True),
@@ -153,10 +142,10 @@ class ReactorChainJoin(io.ComfyNode):
             node_id="ReactorChainJoin",
             display_name="Reactor Chain Join",
             category="Reactor",
-            search_aliases=["concat chains", "append timelines", "combine timelines"],
-            description="Play Reactor chains or timelines one after another, as one chain. They must be for the same model, and the first chain's first link sets the settings.",
+            search_aliases=["concat chains"],
+            description="Play Reactor chains one after another, as one chain. They must be for the same model, and the first chain's first link sets the settings.",
             inputs=[io.Autogrow.Input("chains", template=io.Autogrow.TemplatePrefix(
-                ReactorChainType.Input("chain", tooltip="A chain or a Reactor Timeline. Each plays after the one before; its first beat enters by its own shot or cut."),
+                ReactorChainType.Input("chain", tooltip="A chain, from its last link or another Reactor Chain Join. Each plays after the one before; its first beat enters by its own shot or cut."),
                 prefix="chain_", min=2, max=32))],
             outputs=[ReactorChainType.Output()],
         )
@@ -173,27 +162,14 @@ class ReactorTimeline(io.ComfyNode):
             node_id="ReactorTimeline",
             display_name="Reactor Timeline",
             category="Reactor",
-            description="Lay out the beats of a Reactor render on a timeline, snapped to the model's chunks.",
-            inputs=[
-                ReactorChainType.Input("chain", tooltip="The chain the timeline starts with. Its first link sets the model and settings, "
-                                                        "and the beats drawn here play after its beats."),
-                BeatEditor.Input("beats"),
-                io.Autogrow.Input("images", optional=True, template=io.Autogrow.TemplatePrefix(
-                    input=io.Image.Input("image", tooltip="Reference image a beat can pick, for models that take one."),
-                    prefix="image_", min=0, max=100)),
-                io.Autogrow.Input("references", optional=True, template=io.Autogrow.TemplatePrefix(
-                    input=ReactorReferenceType.Input("reference", tooltip="A reference made for this timeline's model, such as a Reactor Vidu S2-Avatar Reference, for beats to pick."),
-                    prefix="reference_", min=0, max=100)),
-            ],
-            outputs=[ReactorChainType.Output()],
+            description="Draws a chain's beats and camera moves on a frame ruler, snapped to the model's chunks as they will play. "
+                        "It only shows the chain; edit a beat on its chain node.",
+            inputs=[ReactorChainType.Input("chain", tooltip="The chain to draw, such as its last link or a Reactor Chain Join.")],
         )
 
     @classmethod
-    def execute(cls, chain, beats, images=None, references=None) -> io.NodeOutput:
-        pngs = {slot: image_to_png(image) for slot, image in (images or {}).items() if image is not None}
-        refs = {slot: r for slot, r in (references or {}).items() if r is not None}
-        # Moves drawn here are placed on the whole video's frames, the chain's beats included, as the ruler shows them.
-        return io.NodeOutput(replace(chain, beats=(*chain.beats, *editor_beats(beats, pngs, refs)), moves=(*chain.moves, *editor_moves(beats))))
+    def execute(cls, chain) -> io.NodeOutput:
+        return io.NodeOutput()
 
 
 class ReactorViduS2AvatarReference(io.ComfyNode):
@@ -248,9 +224,9 @@ class ReactorRender(io.ComfyNode):
             node_id="ReactorRender",
             display_name="Reactor Render",
             category="Reactor",
-            description="Renders a Reactor chain or timeline on its model, with the API key from the REACTOR_API_KEY environment variable or this plugin's config.ini.",
+            description="Renders a Reactor chain on its model, with the API key from the REACTOR_API_KEY environment variable or this plugin's config.ini.",
             inputs=[
-                ReactorChainType.Input("chain", tooltip="The last beat of a chain, a Reactor Chain Join, or a Reactor Timeline."),
+                ReactorChainType.Input("chain", tooltip="The last beat of a chain, or a Reactor Chain Join."),
                 io.Int.Input("seed", default=42, min=0, max=2**31 - 1, control_after_generate=True),
             ],
             outputs=[io.Video.Output()],
@@ -262,7 +238,7 @@ class ReactorRender(io.ComfyNode):
         connect = connect_args()
         spec = MODELS[chain.model]
         beats = [replace(b, image=spec.fit_png(b.image)) if b.image is not None else b for b in chain.beats]
-        plan = compile_timeline(chain.model, beats, seed, chain.settings, list(chain.moves))
+        plan = compile_timeline(chain.model, beats, seed, chain.settings)
         out_path = os.path.join(folder_paths.get_temp_directory(), f"reactor_{uuid.uuid4().hex}.mp4")
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         pbar = comfy.utils.ProgressBar(1)
@@ -350,6 +326,24 @@ class ReactorCameraCapture(io.ComfyNode):
         return io.NodeOutput(camera)
 
 
+def live_option(name: str) -> io.DynamicCombo.Option:
+    """A model's entry in Reactor Realtime's model picker: the inputs that model takes to start a live run."""
+    spec = MODELS[name]
+    source = spec.pattern == "source"
+    return io.DynamicCombo.Option(name, [
+        io.String.Input("prompt", multiline=True, tooltip="What you say to the character first." if spec.pattern == "call"
+                        else "The prompt the video starts from. Change it in the window as it plays."),
+        *([io.Image.Input("image", optional=not spec.image_required,
+                          tooltip="The person the character is made from." if spec.pattern == "call" else "Reference image.")]
+          if spec.images != "none" else []),
+        *([io.Video.Input("video", optional=True, tooltip="Source clip to restyle, looped until you press Done."),
+           ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera instead of a clip.")]
+          if source else []),
+        *[setting_input(key, setting, "Read at start.") for key, setting in spec.settings.items()],
+        *[setting_input(key, setting, "Read at start.") for key, setting in spec.beat_settings.items()],
+    ])
+
+
 class ReactorRealtime(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -357,17 +351,15 @@ class ReactorRealtime(io.ComfyNode):
             node_id="ReactorRealtime",
             display_name="Reactor Realtime",
             category="Reactor",
-            description="Runs a Reactor model live in a modal in your browser tab, starting from one chain link, and you change the prompt as it plays. "
-                        "A video-to-video model restyles the link's video or the camera you connect; you talk with an "
-                        "avatar out loud or by typed message; any other model generates from the link's prompt and image, "
+            description="Runs a Reactor model live in a modal in your browser tab, and you change the prompt as it plays. "
+                        "Pick a model and it shows that model's inputs. A video-to-video model restyles a clip or a camera; you talk with an "
+                        "avatar out loud or by typed message; any other model generates from the prompt and image, "
                         "with keyboard controls on a world model. Each run records a take.",
             not_idempotent=True,
             is_output_node=True,
             inputs=[
-                ReactorChainType.Input("chain", tooltip="One chain link: its model, settings, prompt, image, and for a video-to-video model the "
-                                                        "source video, looped until you press Done. Change the prompt in the window as it plays. "
-                                                        "An avatar call doesn't need one: talk to the character out loud, or type a message and press Send."),
-                ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera into a video-to-video model instead of the link's video."),
+                io.DynamicCombo.Input("model", options=[live_option(name) for name, spec in MODELS.items() if spec.live],
+                                      tooltip="The model to run live, with the inputs and settings it takes."),
                 io.Int.Input("seed", default=42, min=0, max=2**31 - 1),
                 io.String.Input("filename_prefix", default="reactor/realtime",
                                 tooltip="Where each take is saved, under ComfyUI's output folder."),
@@ -381,33 +373,23 @@ class ReactorRealtime(io.ComfyNode):
         return uuid.uuid4().hex
 
     @classmethod
-    async def execute(cls, chain, seed, filename_prefix, camera=None) -> io.NodeOutput:
-        if len(chain.beats) != 1:
-            raise ValueError(f"Reactor Realtime starts from one chain link, and this chain has {len(chain.beats)} beats; connect its first link.")
-        name, settings, beat = chain.model, chain.settings, chain.beats[0]
-        prompt, image, video = beat.prompt, beat.image, beat.video
+    async def execute(cls, model, seed, filename_prefix) -> io.NodeOutput:
+        name, prompt, image, video, camera = model["model"], model["prompt"], model.get("image"), model.get("video"), model.get("camera")
         spec = MODELS[name]
-        if not spec.live:
-            raise ValueError(f"{name} isn't available in Reactor Realtime yet; render it with Reactor Render instead.")
-        if video is not None and camera is not None:
-            raise ValueError("Reactor Realtime takes one source: disconnect the link's video or the Reactor Camera Capture.")
-        png = None if image is None else spec.fit_png(image)
+        settings = {key: model[key] for key in spec.settings if model.get(key) is not None}
+        png = None if image is None else spec.fit_png(image_to_png(image))
         if spec.pattern == "call":
-            if png is None:
-                raise ValueError(f"{name} needs an image of the person.")
-            if video is not None or camera is not None:
-                logging.warning("%s does not take a source video or camera; ignoring it.", name)
             return await live_output("call", name, prompt, call_setup(name, png, settings), None, filename_prefix)
         if spec.pattern != "source":
-            if video is not None or camera is not None:
-                logging.warning("%s does not take a source video or camera; ignoring it.", name)
-            return await live_output("drive", name, prompt, live.drive_setup(name, replace(beat, image=png), seed, settings), None, filename_prefix)
-        if video is None and camera is None:
-            raise ValueError(f"{name} needs a source: connect a video to the link, or a Reactor Camera Capture.")
+            beat = Beat(prompt, 1, image=png, settings={key: model[key] for key in spec.beat_settings if model.get(key) is not None})
+            return await live_output("drive", name, prompt, live.drive_setup(name, beat, seed, settings), None, filename_prefix)
+        if (video is None) == (camera is None):
+            raise ValueError(f"{name} restyles one source: connect a video or a Reactor Camera Capture.")
         clip = None
         if video is not None:
-            # Decoded off the loop: a long clip would stall the server's other requests.
-            clip = await asyncio.to_thread(lambda: [np.asarray(spec.fit(f.to_image())) for f in av.open(bytes_io.BytesIO(video)).decode(video=0)])
+            # Converted off the loop: a long clip would stall the server's other requests.
+            clip = await asyncio.to_thread(lambda: [np.asarray(spec.fit(Image.fromarray(np.clip(255.0 * f.cpu().numpy(), 0, 255).astype(np.uint8))))
+                                                    for f in video.get_components().images])
         return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png), clip, filename_prefix, camera)
 
 

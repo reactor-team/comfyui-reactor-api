@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Generate video live from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nLongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
+        "Generate video live from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Generate video live from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nLongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
+        "text": "Generate video live from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -34,28 +34,33 @@
       "id": 3,
       "type": "ReactorRealtime",
       "pos": [
-        470,
+        40,
         240
       ],
       "size": [
         400,
-        300
+        320
       ],
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
-          "link": 2
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
         },
         {
-          "localized_name": "camera",
-          "name": "camera",
-          "shape": 7,
-          "type": "REACTOR_CAMERA",
+          "localized_name": "prompt",
+          "name": "model.prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "model.prompt"
+          },
           "link": null
         },
         {
@@ -89,96 +94,25 @@
         "Node name for S&R": "ReactorRealtime"
       },
       "widgets_values": [
+        "LongLive-2.0",
+        "A red fox trots through a snowy birch forest at dawn, its breath misting in the cold air, soft golden light slanting between the white trunks, the camera tracking alongside at the fox's height.",
         42,
         "randomize",
         "reactor/realtime"
       ],
       "widgets_values_named": {
-        "seed": 42,
-        "control_after_generate": "randomize",
+        "model": "LongLive-2.0",
+        "model.prompt": "A red fox trots through a snowy birch forest at dawn, its breath misting in the cold air, soft golden light slanting between the white trunks, the camera tracking alongside at the fox's height.",
+        "seed": "randomize",
+        "control_after_generate": "reactor/realtime",
         "filename_prefix": "reactor/realtime"
-      }
-    },
-    {
-      "id": 4,
-      "type": "ReactorLongLive20Chain",
-      "pos": [
-        40,
-        240
-      ],
-      "size": [
-        400,
-        320
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "prompt",
-          "name": "prompt",
-          "type": "STRING",
-          "widget": {
-            "name": "prompt"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "frames",
-          "name": "frames",
-          "type": "INT",
-          "widget": {
-            "name": "frames"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "kind",
-          "name": "kind",
-          "type": "COMBO",
-          "widget": {
-            "name": "kind"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
-          "links": [
-            2
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
-      },
-      "widgets_values": [
-        "A red fox trots through a snowy birch forest at dawn, its breath misting in the cold air, soft golden light slanting between the white trunks, the camera tracking alongside at the fox's height.",
-        128,
-        null
-      ],
-      "widgets_values_named": {
-        "prompt": "A red fox trots through a snowy birch forest at dawn, its breath misting in the cold air, soft golden light slanting between the white trunks, the camera tracking alongside at the fox's height.",
-        "frames": 128,
-        "kind": null
       }
     }
   ],
-  "links": [
-    [
-      2,
-      4,
-      0,
-      3,
-      0,
-      "REACTOR_CHAIN"
-    ]
-  ],
+  "links": [],
   "groups": [],
   "config": {},
+  "version": 0.4,
   "extra": {
     "ds": {
       "scale": 0.45,
@@ -187,6 +121,5 @@
         133.95833333333334
       ]
     }
-  },
-  "version": 0.4
+  }
 }

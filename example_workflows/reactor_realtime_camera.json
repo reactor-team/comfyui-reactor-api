@@ -2,7 +2,7 @@
   "id": "a41bd83f-13b6-41fd-90ef-472c1665de7d",
   "revision": 0,
   "last_node_id": 5,
-  "last_link_id": 3,
+  "last_link_id": 4,
   "nodes": [
     {
       "id": 1,
@@ -34,29 +34,55 @@
       "id": 3,
       "type": "ReactorRealtime",
       "pos": [
-        470,
+        40,
         240
       ],
       "size": [
         400,
-        300
+        320
       ],
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
-          "link": 3
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "model.prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "model.prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image",
+          "name": "model.image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "video",
+          "name": "model.video",
+          "shape": 7,
+          "type": "VIDEO",
+          "link": null
         },
         {
           "localized_name": "camera",
-          "name": "camera",
+          "name": "model.camera",
           "shape": 7,
           "type": "REACTOR_CAMERA",
-          "link": 2
+          "link": 4
         },
         {
           "localized_name": "seed",
@@ -89,13 +115,17 @@
         "Node name for S&R": "ReactorRealtime"
       },
       "widgets_values": [
+        "X2",
+        "Glowing blue butterfly wings unfold from the person's back and flutter gently as they move. Preserve the face, clothing, room and camera.",
         42,
         "randomize",
         "reactor/realtime"
       ],
       "widgets_values_named": {
-        "seed": 42,
-        "control_after_generate": "randomize",
+        "model": "X2",
+        "model.prompt": "Glowing blue butterfly wings unfold from the person's back and flutter gently as they move. Preserve the face, clothing, room and camera.",
+        "seed": "randomize",
+        "control_after_generate": "reactor/realtime",
         "filename_prefix": "reactor/realtime"
       }
     },
@@ -111,7 +141,7 @@
         58
       ],
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "inputs": [
         {
@@ -130,7 +160,7 @@
           "name": "REACTOR_CAMERA",
           "type": "REACTOR_CAMERA",
           "links": [
-            2
+            4
           ]
         }
       ],
@@ -143,84 +173,21 @@
       "widgets_values_named": {
         "camera": "Default"
       }
-    },
-    {
-      "id": 5,
-      "type": "ReactorX2Chain",
-      "pos": [
-        40,
-        240
-      ],
-      "size": [
-        400,
-        320
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "prompt",
-          "name": "prompt",
-          "type": "STRING",
-          "widget": {
-            "name": "prompt"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "frames",
-          "name": "frames",
-          "type": "INT",
-          "widget": {
-            "name": "frames"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
-          "links": [
-            3
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorX2Chain"
-      },
-      "widgets_values": [
-        "Glowing blue butterfly wings unfold from the person's back and flutter gently as they move. Preserve the face, clothing, room and camera.",
-        120
-      ],
-      "widgets_values_named": {
-        "prompt": "Glowing blue butterfly wings unfold from the person's back and flutter gently as they move. Preserve the face, clothing, room and camera.",
-        "frames": 120
-      }
     }
   ],
   "links": [
     [
-      2,
+      4,
       4,
       0,
       3,
-      1,
+      4,
       "REACTOR_CAMERA"
-    ],
-    [
-      3,
-      5,
-      0,
-      3,
-      0,
-      "REACTOR_CHAIN"
     ]
   ],
   "groups": [],
   "config": {},
+  "version": 0.4,
   "extra": {
     "ds": {
       "scale": 1,
@@ -229,6 +196,5 @@
         0
       ]
     }
-  },
-  "version": 0.4
+  }
 }

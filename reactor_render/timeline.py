@@ -59,11 +59,10 @@ class Move:
 
 @dataclass(frozen=True)
 class Timeline:
-    """A whole render request: the model, the settings its chain's first link starts it with, its beats in play order, and its camera moves."""
+    """A whole render request: the model, the settings its chain's first link starts it with, and its beats in play order."""
     model: str
     beats: tuple[Beat, ...]
     settings: dict[str, object] = field(default_factory=dict)
-    moves: tuple[Move, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -263,24 +262,8 @@ def model_facts(spec: ModelSpec) -> dict:
     }
 
 
-def editor_beats(value: dict, images: dict[str, bytes], references: dict[str, Reference]) -> list[Beat]:
-    """The beats stored in a timeline editor's widget value. `images` and `references` map a connected slot name to what it holds."""
-    beats = []
-    for b in value["beats"]:
-        slot = b["image"]
-        if slot is not None and slot not in images:
-            raise ValueError(f"Beat {len(beats) + 1} uses {slot}, which has no image connected.")
-        # A value saved before references existed has none.
-        picked = b.get("references", [])
-        if missing := [r for r in picked if r not in references]:
-            raise ValueError(f"Beat {len(beats) + 1} uses {missing[0]}, which has no reference connected.")
-        beats.append(Beat(b["prompt"], int(b["frames"]), cut=b["cut"], image=None if slot is None else images[slot],
-                          references=tuple(references[r] for r in picked)))
-    return beats
-
-
 def editor_moves(value: dict) -> list[Move]:
-    """The camera moves stored in a timeline editor's widget value. A value saved before moves existed has none."""
+    """The camera moves stored in a chain node's move editor value."""
     return [Move(m["lane"], m["value"], int(m["start_frame"]), int(m["frames"]), m.get("speed")) for m in value.get("moves", [])]
 
 
@@ -303,8 +286,7 @@ class Plan:
     holds: list[int] = field(default_factory=list)
 
 
-def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[str, object] | None = None,
-                     moves: list[Move] | None = None) -> Plan:
+def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[str, object] | None = None) -> Plan:
     spec = MODELS[model]
     if not beats:
         raise ValueError("The timeline has no beats.")
@@ -339,7 +321,7 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
             if beats[i].video is not None:
                 logging.warning("%s reads its video only at start; dropping the video on the beat at frame %d.", model, start)
                 beats[i] = replace(beats[i], video=None)
-    moves = list(moves or [])
+    moves = []
     if any(beat.moves for beat in beats):
         total, starts = scheduled_chunks(spec, beats)
         for beat, first, end in zip(beats, starts, starts[1:] + [total]):
@@ -435,13 +417,7 @@ def join_chains(chains: list[Timeline]) -> Timeline:
     for i, chain in enumerate(rest, 2):
         if chain.model != first.model:
             raise ValueError(f"Chain {i} is for {chain.model} and chain 1 for {first.model}; join chains made for the same model.")
-        moves = chain.moves
-        if moves:
-            # A timeline's moves are placed on its own rendered frames, so they shift to where its first beat now starts.
-            spec = MODELS[first.model]
-            start = spec.frames_in(scheduled_chunks(spec, [*joined.beats, *chain.beats])[1][len(joined.beats)])
-            moves = tuple(replace(m, start_frame=m.start_frame + start) for m in moves)
-        joined = replace(joined, beats=(*joined.beats, *chain.beats), moves=(*joined.moves, *moves))
+        joined = replace(joined, beats=(*joined.beats, *chain.beats))
     return joined
 
 
@@ -545,7 +521,7 @@ def data_url(png: bytes) -> str:
 def call_setup(model: str, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
     """The commands that open a call: the character from `image`, then the call, heard through `mic`."""
     if not settings.get("persona"):
-        raise ValueError(f"{model} needs a persona; set one on the chain's first link.")
+        raise ValueError(f"{model} needs a persona.")
     # An optional field left empty is left out, so the model uses its default.
     start = {"call_mode": "audio", "transcripts": False, **{k: v for k, v in settings.items() if v != ""}}
     return [("create_avatar", {"image": image}), ("start_call", start)]

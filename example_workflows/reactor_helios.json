@@ -1,8 +1,8 @@
 {
   "id": "d8b92636-5337-41c5-96ee-400ba063a955",
   "revision": 0,
-  "last_node_id": 6,
-  "last_link_id": 4,
+  "last_node_id": 8,
+  "last_link_id": 8,
   "nodes": [
     {
       "id": 1,
@@ -22,7 +22,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "A Helios scene in three beats from text alone. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes.\n\nSet your Reactor API key in this plugin's config.ini."
+        "A Helios scene in three beats from text alone, one chain node per beat. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes. Reactor Timeline draws the chain.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
         "text": "A Helios scene in three beats from text alone. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes.\n\nSet your Reactor API key in this plugin's config.ini."
@@ -34,12 +34,12 @@
       "id": 3,
       "type": "ReactorTimeline",
       "pos": [
-        470,
-        240
+        40,
+        600
       ],
       "size": [
-        900,
-        256
+        1260,
+        200
       ],
       "flags": {},
       "order": 2,
@@ -49,80 +49,20 @@
           "localized_name": "chain",
           "name": "chain",
           "type": "REACTOR_CHAIN",
-          "link": 4
-        },
-        {
-          "localized_name": "image_0",
-          "name": "images.image_0",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
-          "localized_name": "beats",
-          "name": "beats",
-          "type": "REACTOR_BEAT_EDITOR",
-          "widget": {
-            "name": "beats"
-          },
-          "link": null
+          "link": 7
         }
       ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
-          "links": [
-            2
-          ]
-        }
-      ],
+      "outputs": [],
       "properties": {
         "Node name for S&R": "ReactorTimeline"
       },
-      "widgets_values": [
-        {
-          "beats": [
-            {
-              "prompt": "Leo shifts his powerful weight slightly on the rocky outcrop, his golden mane rippling as he does so. Suddenly, he opens his massive jaws to release a deep, resonant roar that vibrates through the humid air, revealing his formidable white teeth. The dappled sunlight filtering through the canopy dances across his fur as his chest expands with the effort. The vibrant jungle remains lush and green around him, with tall trees and cascading vines framing his commanding figure. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            },
-            {
-              "prompt": "Leo maintains his regal position on the rocky outcrop as the humid jungle air settles around his broad shoulders. He suddenly lowers his massive head to sniff a vibrant blue butterfly that has fluttered near his nose, his piercing amber eyes momentarily softening with curiosity. The dappled sunlight continues to filter through the tall trees and cascading vines, illuminating the golden hues of his mane against the lush green background. His tail remains held high, a symbol of his enduring authority over the landscape. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            }
-          ]
-        }
-      ],
-      "widgets_values_named": {
-        "beats": {
-          "beats": [
-            {
-              "prompt": "Leo shifts his powerful weight slightly on the rocky outcrop, his golden mane rippling as he does so. Suddenly, he opens his massive jaws to release a deep, resonant roar that vibrates through the humid air, revealing his formidable white teeth. The dappled sunlight filtering through the canopy dances across his fur as his chest expands with the effort. The vibrant jungle remains lush and green around him, with tall trees and cascading vines framing his commanding figure. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            },
-            {
-              "prompt": "Leo maintains his regal position on the rocky outcrop as the humid jungle air settles around his broad shoulders. He suddenly lowers his massive head to sniff a vibrant blue butterfly that has fluttered near his nose, his piercing amber eyes momentarily softening with curiosity. The dappled sunlight continues to filter through the tall trees and cascading vines, illuminating the golden hues of his mane against the lush green background. His tail remains held high, a symbol of his enduring authority over the landscape. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            }
-          ]
-        }
-      }
+      "widgets_values": []
     },
     {
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1410,
+        1330,
         240
       ],
       "size": [
@@ -137,7 +77,7 @@
           "localized_name": "chain",
           "name": "chain",
           "type": "REACTOR_CHAIN",
-          "link": 2
+          "link": 8
         },
         {
           "localized_name": "seed",
@@ -175,7 +115,7 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1410,
+        1330,
         580
       ],
       "size": [
@@ -302,7 +242,7 @@
           "name": "REACTOR_CHAIN",
           "type": "REACTOR_CHAIN",
           "links": [
-            4
+            5
           ]
         }
       ],
@@ -319,17 +259,160 @@
         "frames": 198,
         "image_strength": 1.0
       }
+    },
+    {
+      "id": 7,
+      "type": "ReactorHeliosChain",
+      "pos": [
+        470,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_CHAIN",
+          "link": 5
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image_strength",
+          "name": "image_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "image_strength"
+          },
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorHeliosChain"
+      },
+      "widgets_values": [
+        "Leo shifts his powerful weight slightly on the rocky outcrop, his golden mane rippling as he does so. Suddenly, he opens his massive jaws to release a deep, resonant roar that vibrates through the humid air, revealing his formidable white teeth. The dappled sunlight filtering through the canopy dances across his fur as his chest expands with the effort. The vibrant jungle remains lush and green around him, with tall trees and cascading vines framing his commanding figure. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
+        198,
+        1.0
+      ],
+      "widgets_values_named": {
+        "prompt": "Leo shifts his powerful weight slightly on the rocky outcrop, his golden mane rippling as he does so. Suddenly, he opens his massive jaws to release a deep, resonant roar that vibrates through the humid air, revealing his formidable white teeth. The dappled sunlight filtering through the canopy dances across his fur as his chest expands with the effort. The vibrant jungle remains lush and green around him, with tall trees and cascading vines framing his commanding figure. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
+        "frames": 198,
+        "image_strength": 1.0
+      }
+    },
+    {
+      "id": 8,
+      "type": "ReactorHeliosChain",
+      "pos": [
+        900,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_CHAIN",
+          "link": 6
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image_strength",
+          "name": "image_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "image_strength"
+          },
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            7,
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorHeliosChain"
+      },
+      "widgets_values": [
+        "Leo maintains his regal position on the rocky outcrop as the humid jungle air settles around his broad shoulders. He suddenly lowers his massive head to sniff a vibrant blue butterfly that has fluttered near his nose, his piercing amber eyes momentarily softening with curiosity. The dappled sunlight continues to filter through the tall trees and cascading vines, illuminating the golden hues of his mane against the lush green background. His tail remains held high, a symbol of his enduring authority over the landscape. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
+        198,
+        1.0
+      ],
+      "widgets_values_named": {
+        "prompt": "Leo maintains his regal position on the rocky outcrop as the humid jungle air settles around his broad shoulders. He suddenly lowers his massive head to sniff a vibrant blue butterfly that has fluttered near his nose, his piercing amber eyes momentarily softening with curiosity. The dappled sunlight continues to filter through the tall trees and cascading vines, illuminating the golden hues of his mane against the lush green background. His tail remains held high, a symbol of his enduring authority over the landscape. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
+        "frames": 198,
+        "image_strength": 1.0
+      }
     }
   ],
   "links": [
-    [
-      2,
-      3,
-      0,
-      4,
-      0,
-      "REACTOR_CHAIN"
-    ],
     [
       3,
       4,
@@ -339,10 +422,34 @@
       "VIDEO"
     ],
     [
-      4,
+      5,
       6,
       0,
+      7,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      6,
+      7,
+      0,
+      8,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      7,
+      8,
+      0,
       3,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      8,
+      8,
+      0,
+      4,
       0,
       "REACTOR_CHAIN"
     ]

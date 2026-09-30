@@ -1,8 +1,8 @@
 {
   "id": "e48b30fe-b3d3-4d75-a769-b73df4f9ffb7",
   "revision": 0,
-  "last_node_id": 7,
-  "last_link_id": 6,
+  "last_node_id": 9,
+  "last_link_id": 10,
   "nodes": [
     {
       "id": 1,
@@ -22,7 +22,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "A Visko Orbis Stable scene in three beats. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one beat to the next instead of cutting.\n\nLoad Image feeds image_0. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "A Visko Orbis Stable scene in three beats, one chain node per beat. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one beat to the next instead of cutting. Reactor Timeline draws the chain.\n\nLoad Image feeds the first node. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
         "text": "A Visko Orbis Stable scene in three beats. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one beat to the next instead of cutting.\n\nLoad Image feeds image_0. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
@@ -34,12 +34,12 @@
       "id": 3,
       "type": "ReactorTimeline",
       "pos": [
-        470,
-        240
+        40,
+        600
       ],
       "size": [
-        900,
-        256
+        1260,
+        200
       ],
       "flags": {},
       "order": 2,
@@ -49,73 +49,20 @@
           "localized_name": "chain",
           "name": "chain",
           "type": "REACTOR_CHAIN",
-          "link": 6
-        },
-        {
-          "localized_name": "beats",
-          "name": "beats",
-          "type": "REACTOR_BEAT_EDITOR",
-          "widget": {
-            "name": "beats"
-          },
-          "link": null
+          "link": 9
         }
       ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
-          "links": [
-            2
-          ]
-        }
-      ],
+      "outputs": [],
       "properties": {
         "Node name for S&R": "ReactorTimeline"
       },
-      "widgets_values": [
-        {
-          "beats": [
-            {
-              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            },
-            {
-              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            }
-          ]
-        }
-      ],
-      "widgets_values_named": {
-        "beats": {
-          "beats": [
-            {
-              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            },
-            {
-              "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
-              "frames": 198,
-              "cut": false,
-              "image": null
-            }
-          ]
-        }
-      }
+      "widgets_values": []
     },
     {
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1410,
+        1330,
         240
       ],
       "size": [
@@ -130,7 +77,7 @@
           "localized_name": "chain",
           "name": "chain",
           "type": "REACTOR_CHAIN",
-          "link": 2
+          "link": 10
         },
         {
           "localized_name": "seed",
@@ -168,7 +115,7 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1410,
+        1330,
         580
       ],
       "size": [
@@ -249,8 +196,8 @@
       "id": 6,
       "type": "LoadImage",
       "pos": [
-        40,
-        340
+        -300,
+        240
       ],
       "size": [
         270,
@@ -379,7 +326,7 @@
           "name": "REACTOR_CHAIN",
           "type": "REACTOR_CHAIN",
           "links": [
-            6
+            7
           ]
         }
       ],
@@ -400,17 +347,206 @@
         "audio": true,
         "audio_prompt": ""
       }
+    },
+    {
+      "id": 8,
+      "type": "ReactorViskoOrbisChain",
+      "pos": [
+        470,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_CHAIN",
+          "link": 7
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null,
+          "shape": 7
+        },
+        {
+          "localized_name": "audio_prompt",
+          "name": "audio_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "audio_prompt"
+          },
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorViskoOrbisChain"
+      },
+      "widgets_values": [
+        "Visko Orbis Stable",
+        "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
+        198,
+        true,
+        ""
+      ],
+      "widgets_values_named": {
+        "model": "Visko Orbis Stable",
+        "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
+        "frames": 198,
+        "audio": true,
+        "audio_prompt": ""
+      }
+    },
+    {
+      "id": 9,
+      "type": "ReactorViskoOrbisChain",
+      "pos": [
+        900,
+        240
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_CHAIN",
+          "link": 8
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null,
+          "shape": 7
+        },
+        {
+          "localized_name": "audio_prompt",
+          "name": "audio_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "audio_prompt"
+          },
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            9,
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorViskoOrbisChain"
+      },
+      "widgets_values": [
+        "Visko Orbis Stable",
+        "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
+        198,
+        true,
+        ""
+      ],
+      "widgets_values_named": {
+        "model": "Visko Orbis Stable",
+        "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
+        "frames": 198,
+        "audio": true,
+        "audio_prompt": ""
+      }
     }
   ],
   "links": [
-    [
-      2,
-      3,
-      0,
-      4,
-      0,
-      "REACTOR_CHAIN"
-    ],
     [
       3,
       4,
@@ -428,10 +564,34 @@
       "IMAGE"
     ],
     [
-      6,
+      7,
       7,
       0,
+      8,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      8,
+      8,
+      0,
+      9,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      9,
+      9,
+      0,
       3,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      10,
+      9,
+      0,
+      4,
       0,
       "REACTOR_CHAIN"
     ]

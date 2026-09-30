@@ -19,16 +19,11 @@ const STYLE = `
 .reactor-tl-boundary { position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px; cursor: ew-resize; z-index: 1; }
 .reactor-tl-boundary.shot { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--input-text) 45%, transparent), transparent); }
 .reactor-tl-boundary.cut::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 4px; background: var(--input-text); }
-.reactor-tl-boundary.locked { cursor: default; }
 .reactor-tl-beat.selected { outline: 2px solid var(--p-primary-color, #4a9eff); }
 .reactor-tl-beat.invalid { border-color: #e05252; background: color-mix(in srgb, #e05252 25%, var(--comfy-menu-bg)); }
-.reactor-tl-beat.locked { cursor: default; opacity: 0.85; }
 .reactor-tl-panel { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 6px; align-items: center; }
-.reactor-tl-panel textarea { grid-column: 1 / -1; min-height: 44px; resize: vertical; }
-.reactor-tl-panel textarea, .reactor-tl-panel input, .reactor-tl-panel select, .reactor-tl button { background: var(--comfy-input-bg); color: var(--input-text); border: 1px solid var(--border-color); border-radius: 3px; font: inherit; }
+.reactor-tl-panel input, .reactor-tl-panel select, .reactor-tl button { background: var(--comfy-input-bg); color: var(--input-text); border: 1px solid var(--border-color); border-radius: 3px; font: inherit; }
 .reactor-tl-row { display: flex; gap: 6px; align-items: center; }
-.reactor-tl-refs-label { grid-column: 1; }
-.reactor-tl-refs { grid-column: 2 / -1; flex-wrap: wrap; }
 .reactor-tl-note { opacity: 0.75; }
 .reactor-tl-problem { color: #e05252; grid-column: 1 / -1; }
 .reactor-tl-lane { position: relative; height: 22px; background: var(--comfy-input-bg); border-radius: 4px; overflow: hidden; cursor: copy; }
@@ -36,8 +31,6 @@ const STYLE = `
 .reactor-tl-move { position: absolute; top: 2px; bottom: 2px; box-sizing: border-box; padding: 1px 6px; border-radius: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: grab; user-select: none; font-size: 11px; background: color-mix(in srgb, var(--p-primary-color, #4a9eff) 30%, var(--comfy-menu-bg)); border: 1px solid var(--border-color); }
 .reactor-tl-move.selected { outline: 2px solid var(--p-primary-color, #4a9eff); }
 .reactor-tl-lane.locked, .reactor-tl-move.locked { cursor: default; }
-.reactor-tl-beat.locked:not(.invalid), .reactor-tl-move.locked:not(.invalid) { filter: grayscale(1); opacity: 0.6; }
-.reactor-tl-badge { padding: 1px 6px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 10px; opacity: 0.8; }
 .reactor-tl-move.invalid { border-color: #e05252; background: color-mix(in srgb, #e05252 25%, var(--comfy-menu-bg)); }
 `;
 
@@ -186,12 +179,6 @@ function nextEdge(frame, facts) {
     return facts ? framesIn(chunksFor(frame, facts) + 1, facts) : frame + 1;
 }
 
-// A length rounded to whole chunks (at least one).
-function snapLength(frames, facts) {
-    if (!facts) return Math.max(1, Math.round(frames));
-    return Math.max(1, Math.round(frames / facts.frames_per_chunk)) * facts.frames_per_chunk;
-}
-
 // A ruler step from the 1-2-5 series that puts at most `ticks` ticks across `length` frames.
 function tickStep(length, ticks) {
     const step = 10 ** Math.max(0, Math.floor(Math.log10(length / ticks)) || 0);
@@ -220,13 +207,10 @@ function adaptBeat(node) {
 }
 
 // Why the model would reject each beat, keyed by index; mirrors compile_timeline.
-// The first `chained` beats come from the chain, whose images and references are its own.
-function problems(beats, spans, facts, chained, slots, refs) {
+function problems(beats, spans, facts) {
     const found = new Map();
     const add = (i, why) => found.set(i, [...(found.get(i) ?? []), why]);
     beats.forEach((b, i) => {
-        if (i >= chained && b.image && !slots.includes(b.image)) add(i, `${b.image} has no image connected`);
-        for (const r of i < chained ? [] : b.references ?? []) if (!refs.includes(r)) add(i, `${r} has no reference connected`);
         if (!facts) return;
         if (b.references?.length && !facts.references) add(i, "this model takes no references");
         if (b.references?.length > 3) add(i, "a beat holds at most 3 references");
@@ -288,8 +272,6 @@ function chainMoves(beats, spans) {
 
 const moveLabel = (m) => (typeof m.value === "number" ? `${m.value}°` : String(m.value).replace("_", " ")) + (m.speed != null ? ` ${m.speed}°` : "");
 
-const HINT = "Click a beat to edit it. Drag the line after a beat to set how long it plays; click a line between two beats to switch shot and cut.";
-
 // Drags listen on the window, since each redraw replaces the element the drag started on.
 const dragger = (changed) => (onMove, onUp) => {
     const move = (m) => { onMove(m); changed(); };
@@ -325,8 +307,8 @@ function drawRuler(ruler, length, pct) {
 }
 
 // One row per camera lane, plus any lane a move names that this model lacks, so it can be deleted.
-// With `edit` null the lanes are read-only; otherwise it adds, selects and drags the moves from
-// `edit.first` on, and a move added or resized stays within `edit.limit`.
+// With `edit` null the lanes are read-only; otherwise it adds, selects and drags the moves, and a
+// move added or resized stays within `edit.limit`.
 function drawLanes(lanes, moves, { camera, facts, length, pct, at, found, selectedMove, pastEnd, edit }) {
     lanes.replaceChildren();
     for (const name of [...new Set([...Object.keys(camera), ...moves.map((m) => m.lane)])]) {
@@ -343,14 +325,13 @@ function drawLanes(lanes, moves, { camera, facts, length, pct, at, found, select
         moves.forEach((m, i) => {
             if (m.lane !== name) return;
             const end = m.start_frame + m.frames;
-            const editable = edit && i >= (edit.first ?? 0);
             const block = el("div", {
-                className: ["reactor-tl-move", i === selectedMove && "selected", found.has(i) && "invalid", !editable && "locked"].filter(Boolean).join(" "),
+                className: ["reactor-tl-move", i === selectedMove && "selected", found.has(i) && "invalid", !edit && "locked"].filter(Boolean).join(" "),
                 title: [`${m.lane} ${moveLabel(m)}, frames ${m.start_frame} to ${end}`,
                         ...(end > length ? [pastEnd] : []), ...(found.get(i) ?? [])].join("\n"),
                 style: `left:${pct(m.start_frame)};width:${pct(m.frames)}`,
             }, moveLabel(m));
-            if (editable) {
+            if (edit) {
                 block.addEventListener("pointerdown", (e) => {
                     e.stopPropagation();
                     edit.select(i);
@@ -411,13 +392,12 @@ function drawMovePanel(panel, move, { camera, facts, problems, remove, changed }
     if (problems) panel.append(el("div", { className: "reactor-tl-problem", textContent: problems.join("; ") }));
 }
 
-function createEditor(node, inputName, inputData) {
-    let value = structuredClone(inputData?.[1]?.default ?? { beats: [] });
-    value.moves ??= [];
+// A chain drawn on a frame ruler: its beats as they will play, snapped to the model's chunks, and its
+// camera moves on the lanes underneath. It only shows the chain, so it saves nothing.
+function createViewer(node) {
     let selected = null;
-    let selectedMove = null;
     let signature = "";
-    // Measured on each draw, since the editor may not be laid out when it renders; the default fits an empty editor until then.
+    // Measured on each draw, since the viewer may not be laid out when it renders; the default fits an empty viewer until then.
     let height = 120;
     let laidOut = false;
 
@@ -429,52 +409,20 @@ function createEditor(node, inputName, inputData) {
     const panel = el("div");
     const footer = el("div", { className: "reactor-tl-row" });
     root.append(ruler, track, lanes, panel, footer);
-    // How many beats and moves at the front come from the chain, drawn locked before the editor's own.
-    let chained = 0;
-    let chainedMoves = 0;
-    deleteKey(root, () => {
-        if (selectedMove !== null) value.moves.splice(selectedMove - chainedMoves, 1);
-        else if (selected !== null && selected >= chained) value.beats.splice(selected - chained, 1);
-        else return false;
-        selected = selectedMove = null;
-        changed();
-    });
 
-    const changed = () => {
-        signature = "";
-        render();
-        node.graph?.setDirtyCanvas(true, true);
-    };
-
-    // What the editor draws from besides its own value; a change here, including upstream edits, triggers a redraw.
-    const state = () => ({ chain: chainBeats(node), facts: modelFacts(node), slots: connectedSlots(node, "images"), refs: connectedSlots(node, "references"), width: track.clientWidth });
-
-    const drag = dragger(changed);
+    // What the viewer draws from; a change here, including edits upstream, triggers a redraw.
+    const state = () => ({ chain: chainBeats(node), facts: modelFacts(node), width: track.clientWidth });
 
     function render() {
         const s = state();
-        // A chain this editor can't read is drawn as nothing, so the drawn beats start at 0 until it can.
-        const before = Array.isArray(s.chain) ? s.chain : [];
-        chained = before.length;
-        const beats = [...before, ...value.beats];
-        const own = (i) => i >= chained;
+        const beats = Array.isArray(s.chain) ? s.chain : [];
         const spans = layout(beats, s.facts);
         const length = spans.length ? Math.max(spans.at(-1)[1], s.facts?.frames_per_chunk ?? 1) : 240;
-        const found = problems(beats, spans, s.facts, chained, s.slots, s.refs);
+        const found = problems(beats, spans, s.facts);
         const pct = (frame) => `${(100 * frame) / length}%`;
-        const at = (clientX) => {
-            const rect = track.getBoundingClientRect();
-            return ((clientX - rect.left) / rect.width) * length;
-        };
-        const cuts = !s.facts || s.facts.supports_cuts;
         if (selected !== null && selected >= beats.length) selected = null;
         const camera = s.facts?.camera ?? {};
-        // The chain's moves live on its beats, so they are drawn here read-only, before the editor's own.
-        const locked = chainMoves(before, spans.slice(0, chained));
-        chainedMoves = locked.length;
-        const moves = [...locked, ...value.moves];
-        if (selectedMove !== null && (selectedMove < chainedMoves || selectedMove >= moves.length)) selectedMove = null;
-        const moveFound = moveProblems(moves, s.facts);
+        const moves = chainMoves(beats, spans);
 
         drawRuler(ruler, length, pct);
 
@@ -491,147 +439,48 @@ function createEditor(node, inputName, inputData) {
         beats.forEach((b, i) => {
             const [start, end] = spans[i];
             const block = el("div", {
-                className: ["reactor-tl-beat", i === selected && "selected", found.has(i) && "invalid", !own(i) && "locked"].filter(Boolean).join(" "),
-                title: [`frames ${start} to ${end}`, ...(own(i) ? [] : ["From the chain; edit it on its chain node."]), ...(found.get(i) ?? [])].join("\n"),
+                className: ["reactor-tl-beat", i === selected && "selected", found.has(i) && "invalid"].filter(Boolean).join(" "),
+                title: [`frames ${start} to ${end}`, ...(found.get(i) ?? [])].join("\n"),
                 style: `left:${pct(start)};width:${pct(Math.max(0, end - start))}`,
             }, el("span", { textContent: b.prompt || "(empty prompt)" }), el("span", { className: "reactor-tl-length", textContent: ` ${end - start}f` }));
             block.addEventListener("pointerdown", (e) => {
                 e.stopPropagation();
-                selected = i;
-                selectedMove = null;
-                changed();
+                selected = selected === i ? null : i;
+                render();
             });
-            // The last beat's end has no boundary to drag, so it gets a handle of its own.
-            if (own(i) && i === beats.length - 1) {
-                const handle = el("div", { className: "reactor-tl-resize", title: "Drag to set how long this beat plays" });
-                handle.addEventListener("pointerdown", (e) => {
-                    e.stopPropagation();
-                    drag((m) => { value.beats[i - chained].frames = snapLength(at(m.clientX) - start, s.facts); });
-                });
-                block.append(handle);
-            }
             track.append(block);
-            if (i === 0) return;
             // Shot or cut is how this beat enters from the one before, so it is drawn on their boundary.
-            // A cut stays drawn on a model without cuts, so the flagged beat can be clicked back to a shot.
-            // The first drawn beat's entry is its own, but the chain beat before it can't be resized here.
-            const kind = b.cut ? "cut" : "shot", resizes = own(i - 1);
-            const boundary = el("div", {
-                className: `reactor-tl-boundary ${kind}${own(i) ? "" : " locked"}`,
-                title: (kind === "cut" ? "Cut: starts fresh, with no blend." + (own(i) ? " Click for a shot." : "")
-                    : "Shot: blends from the beat before." + (!own(i) ? "" : cuts ? " Click for a cut." : " This model has no hard cuts."))
-                    + (resizes ? "\nDrag to change how long the beat before plays." : ""),
-                style: `left:${pct(start)}`,
-            });
-            // Dragging the boundary resizes the beat before it; a click without a drag switches shot and cut.
-            if (own(i))
-                boundary.addEventListener("pointerdown", (e) => {
-                    e.stopPropagation();
-                    let moved = false;
-                    drag((m) => {
-                        moved ||= resizes && Math.abs(m.clientX - e.clientX) > 3;
-                        if (moved) value.beats[i - 1 - chained].frames = snapLength(at(m.clientX) - spans[i - 1][0], s.facts);
-                    }, () => {
-                        const beat = value.beats[i - chained];
-                        if (moved || (!cuts && !beat.cut)) return;
-                        beat.cut = !beat.cut;
-                        changed();
-                    });
-                });
-            track.append(boundary);
+            if (i) track.append(el("div", { className: `reactor-tl-boundary ${b.cut ? "cut" : "shot"} locked`, style: `left:${pct(start)}`,
+                                            title: b.cut ? "Cut: starts fresh, with no blend." : "Shot: blends from the beat before." }));
         });
 
-        drawLanes(lanes, moves, {
-            camera, facts: s.facts, length, pct, at, found: moveFound, selectedMove, pastEnd: "runs past the end; cut at the last chunk",
-            edit: {
-                first: chainedMoves,
-                limit: Infinity,
-                drag,
-                select: (i) => { selectedMove = i; selected = null; changed(); },
-                add: (move) => { value.moves.push(move); selectedMove = moves.length; selected = null; changed(); },
-            },
-        });
+        drawLanes(lanes, moves, { camera, facts: s.facts, length, pct, found: moveProblems(moves, s.facts), selectedMove: null,
+                                  pastEnd: "runs past the end; cut at the last chunk", edit: null });
 
         panel.replaceChildren();
-        panel.className = "reactor-tl-panel";
-        if (selectedMove !== null) {
-            drawMovePanel(panel, value.moves[selectedMove - chainedMoves], {
-                camera, facts: s.facts, problems: moveFound.get(selectedMove), changed,
-                remove: () => { value.moves.splice(selectedMove - chainedMoves, 1); selectedMove = null; changed(); },
-            });
-        } else if (selected !== null && !own(selected)) {
-            panel.className = "reactor-tl-note";
-            panel.textContent = `${beats[selected].prompt || "(empty prompt)"} (from the chain; edit it and its camera moves on its chain node)`;
-        } else if (selected !== null) {
-            const beat = value.beats[selected - chained];
-            const prompt = el("textarea", { value: beat.prompt, placeholder: "Prompt" });
-            prompt.addEventListener("input", () => { beat.prompt = prompt.value; node.graph?.setDirtyCanvas(true, false); });
-            // Dragging the resize grip changes nothing on the canvas, so redraw to let the node refit.
-            new ResizeObserver(() => node.graph?.setDirtyCanvas(true, false)).observe(prompt);
-            prompt.addEventListener("change", changed);
-            const frames = el("input", { type: "number", min: 1, step: s.facts?.frames_per_chunk ?? 1, value: beat.frames });
-            frames.addEventListener("change", () => { beat.frames = snapLength(Number(frames.value) || 0, s.facts); changed(); });
-            const kind = el("select", { disabled: selected === 0 || (!cuts && !beat.cut) },
-                el("option", { value: "shot", textContent: "shot (blend in)" }), el("option", { value: "cut", textContent: "cut (start fresh)" }));
-            kind.value = beat.cut && selected > 0 ? "cut" : "shot";
-            kind.addEventListener("change", () => { beat.cut = kind.value === "cut"; changed(); });
-            const slots = [...new Set([...s.slots, ...(beat.image ? [beat.image] : [])])];
-            const image = el("select", {}, el("option", { value: "", textContent: "no image" }), ...slots.map((n) => el("option", { value: n, textContent: n })));
-            image.value = beat.image ?? "";
-            image.addEventListener("change", () => { beat.image = image.value || null; changed(); });
-            const remove = el("button", { textContent: "Delete beat" });
-            remove.addEventListener("click", () => { value.beats.splice(selected - chained, 1); selected = null; changed(); });
-            // A picked image stays pickable so it can be cleared; problems() flags it.
-            const takesImage = !s.facts || s.facts.images === "any" || (s.facts.images === "first" && selected === 0) || beat.image;
-            panel.append(prompt, el("span", { textContent: "frames" }), frames, el("span", { textContent: "enters as" }), kind,
-                         ...(takesImage ? [el("span", { textContent: "image" }), image] : []));
-            // As with images, a picked reference stays listed so it can be unpicked.
-            const picked = beat.references ?? [];
-            const refs = [...new Set([...s.refs, ...picked])];
-            if (refs.length && (s.facts?.references || picked.length)) {
-                const boxes = refs.map((n) => {
-                    const box = el("input", { type: "checkbox", checked: picked.includes(n) });
-                    box.addEventListener("change", () => { beat.references = refs.filter((r) => r === n ? box.checked : picked.includes(r)); changed(); });
-                    return el("label", {}, box, n);
-                });
-                panel.append(el("span", { className: "reactor-tl-refs-label", textContent: "references" }), el("div", { className: "reactor-tl-row reactor-tl-refs" }, ...boxes));
-            }
-            panel.append(el("span"), remove);
+        panel.className = "reactor-tl-note";
+        if (selected !== null) {
+            const [start, end] = spans[selected];
+            panel.textContent = `Beat ${selected + 1}, frames ${start} to ${end}: ${beats[selected].prompt || "(empty prompt)"}`;
+            if (found.has(selected)) panel.append(el("div", { className: "reactor-tl-problem", textContent: found.get(selected).join("; ") }));
         } else {
-            panel.className = "reactor-tl-note";
-            panel.textContent = (s.chain === "unknown" ? "This editor can't read the chain, so its beats aren't drawn. " : "")
-                + (value.beats.length ? HINT : "Beats added here play after the chain's.")
-                + (Object.keys(camera).length ? " Click a camera lane to add a move; moves on different lanes can overlap." : "");
+            panel.textContent = s.chain === null ? "Connect a chain to draw it."
+                : s.chain === "unknown" ? "This timeline can't read the chain, so its beats aren't drawn."
+                : "Click a beat to read its prompt. Edit a beat and its camera moves on its chain node.";
         }
-        if (selectedMove === null && found.has(selected)) panel.append(el("div", { className: "reactor-tl-problem", textContent: found.get(selected).join("; ") }));
 
         footer.replaceChildren();
-        const add = el("button", { textContent: "+ Beat" });
-        add.addEventListener("click", () => {
-            value.beats.push({ prompt: "", frames: snapLength(120, s.facts), cut: false, image: null, references: [] });
-            selected = beats.length;
-            changed();
-        });
-        footer.append(add);
-        if (s.chain !== "unknown") footer.append(el("span", { className: "reactor-tl-note", textContent: s.facts ? `${length} frames, ${(length / s.facts.fps).toFixed(1)} s at ${s.facts.fps} fps` : `${length} frames` }));
-        if (!s.facts) footer.append(el("span", { className: "reactor-tl-note", textContent: "Connect a chain to snap to its model's chunks." }));
+        if (Array.isArray(s.chain)) footer.append(el("span", { className: "reactor-tl-note", textContent: s.facts ? `${length} frames, ${(length / s.facts.fps).toFixed(1)} s at ${s.facts.fps} fps` : `${length} frames` }));
     }
 
-    const widget = node.addDOMWidget(inputName, "REACTOR_BEAT_EDITOR", root, {
-        getValue: () => value,
-        setValue: (v) => {
-            value = v && Array.isArray(v.beats) ? structuredClone(v) : { beats: [] };
-            value.moves = Array.isArray(value.moves) ? value.moves : [];
-            selected = null;
-            selectedMove = null;
-            changed();
-        },
+    const widget = node.addDOMWidget("timeline", "REACTOR_TIMELINE", root, {
+        serialize: false,
         getMinHeight: () => height && height + 2 * widget.margin,
         // The Parameters panel draws a widget by setting its width to the panel's and never restores it.
         hideInPanel: true,
         onDraw: () => {
             const s = state();
-            const next = JSON.stringify([s.chain, s.facts, s.slots, s.refs, s.width]);
+            const next = JSON.stringify([s.chain, s.facts, s.width]);
             if (next !== signature) {
                 signature = next;
                 render();
@@ -647,9 +496,12 @@ function createEditor(node, inputName, inputData) {
             }
         },
     });
-    // A Reactor Render fed by this timeline reports frames rendered over frames planned, and the
-    // planned length is this ruler's length, so the ratio places the playhead.
-    const rendersThis = (id) => (node.outputs?.[0]?.links ?? []).some((l) => String(node.graph?.links[l]?.target_id) === String(id));
+    // A Reactor Render of the same chain reports frames rendered over frames planned, and the planned
+    // length is this ruler's length, so the ratio places the playhead.
+    const rendersThis = (id) => {
+        const render = node.graph?.getNodeById(id), chain = upstream(node, "chain");
+        return !!chain && render?.comfyClass === "ReactorRender" && upstream(render, "chain") === chain;
+    };
     const onProgress = ({ detail }) => {
         if (!rendersThis(detail.node)) return;
         playhead.hidden = false;
@@ -669,7 +521,7 @@ function createEditor(node, inputName, inputData) {
         onRemove?.call(this);
     };
     render();
-    return { widget };
+    return widget;
 }
 
 // A chain beat's camera lanes: moves counted from the beat's own start, on the lanes of the model
@@ -784,23 +636,12 @@ app.registerExtension({
         document.head.append(el("style", { textContent: STYLE }));
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name === "ReactorRealtime") {
-            const onDrawForeground = nodeType.prototype.onDrawForeground;
-            nodeType.prototype.onDrawForeground = function (...args) {
-                // A camera is a live source video, for the models that take a video on their link.
-                const facts = modelFacts(this);
-                fitInputs(this, [["camera", "REACTOR_CAMERA", !facts || facts.videos !== "none"]]);
-                return onDrawForeground?.apply(this, args);
-            };
-        }
         if (nodeData.name === "ReactorTimeline") {
-            const onDrawForeground = nodeType.prototype.onDrawForeground;
-            nodeType.prototype.onDrawForeground = function (...args) {
-                // The drawn beats play after the chain's, so they pick from these only where the model takes them.
-                const facts = modelFacts(this);
-                if (showGrown(this, "images", "image_0", "IMAGE", !facts || facts.images === "any")
-                    | showGrown(this, "references", "reference_0", "REACTOR_REFERENCE", !facts || facts.references)) fitNode(this);
-                return onDrawForeground?.apply(this, args);
+            const onNodeCreated = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function (...args) {
+                const result = onNodeCreated?.apply(this, args);
+                createViewer(this);
+                return result;
             };
         }
         if (nodeData.name === "ReactorRender") {
@@ -858,7 +699,6 @@ app.registerExtension({
     },
     getCustomWidgets() {
         return {
-            REACTOR_BEAT_EDITOR: (node, inputName, inputData) => createEditor(node, inputName, inputData),
             REACTOR_MOVE_EDITOR: (node, inputName) => ({ widget: createMoveEditor(node, inputName) }),
         };
     },

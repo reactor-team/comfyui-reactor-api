@@ -1,8 +1,18 @@
 # comfyui-reactor-api
 
-Render videos on [Reactor](https://docs.reactor.inc) real-time video models from ComfyUI. Lay out
-prompt beats and camera moves as a chain of a model's nodes or on a timeline, and Reactor Render
-returns the video.
+Run [Reactor](https://docs.reactor.inc) real-time video models from ComfyUI, live or as a scripted
+render.
+
+## Two ways to use it
+
+- **Live: Reactor Realtime.** For interactive use. Pick a model on the node and it shows the inputs
+  that model takes: a prompt, an image, a clip or camera, and its settings. Queue it and the model
+  plays in a window where you steer it: change the prompt, drive the camera from the keyboard, or
+  talk to an avatar. Press Done and the take comes out of the node as a video.
+- **Scripted: chain nodes and Reactor Render.** For a sequence you define ahead of time. Each beat is
+  a model's chain node, with its prompt, length, image and camera moves, and the beats play in chain
+  order. Every input is an ordinary ComfyUI input, so other nodes can write the prompts, make the
+  images, fork the story or pick an ending, and the render is a video like any other node's output.
 
 <table>
   <tr>
@@ -98,37 +108,31 @@ priority over `config.ini`. The key is stored in plain text, and `config.ini` is
 
 ## Nodes
 
-- **Reactor Timeline** is a visual editor. It starts from a chain and shows its beats on a frame
-  ruler, then the beats you draw after them, snapped to the model's chunks, with camera lanes
-  underneath for models that have camera controls.
+- **Reactor Timeline** draws a chain on a frame ruler: its beats, snapped to the model's chunks as
+  they will play, with the camera moves underneath for models that have camera controls. It only
+  shows the chain; edit a beat on its chain node.
 - **Reactor <model> Chain**, such as Reactor Helios Chain, is a single beat for that model, with
   only the inputs the model takes. Each model's chain node is in its own submenu under Reactor, and
-  searching "reactor chain" lists them all. Chain beats together instead of drawing them. The first
+  searching "reactor chain" lists them all. Chain beats together, one node per beat. The first
   beat also sets the model's settings, such as `audio` or `persona`; later beats hide them and
   change only the settings a model takes mid-run, such as `image_strength`, which hold until
   changed. Reactor Visko Orbis Chain covers both Visko Orbis models and picks one on its first
   beat. On the
   LingBots, each beat has its own camera moves, and a move that continues onto the next beat plays
   as one move.
-- **Reactor Chain Join** plays chains or timelines one after another, as one chain. They must be for
+- **Reactor Chain Join** plays chains one after another, as one chain. They must be for
   the same model, and the first chain's settings are used.
 - **Reactor Vidu S2-Avatar Reference** tags an image as an object, outfit (`garment`) or background, with an
   optional sentence saying what happens, such as "He holds up the crystal ball." A beat holds up to 3.
-- **Reactor Render** renders a chain, from its last beat, a Reactor Chain Join or a Reactor
-  Timeline, and outputs a video.
-- **Reactor Realtime** opens a live session from one chain beat, which sets the model, settings,
-  prompt and image or video. You steer it while it plays, and each take is saved as a video.
+- **Reactor Render** renders a chain, from its last beat or a Reactor Chain Join, and outputs a
+  video.
+- **Reactor Realtime** runs a model live. Its `model` picker shows only the inputs and settings the
+  picked model takes. You steer it while it plays, and each take is saved as a video.
 - **Reactor Camera Capture** picks a camera on this browser to stream into Reactor Realtime.
 
-## Two ways to build a timeline
+## Building a video from chain nodes
 
-**Draw it on Reactor Timeline.** This is the simple way. Connect the model's chain node for the
-first beat and its settings, then add beats on the ruler, type a prompt into each one, drag the
-edges to set how long it plays, and draw camera moves in the lanes underneath. `reactor_timeline_editor` and `reactor_camera_moves` work this
-way.
-
-**Build it from a model's chain nodes.** Use this for more control. Each beat is its own node, so the rest of
-the graph can feed it:
+Each beat is its own node, so the rest of the graph can feed it:
 
 - **ComfyUI nodes build the beats.** A beat's prompt, length, and image are ordinary inputs. Fill
   them from any other node, such as text built from templates, a prompt from a language model node,
@@ -140,23 +144,24 @@ the graph can feed it:
   pick one with ComfyUI's If/Else Switch (still experimental). Only the chosen ending runs.
 
 The first beat sets the model and its settings; later beats take them from the chain. Then connect
-the last beat, or the switch, to Reactor Render. `reactor_beat_chain`, `reactor_camera_beats`,
-`reactor_camera_events` and `reactor_ad_variants` work this way.
+the last beat, or the switch, to Reactor Render. Connect it to a Reactor Timeline as well to see the
+beats and camera moves laid out as they will play.
 
 ## Realtime
 
-Reactor Realtime opens a window in ComfyUI that plays the model's output live. Edit the prompt there
+Reactor Realtime takes no chain: pick the model on the node and fill in the inputs it shows. It
+opens a window in ComfyUI that plays the model's output live. Edit the prompt there
 and press Apply to change it mid-take; press Done to save the take under `reactor/realtime`, or
 Cancel to drop it. With more than one camera, the window can switch cameras mid-take.
 
 - **Video-to-video** models edit a source you stream in. Connect a Reactor Camera Capture to stream
-  a camera, or connect a video to the beat to stream a file, which loops until you press Done. X2 also takes a
+  a camera, or connect a video to stream a file, which loops until you press Done. X2 also takes a
   reference image. Sana Streaming isn't available in Realtime yet; render it with Reactor Render.
 - **Generating** models start from a prompt, and from an image where the model takes one. For
   models with camera lanes, click the video and drive with the keys shown under it: W, A, S and D move, the arrow keys look,
   and Q and E orbit on LingBot World 2. Models without camera lanes are steered by prompt alone.
-- **Vidu S2-Avatar** holds a conversation with you. Connect the person's image to the beat and set
-  `persona` on it. Talk to the character out loud, or type a message and press Send; it answers either
+- **Vidu S2-Avatar** holds a conversation with you. Connect the person's image and set
+  `persona`. Talk to the character out loud, or type a message and press Send; it answers either
   way. The window asks for microphone access. Wear headphones so the character doesn't hear itself.
   The take records the character only, not your voice.
 
@@ -178,9 +183,9 @@ loads `example_outputs/reactor_camera_beats.mp4` the same way.
 
 | Workflow | Model | Scene |
 | --- | --- | --- |
-| `reactor_timeline_editor` | LongLive-2.0 | Martian outpost: nine beats drawn on the timeline, shots and cuts |
+| `reactor_timeline_editor` | LongLive-2.0 | Martian outpost: nine beats, shots and cuts, drawn on a Reactor Timeline |
 | `reactor_beat_chain` | LongLive-2.0 | Wildlife montage: a chain of three beats, joined by cuts |
-| `reactor_camera_moves` | LingBot World 2 | Jet ski cruise: beats and camera moves drawn on the timeline |
+| `reactor_camera_moves` | LingBot World 2 | Jet ski cruise: three beats and their camera moves, drawn on a Reactor Timeline |
 | `reactor_camera_beats` | LingBot World 2 | The same jet ski cruise as a chain of beats, each with its own moves |
 | `reactor_camera_events` | LingBot World 2 | The jet ski ride on one camera path, with an event you pick: meteors, dolphins, a whale or a seaplane |
 | `reactor_ad_variants` | LongLive-2.0 | Park ad: one opening, three audience endings rendered in one run, and a season you pick |

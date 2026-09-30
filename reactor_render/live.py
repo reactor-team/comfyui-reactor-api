@@ -267,7 +267,7 @@ class LiveRun:
                         await self._send_command(command, data)
                         if command in SETUP_PHASES:
                             self._status("Starting the call…" if self.mode == "call" else "Starting…")
-                            await self._wait_for_phase(SETUP_PHASES[command], SETUP_READY.get(command), check_interrupt)
+                            await self._wait_for_phase(SETUP_PHASES[command], SETUP_READY.get(command), command != "create_avatar", check_interrupt)
                     if self.mode == "call":
                         await self._wait_for_character(check_interrupt)
                         writer.fill_gaps = True
@@ -332,7 +332,7 @@ class LiveRun:
                     return
             await asyncio.sleep(0.1)
 
-    async def _wait_for_phase(self, phase: str, ready: str | None, check_interrupt) -> None:
+    async def _wait_for_phase(self, phase: str, ready: str | None, in_call: bool, check_interrupt) -> None:
         give_up = time.monotonic() + SETUP_SECONDS
         while True:
             check_interrupt()
@@ -344,7 +344,7 @@ class LiveRun:
                 msg = await asyncio.wait_for(self._messages.get(), timeout=0.25)
             except asyncio.TimeoutError:
                 continue
-            if session_phase(msg) == phase and (ready is None or msg["data"].get(ready)):
+            if session_phase(msg, in_call) == phase and (ready is None or msg["data"].get(ready)):
                 return
 
     async def _wait_for_character(self, check_interrupt) -> None:

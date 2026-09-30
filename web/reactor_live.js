@@ -1,7 +1,11 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
+const HINT = "Press Run to start a real-time session: the model plays in a window and you steer it as it runs. "
+    + "Each run records a take. Set the seed's control after generate to fixed to keep the last take instead of starting a new session.";
+
 const STYLE = `
+.reactor-live-node-help { box-sizing: border-box; padding: 4px 6px; color: var(--descrip-text, #999); font: 11px sans-serif; line-height: 1.35; overflow: hidden; }
 .reactor-live-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--bg-color, #202020) 65%, transparent); }
 .reactor-live { box-sizing: border-box; width: min(920px, 94vw); max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--comfy-menu-bg); color: var(--input-text); font: 12px sans-serif; }
 .reactor-live-title { font-size: 14px; font-weight: bold; }
@@ -582,5 +586,17 @@ app.registerExtension({
             current?.cancel();
             current = openLive(detail);
         });
+    },
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+        if (nodeData.name !== "ReactorRealtime") return;
+        const onNodeCreated = nodeType.prototype.onNodeCreated;
+        nodeType.prototype.onNodeCreated = function (...args) {
+            const result = onNodeCreated?.apply(this, args);
+            // The session window opens only once the run starts, so the node says what Run does.
+            const hint = el("div", { className: "reactor-live-node-help", textContent: HINT });
+            // The option alone still leaves the widget in widgets_values; the widget's own flag keeps it out.
+            this.addDOMWidget("hint", "REACTOR_REALTIME_HINT", hint, { serialize: false, hideInPanel: true, getMinHeight: () => 64 }).serialize = false;
+            return result;
+        };
     },
 });

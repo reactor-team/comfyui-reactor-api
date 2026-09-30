@@ -39,7 +39,7 @@ def test_starts_round_cumulatively_so_the_grid_does_not_drift():
 
 
 def test_a_beat_shorter_than_a_chunk_raises():
-    with pytest.raises(ValueError, match="Beat 2 lasts 12 frames, less than one 32-frame chunk"):
+    with pytest.raises(ValueError, match="Segment 2 lasts 12 frames, less than one 32-frame chunk"):
         compile_timeline("LongLive-2.0", [Beat("a", 48), Beat("b", 12)], seed=0)
 
 
@@ -49,7 +49,7 @@ def test_a_cut_opening_the_video_is_just_the_opening_shot():
 
 
 def test_longlive_scene_longer_than_48_chunks_is_rejected():
-    with pytest.raises(ValueError, match="add a cut beat"):
+    with pytest.raises(ValueError, match="add a cut segment"):
         compile_timeline("LongLive-2.0", [Beat("a", 1680)], seed=0)
 
 
@@ -59,7 +59,7 @@ def test_a_cut_resets_the_longlive_scene_budget():
 
 
 def test_a_soft_shot_does_not_reset_the_scene_budget():
-    with pytest.raises(ValueError, match="add a cut beat"):
+    with pytest.raises(ValueError, match="add a cut segment"):
         compile_timeline("LongLive-2.0", [Beat("a", 1200), Beat("b", 1200)], seed=0)
 
 
@@ -69,7 +69,7 @@ def test_longlive_rejects_images():
 
 
 def test_empty_timeline_is_rejected():
-    with pytest.raises(ValueError, match="no beats"):
+    with pytest.raises(ValueError, match="no segments"):
         compile_timeline("LongLive-2.0", [], seed=0)
 
 
@@ -124,11 +124,11 @@ def test_live_beats_after_the_first_are_sent_a_chunk_early():
 def test_a_follow_up_image_is_dropped_with_a_warning_when_the_model_reads_images_only_at_start(caplog):
     plan = compile_timeline("LingBot", [Beat("a", 48, image=b"one"), Beat("b", 48, image=b"two")], seed=0)
     assert plan.timed == [(1, "set_prompt", {"prompt": "b"})]
-    assert "dropping the image on the beat at frame 48" in caplog.text
+    assert "dropping the image on the segment at frame 48" in caplog.text
 
 
 def test_a_model_that_needs_an_image_refuses_a_timeline_without_one():
-    with pytest.raises(ValueError, match="LingBot World 2 needs an image on the first beat"):
+    with pytest.raises(ValueError, match="LingBot World 2 needs an image on the first segment"):
         compile_timeline("LingBot World 2", [Beat("a", 144)], seed=0)
 
 
@@ -190,7 +190,7 @@ def test_an_edit_without_an_edit_type_sends_none():
 
 
 def test_an_edit_needs_a_reference_image():
-    with pytest.raises(ValueError, match="needs an image on the first beat"):
+    with pytest.raises(ValueError, match="needs an image on the first segment"):
         compile_timeline("Vidu S2-Editing", [Beat("", 48, video=b"mp4")], seed=0)
 
 
@@ -200,7 +200,7 @@ def test_a_model_without_video_rejects_one():
 
 
 def test_a_model_that_needs_a_video_refuses_a_timeline_without_one():
-    with pytest.raises(ValueError, match="Sana Streaming needs a video on the first beat"):
+    with pytest.raises(ValueError, match="Sana Streaming needs a video on the first segment"):
         compile_timeline("Sana Streaming", [Beat("a", 120)], seed=0)
 
 
@@ -208,7 +208,7 @@ def test_a_follow_up_video_is_dropped_with_a_warning_when_the_model_reads_its_vi
     plan = compile_timeline("X2", [Beat("a", 48, video=b"one"), Beat("b", 48, video=b"two")], seed=0)
     assert plan.timed == [(48, "set_prompt", {"prompt": "b"})]
     assert plan.source == b"one"
-    assert "dropping the video on the beat at frame 48" in caplog.text
+    assert "dropping the video on the segment at frame 48" in caplog.text
 
 
 def test_model_facts_give_a_model_without_chunks_one_frame_chunks():
@@ -380,7 +380,7 @@ def test_a_beat_move_is_cut_at_its_beats_end():
 def test_a_beat_move_starting_after_its_beat_is_dropped_with_a_warning(caplog):
     beats = [Beat("a", 65, image=b"one", moves=(Move("movement", "back", 70, 24),)), Beat("b", 79)]
     assert camera(compile_timeline("LingBot", beats, seed=0)) == ([], [])
-    assert "after the beat ends" in caplog.text
+    assert "after the segment ends" in caplog.text
 
 
 def test_inputs_fit_each_models_native_size():
@@ -416,7 +416,7 @@ def test_joined_chains_start_with_the_first_chains_settings():
 
 def test_joining_chains_for_different_models_is_an_error():
     chain = Timeline("Visko Orbis Stable", (Beat("a", 48),))
-    with pytest.raises(ValueError, match="Chain 2 is for Helios and chain 1 for Visko Orbis Stable"):
+    with pytest.raises(ValueError, match="Sequence 2 is for Helios and sequence 1 for Visko Orbis Stable"):
         join_chains([chain, Timeline("Helios", (Beat("b", 48),))])
 
 
@@ -427,10 +427,18 @@ def test_an_avatar_call_creates_the_character_then_says_each_beat_after_a_reply(
     plan = compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 100, image=b"photo"), Beat("How was the catch?", 50)], seed=0, settings=AVATAR)
     assert plan.setup == [("create_avatar", {"image": b"photo"}),
                           ("start_call", {"call_mode": "audio", "transcripts": False, "persona": "A gruff fisherman.", "voice": "Marcus"})]
-    # The first reply answers the call's opening; each line then waits for the reply before it.
+    # With no greeting the character waits, so the first line goes out at once; each line then waits for the reply before it.
+    assert plan.chunks == 2
+    assert plan.timed == [(0, "say", {"text": "Hi."}), (1, "say", {"text": "How was the catch?"})]
+    assert plan.holds == [100, 50]
+
+
+def test_an_avatar_greeting_is_a_first_reply_the_lines_wait_for():
+    plan = compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 100, image=b"photo"), Beat("How was the catch?", 50)], seed=0,
+                            settings=AVATAR | {"greeting": "Wave."})
     assert plan.chunks == 3
     assert plan.timed == [(1, "say", {"text": "Hi."}), (2, "say", {"text": "How was the catch?"})]
-    # Each beat's reply plays at least its frames; the opening has no beat.
+    # The opening has no beat, so it holds no frames.
     assert plan.holds == [0, 100, 50]
 
 
@@ -446,8 +454,8 @@ def test_avatar_references_are_what_each_beat_has_on_so_only_changes_go_out_befo
              Beat("Where's the cat?", 0, references=(hat,)), Beat("Bye.", 0, references=(hat,))]
     timed = compile_timeline("Vidu S2-Avatar", beats, seed=0, settings=AVATAR).timed
     assert [(turn, command) for turn, command, _ in timed] == [
-        (1, "set_reference_images"), (1, "say"), (2, "set_reference_images"), (2, "say"),
-        (3, "clear_reference_images"), (3, "say"), (4, "say")]
+        (0, "set_reference_images"), (0, "say"), (1, "set_reference_images"), (1, "say"),
+        (2, "clear_reference_images"), (2, "say"), (3, "say")]
     [held], [added] = timed[0][2]["images"], timed[2][2]["images"]
     assert held["kind"] == "object" and held["text"] == "He holds up the cat." and held["image_url"].startswith("data:image/jpeg;base64,")
     # A reference with no text leaves it out.
@@ -457,7 +465,7 @@ def test_avatar_references_are_what_each_beat_has_on_so_only_changes_go_out_befo
 
 def test_an_avatar_beat_holds_at_most_three_references():
     refs = tuple(Reference("Vidu S2-Avatar", png(c), "object") for c in ("red", "green", "blue", "white"))
-    with pytest.raises(ValueError, match="Beat 1 has 4 references"):
+    with pytest.raises(ValueError, match="Segment 1 has 4 references"):
         compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo", references=refs)], seed=0, settings=AVATAR)
 
 
@@ -471,7 +479,7 @@ def test_an_avatar_reads_a_beat_image_only_as_the_person_and_its_references_go_t
 def test_an_avatar_call_needs_a_persona_a_photo_and_something_to_say():
     with pytest.raises(ValueError, match="persona"):
         compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo")], seed=0, settings={**AVATAR, "persona": ""})
-    with pytest.raises(ValueError, match="image on the first beat"):
+    with pytest.raises(ValueError, match="image on the first segment"):
         compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0)], seed=0, settings=AVATAR)
-    with pytest.raises(ValueError, match="Beat 2 says nothing"):
+    with pytest.raises(ValueError, match="Segment 2 says nothing"):
         compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo"), Beat(" ", 0)], seed=0, settings=AVATAR)

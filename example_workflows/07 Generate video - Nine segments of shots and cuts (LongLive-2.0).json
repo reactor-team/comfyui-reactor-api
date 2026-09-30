@@ -22,39 +22,39 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "A LongLive-2.0 story in nine beats. Each chain node is one beat: the video follows its prompt for its frames, and beats play in chain order. The first node picks the model. On each later node, kind sets how the beat enters: a shot blends from the beat before, a cut starts a fresh scene.\n\nThe last node feeds Reactor Render, and Reactor Timeline, which draws the chain on a frame ruler as it will play. Edit a beat on its node.\n\nSet your Reactor API key in this plugin's config.ini."
+        "A LongLive-2.0 story in nine segments. Each node is one segment: the video follows its prompt for its frames, and segments play in sequence order. The first node picks the model. On each later node, kind sets how the segment enters: a shot blends from the segment before, a cut starts a fresh scene.\n\nThe last node feeds Reactor Render, and Reactor Sequence Visualizer, which draws the sequence on a frame ruler as it will play. Edit a segment on its node.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Each block is a beat: the video follows its prompt for as long as the block lasts, and beats play left to right. The first beat comes from the chain node, which picks the model; it is drawn greyed out, and you edit it on that node.\n\nClick a block to edit it. Drag the line after a block to change how long it plays; lengths snap to the model's chunks.\n\nThe line between two beats is how the second one enters: a soft band is a shot, which blends from the beat before; a solid bar is a cut, which starts a fresh scene. Click the line to switch. Models without cuts only blend.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "A LongLive-2.0 story in nine segments. Each node is one segment: the video follows its prompt for its frames, and segments play in sequence order. The first node picks the model. On each later node, kind sets how the segment enters: a shot blends from the segment before, a cut starts a fresh scene.\n\nThe last node feeds Reactor Render, and Reactor Sequence Visualizer, which draws the sequence on a frame ruler as it will play. Edit a segment on its node.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
       "id": 3,
-      "type": "ReactorTimeline",
+      "type": "ReactorSequenceVisualizer",
       "pos": [
         40,
-        1440
+        1470
       ],
       "size": [
-        1260,
-        200
+        1320,
+        160
       ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 13
         }
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "ReactorTimeline"
+        "Node name for S&R": "ReactorSequenceVisualizer"
       },
       "widgets_values": []
     },
@@ -62,8 +62,8 @@
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1330,
-        240
+        1420,
+        1080
       ],
       "size": [
         400,
@@ -74,9 +74,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 14
         },
         {
@@ -115,8 +115,8 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1330,
-        580
+        1880,
+        1080
       ],
       "size": [
         270,
@@ -194,10 +194,10 @@
     },
     {
       "id": 6,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
         40,
-        240
+        300
       ],
       "size": [
         400,
@@ -237,16 +237,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             5
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "A vast windswept Martian landscape of deep rust-red dunes and wind-carved rock stretching unbroken to the horizon at golden hour, fine ochre dust streaming off the ridgelines, a pale ringed planet hanging low and enormous in the dusty amber sky. Long sweeping aerial drone shot gliding steadily forward over ridge after ridge, wide-angle, deep focus, slow majestic continuous move, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
@@ -261,10 +261,10 @@
     },
     {
       "id": 7,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        470,
-        240
+        500,
+        300
       ],
       "size": [
         400,
@@ -275,10 +275,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 5
         },
         {
@@ -311,34 +311,34 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             6
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
-        "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain — a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
+        "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain \u2014 a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
         157,
         "cut"
       ],
       "widgets_values_named": {
-        "prompt": "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain — a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
+        "prompt": "A high, wide aerial view across the rust-red Martian basin with a low, spartan futuristic research habitat sitting far off in the distance, small but clearly visible on the open plain \u2014 a cluster of interlocking white composite-panel modules and cylindrical pods, an angled bank of dark solar arrays, and a single slender comms mast, dwarfed by the surrounding dunes. Slow high drone glide holding the distant outpost in frame, ultra-wide, deep focus, raking golden light across the basin, warm amber palette, volumetric haze, photoreal, 35mm film look.",
         "frames": 157,
         "kind": "cut"
       }
     },
     {
       "id": 8,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        900,
-        240
+        960,
+        300
       ],
       "size": [
         400,
@@ -349,10 +349,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 6
         },
         {
@@ -385,34 +385,34 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             7
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
-        "A ground-level forward-facing tracking shot on the Martian surface that begins on a medium shot of a spartan futuristic research habitat — the whole low cluster of white composite-panel modules visible across the rust-red regolith — then travels steadily forward, closing the distance toward the front airlock door, the ribbed hatch and its lit control panel growing from small to large in frame as the camera covers ground toward the entrance. Eye-level wide-angle, deep focus, pronounced forward dolly, immersive and grounded, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+        "A ground-level forward-facing tracking shot on the Martian surface that begins on a medium shot of a spartan futuristic research habitat \u2014 the whole low cluster of white composite-panel modules visible across the rust-red regolith \u2014 then travels steadily forward, closing the distance toward the front airlock door, the ribbed hatch and its lit control panel growing from small to large in frame as the camera covers ground toward the entrance. Eye-level wide-angle, deep focus, pronounced forward dolly, immersive and grounded, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
         157,
         "cut"
       ],
       "widgets_values_named": {
-        "prompt": "A ground-level forward-facing tracking shot on the Martian surface that begins on a medium shot of a spartan futuristic research habitat — the whole low cluster of white composite-panel modules visible across the rust-red regolith — then travels steadily forward, closing the distance toward the front airlock door, the ribbed hatch and its lit control panel growing from small to large in frame as the camera covers ground toward the entrance. Eye-level wide-angle, deep focus, pronounced forward dolly, immersive and grounded, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
+        "prompt": "A ground-level forward-facing tracking shot on the Martian surface that begins on a medium shot of a spartan futuristic research habitat \u2014 the whole low cluster of white composite-panel modules visible across the rust-red regolith \u2014 then travels steadily forward, closing the distance toward the front airlock door, the ribbed hatch and its lit control panel growing from small to large in frame as the camera covers ground toward the entrance. Eye-level wide-angle, deep focus, pronounced forward dolly, immersive and grounded, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
         "frames": 157,
         "kind": "cut"
       }
     },
     {
       "id": 9,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
         40,
-        640
+        690
       ],
       "size": [
         400,
@@ -423,10 +423,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 7
         },
         {
@@ -459,16 +459,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             8
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "Interior of a clean, spartan Martian habitat airlock bay: a lone astronaut stands at an open equipment rack methodically suiting up, pulling on a worn white-and-orange pressure suit and latching the chest panel, helmet waiting on the bench beside him. Cool white LED light from overhead, a small porthole glowing with red Martian daylight. Medium close-up, 35mm lens, shallow depth of field, slow push-in, muted steel-and-white palette with warm accents, photoreal, cinematic.",
@@ -483,10 +483,10 @@
     },
     {
       "id": 10,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        470,
-        640
+        500,
+        690
       ],
       "size": [
         400,
@@ -497,10 +497,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 8
         },
         {
@@ -533,16 +533,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             9
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "Interior tracking shot following an astronaut in a worn white-and-orange pressure suit, now fully suited with the helmet on, walking purposefully down a narrow corridor inside the spartan Martian habitat toward the airlock at the far end, clean white composite walls and softly glowing LED strip lighting lining the passage, cabling and equipment racks set along the panels. Steady forward Steadicam tracking from behind, 35mm lens, shallow depth of field, cool white interior light with warm accents, muted steel-and-white palette, photoreal, cinematic.",
@@ -557,10 +557,10 @@
     },
     {
       "id": 11,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        900,
-        640
+        960,
+        690
       ],
       "size": [
         400,
@@ -571,10 +571,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 9
         },
         {
@@ -607,16 +607,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             10
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "Exterior on the Martian surface: the astronaut in the worn white-and-orange pressure suit stands directly in front of his spartan research habitat, the white composite-panel modules, recessed portholes, angled solar arrays and slender comms mast rising clearly directly behind him, ochre dust drifting past his boots across the rust-red ground. Golden low sunlight rakes across suit and structure alike, wide cinematic shot, long lens, shallow depth of field, slow dolly, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
@@ -631,10 +631,10 @@
     },
     {
       "id": 12,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
         40,
-        1040
+        1080
       ],
       "size": [
         400,
@@ -645,10 +645,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 10
         },
         {
@@ -681,16 +681,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             11
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "The same astronaut, still standing in front of his habitat on the rust-red Martian surface, raises an arm and waves warmly toward the camera, the white composite-panel modules and slender comms mast rising behind him, ochre dust drifting past his boots. Golden low sunlight rakes across suit and structure, wide cinematic shot, long lens, shallow depth of field, slow dolly, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look.",
@@ -705,10 +705,10 @@
     },
     {
       "id": 13,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        470,
-        1040
+        500,
+        1080
       ],
       "size": [
         400,
@@ -719,10 +719,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 11
         },
         {
@@ -755,16 +755,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             12
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "An astronaut in a worn white-and-orange pressure suit walks across a vast, utterly empty Martian expanse, a single small figure crossing an immense open plain of rust-red dunes with nothing but bare horizon ahead, boots kicking up trailing veils of fine dust. Wide dramatic tracking shot following from behind, long lens, deep focus, the emptiness stretching huge around him, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look, epic and cinematic.",
@@ -779,10 +779,10 @@
     },
     {
       "id": 14,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        900,
-        1040
+        960,
+        1080
       ],
       "size": [
         400,
@@ -793,10 +793,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 12
         },
         {
@@ -829,9 +829,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             13,
             14
@@ -839,7 +839,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "An extreme wide aerial drone shot of the Martian desert, a lone astronaut in a white-and-orange pressure suit reduced to a tiny speck far below crossing the colossal sweep of rust-red dunes, a single track of footprints trailing behind him, the ringed planet vast on the distant horizon. Towering high-altitude drone view craning up and pulling back, ultra-wide, deep focus, the figure dwarfed to almost nothing, warm crimson-and-amber palette, volumetric haze, photoreal, 35mm film look, epic and cinematic.",
@@ -868,7 +868,7 @@
       0,
       7,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       6,
@@ -876,7 +876,7 @@
       0,
       8,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       7,
@@ -884,7 +884,7 @@
       0,
       9,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       8,
@@ -892,7 +892,7 @@
       0,
       10,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       9,
@@ -900,7 +900,7 @@
       0,
       11,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       10,
@@ -908,7 +908,7 @@
       0,
       12,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       11,
@@ -916,7 +916,7 @@
       0,
       13,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       12,
@@ -924,7 +924,7 @@
       0,
       14,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       13,
@@ -932,7 +932,7 @@
       0,
       3,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       14,
@@ -940,7 +940,7 @@
       0,
       4,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ]
   ],
   "groups": [],

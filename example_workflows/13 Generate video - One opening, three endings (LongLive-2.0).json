@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a beat's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Beat frames sets every beat's length.\n\nDawn and Sunrise are the shared opening, with no animal in it, so nothing carries over into an ending. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Render, so one change to the opening or the season reaches every cut. Mute an ending's Save Video to skip rendering it.\n\nSet your Reactor API key in this plugin's config.ini."
+        "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a segment's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Segment frames sets every segment's length.\n\nDawn and Sunrise are the shared opening, with no animal in it, so nothing carries over into an ending. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Render, so one change to the opening or the season reaches every cut. Mute an ending's Save Video to skip rendering it.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a beat's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Beat frames sets every beat's length.\n\nDawn and Sunrise are the shared opening, with no animal in it, so nothing carries over into an ending. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Render, so one change to the opening or the season reaches every cut. Mute an ending's Save Video to skip rendering it.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a segment's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Segment frames sets every segment's length.\n\nDawn and Sunrise are the shared opening, with no animal in it, so nothing carries over into an ending. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Render, so one change to the opening or the season reaches every cut. Mute an ending's Save Video to skip rendering it.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -35,7 +35,7 @@
       "type": "CustomCombo",
       "pos": [
         40,
-        330
+        380
       ],
       "size": [
         440,
@@ -103,7 +103,7 @@
       "type": "PrimitiveStringMultiline",
       "pos": [
         40,
-        640
+        690
       ],
       "size": [
         440,
@@ -152,7 +152,7 @@
       "type": "PrimitiveInt",
       "pos": [
         40,
-        850
+        920
       ],
       "size": [
         440,
@@ -186,7 +186,7 @@
           ]
         }
       ],
-      "title": "Beat frames",
+      "title": "Segment frames",
       "properties": {
         "Node name for S&R": "PrimitiveInt"
       },
@@ -204,7 +204,7 @@
       "type": "StringFormat",
       "pos": [
         540,
-        20
+        380
       ],
       "size": [
         400,
@@ -268,10 +268,10 @@
     },
     {
       "id": 7,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        1000,
-        20
+        540,
+        690
       ],
       "size": [
         320,
@@ -282,10 +282,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": null
         },
         {
@@ -318,9 +318,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             20
           ]
@@ -328,7 +328,7 @@
       ],
       "title": "Dawn",
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "",
@@ -345,8 +345,8 @@
       "id": 8,
       "type": "StringFormat",
       "pos": [
-        540,
-        320
+        1000,
+        380
       ],
       "size": [
         400,
@@ -410,10 +410,10 @@
     },
     {
       "id": 9,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
         1000,
-        320
+        690
       ],
       "size": [
         320,
@@ -424,10 +424,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 20
         },
         {
@@ -460,9 +460,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             21,
             26,
@@ -472,7 +472,7 @@
       ],
       "title": "Sunrise",
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "",
@@ -489,8 +489,8 @@
       "id": 10,
       "type": "StringFormat",
       "pos": [
-        540,
-        620
+        1460,
+        380
       ],
       "size": [
         400,
@@ -554,10 +554,10 @@
     },
     {
       "id": 11,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        1000,
-        620
+        1460,
+        690
       ],
       "size": [
         320,
@@ -568,10 +568,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 21
         },
         {
@@ -604,9 +604,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             24
           ]
@@ -614,7 +614,7 @@
       ],
       "title": "Families (shot)",
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "",
@@ -631,8 +631,8 @@
       "id": 12,
       "type": "StringFormat",
       "pos": [
-        540,
-        960
+        1460,
+        1072
       ],
       "size": [
         400,
@@ -689,10 +689,10 @@
     },
     {
       "id": 13,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        1000,
-        960
+        1460,
+        1382
       ],
       "size": [
         320,
@@ -703,10 +703,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 26
         },
         {
@@ -739,9 +739,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             29
           ]
@@ -749,7 +749,7 @@
       ],
       "title": "Adventure (cut)",
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "",
@@ -766,8 +766,8 @@
       "id": 14,
       "type": "StringFormat",
       "pos": [
-        540,
-        1300
+        1460,
+        1652
       ],
       "size": [
         400,
@@ -831,10 +831,10 @@
     },
     {
       "id": 15,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        1000,
-        1300
+        1460,
+        1962
       ],
       "size": [
         320,
@@ -845,10 +845,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 31
         },
         {
@@ -881,9 +881,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             34
           ]
@@ -891,7 +891,7 @@
       ],
       "title": "Quiet (shot)",
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "",
@@ -908,8 +908,8 @@
       "id": 17,
       "type": "ReactorRender",
       "pos": [
-        1380,
-        620
+        1920,
+        380
       ],
       "size": [
         400,
@@ -920,9 +920,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 24
         },
         {
@@ -961,8 +961,8 @@
       "id": 18,
       "type": "SaveVideo",
       "pos": [
-        1820,
-        620
+        2380,
+        380
       ],
       "size": [
         270,
@@ -1042,8 +1042,8 @@
       "id": 20,
       "type": "ReactorRender",
       "pos": [
-        1380,
-        960
+        1920,
+        1072
       ],
       "size": [
         400,
@@ -1054,9 +1054,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 29
         },
         {
@@ -1095,8 +1095,8 @@
       "id": 21,
       "type": "SaveVideo",
       "pos": [
-        1820,
-        960
+        2380,
+        1072
       ],
       "size": [
         270,
@@ -1176,8 +1176,8 @@
       "id": 23,
       "type": "ReactorRender",
       "pos": [
-        1380,
-        1300
+        1920,
+        1652
       ],
       "size": [
         400,
@@ -1188,9 +1188,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 34
         },
         {
@@ -1229,8 +1229,8 @@
       "id": 24,
       "type": "SaveVideo",
       "pos": [
-        1820,
-        1300
+        2380,
+        1652
       ],
       "size": [
         270,
@@ -1314,7 +1314,7 @@
       0,
       17,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       29,
@@ -1322,7 +1322,7 @@
       0,
       20,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       34,
@@ -1330,7 +1330,7 @@
       0,
       23,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       13,
@@ -1450,7 +1450,7 @@
       0,
       9,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       7,
@@ -1474,7 +1474,7 @@
       0,
       11,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       11,
@@ -1498,7 +1498,7 @@
       0,
       13,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       14,
@@ -1522,7 +1522,7 @@
       0,
       15,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       18,

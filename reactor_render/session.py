@@ -61,6 +61,8 @@ class Session:
         self.messages: asyncio.Queue[dict] = asyncio.Queue()
         # Observed on cloud sessions: the stream opens with a placeholder frame at connect, before the model produces anything.
         self.capturing = False
+        # Set to start capturing at the character's next speech rather than at once.
+        self.capture_on_speech = False
         self.frame_shape: tuple[int, ...] | None = None
         self.reported = -1
         self.reported_at = -PROGRESS_INTERVAL_SECONDS
@@ -77,6 +79,8 @@ class Session:
     def push_audio(self, pcm: np.ndarray, sample_rate: int) -> None:
         if np.sqrt(np.mean(np.square(pcm, dtype=np.float32))) > SPEECH_LEVEL:
             self.sounded_at = time.monotonic()
+            if self.capture_on_speech:
+                self.capture_on_speech, self.capturing = False, True
         if self.capturing:
             self.writer.push_audio(pcm, sample_rate)
 
@@ -228,12 +232,13 @@ async def hold_until(session: Session, spec: ModelSpec, track, frame: np.ndarray
         track.push_frame(frame)
 
 
-def session_phase(msg: dict | None) -> str | None:
-    """The phase a `session_state` reports, if `msg` is one. Raises SessionEnded once the session has failed or ended."""
+def session_phase(msg: dict | None, in_call: bool = True) -> str | None:
+    """The phase a `session_state` reports, if `msg` is one. Raises SessionEnded once the session has failed or ended,
+    unless not `in_call`: observed on cloud sessions, a new session can first report the end of the call before it."""
     if msg is None or msg.get("type") != "session_state":
         return None
     data = msg.get("data") or {}
-    if data.get("phase") in ("failed", "ended"):
+    if in_call and data.get("phase") in ("failed", "ended"):
         raise SessionEnded(data["phase"], data.get("last_error") or data.get("end_reason"))
     return data.get("phase")
 
@@ -243,7 +248,7 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
     for command, data in plan.setup:
         await session.send(command, data)
         give_up = time.monotonic() + SETUP_SECONDS
-        while session_phase(await session.next_message()) != SETUP_PHASES[command]:
+        while session_phase(await session.next_message(), command != "create_avatar") != SETUP_PHASES[command]:
             if time.monotonic() > give_up:
                 raise RuntimeError(f"The session never reached {SETUP_PHASES[command]}.")
     # Observed on cloud sessions: a live call keeps streaming the connect placeholder for a few
@@ -254,7 +259,9 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
         if time.monotonic() > give_up:
             raise RuntimeError("The avatar never appeared.")
         session_phase(await session.next_message(timeout=0.05))
-    session.capturing = True
+    # With no greeting the character waits for the first line, so the take starts at its answer.
+    greeting = any(data.get("greeting") for command, data in plan.setup if command == "start_call")
+    session.capturing = greeting
     session.writer.fill_gaps = True
     session.planned = sum(max(hold, round(REPLY_ESTIMATE_SECONDS * spec.fps)) for hold in plan.holds)
     timed = sorted(plan.timed, key=lambda t: t[0])
@@ -264,6 +271,8 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
         while timed and timed[0][0] <= replies:
             _, command, data = timed.pop(0)
             await session.send(command, data)
+        if replies == 0 and not greeting:
+            session.capture_on_speech = True
         give_up = time.monotonic() + REPLY_TIMEOUT_SECONDS
         while (session.sounded_at <= since or time.monotonic() - session.sounded_at < REPLY_QUIET_SECONDS
                or session.writer.received < held):

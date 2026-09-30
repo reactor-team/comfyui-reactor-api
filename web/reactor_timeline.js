@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-// Grid facts per model, from the chain nodes' definitions (timeline.model_facts).
+// Grid facts per model, from the segment nodes' definitions (timeline.model_facts).
 let MODEL_FACTS = {};
 
 const STYLE = `
@@ -55,20 +55,20 @@ function inputValue(node, name) {
     return source ? widgetValue(source, "value") : widgetValue(node, name);
 }
 
-// The chains a Reactor Chain Join plays, in order.
+// The sequences a Reactor Sequence Join plays, in order.
 function joinedChains(join) {
     return (join.inputs ?? []).map((input, slot) => [input, slot])
-        .filter(([input]) => input.name.startsWith("chains.") && input.link != null).map(([, slot]) => join.getInputNode(slot));
+        .filter(([input]) => input.name.startsWith("sequences.") && input.link != null).map(([, slot]) => join.getInputNode(slot));
 }
 
-// Whether a node type is a model's chain beat, such as ReactorHeliosChain.
-const isBeat = (name) => /^Reactor\w+Chain$/.test(name);
+// Whether a node type is a model's segment, such as ReactorHeliosSegment.
+const isBeat = (name) => /^Reactor\w+Segment$/.test(name);
 
-// The model a node is for: the one its chain's first link picks, or null when the chain can't be
-// followed there. Past a Reactor Chain Join it is the first chain's, since the join requires every chain's to match.
+// The model a node is for: the one its sequence's first segment picks, or null when the sequence can't be
+// followed there. Past a Reactor Sequence Join it is the first sequence's, since the join requires every sequence's to match.
 function chainModel(node) {
-    for (let n = node; n; n = n.comfyClass === "ReactorChainJoin" ? joinedChains(n)[0] : upstream(n, "chain"))
-        if (isBeat(n.comfyClass) && !upstream(n, "chain")) return widgetValue(n, "model") ?? n.reactorModels?.[0] ?? null;
+    for (let n = node; n; n = n.comfyClass === "ReactorSequenceJoin" ? joinedChains(n)[0] : upstream(n, "sequence"))
+        if (isBeat(n.comfyClass) && !upstream(n, "sequence")) return widgetValue(n, "model") ?? n.reactorModels?.[0] ?? null;
     return null;
 }
 
@@ -100,8 +100,8 @@ function fitInputs(node, sockets) {
 // The beats of a chain ending at `last`, first to last, or "unknown" when the chain can't be read.
 function beatsUpTo(last) {
     const beats = [];
-    for (let beat = last; beat; beat = upstream(beat, "chain")) {
-        if (beat.comfyClass === "ReactorChainJoin") {
+    for (let beat = last; beat; beat = upstream(beat, "sequence")) {
+        if (beat.comfyClass === "ReactorSequenceJoin") {
             const parts = joinedChains(beat).map(beatsUpTo);
             return parts.includes("unknown") ? "unknown" : [...parts.flat(), ...beats.reverse()];
         }
@@ -119,7 +119,7 @@ function beatsUpTo(last) {
 
 // Beats from a connected chain, first to last: null with no chain, "unknown" when the chain can't be read.
 function chainBeats(node) {
-    const slot = node.inputs?.findIndex((i) => i.name === "chain") ?? -1;
+    const slot = node.inputs?.findIndex((i) => i.name === "sequence") ?? -1;
     return slot < 0 || node.inputs[slot].link == null ? null : beatsUpTo(node.getInputNode(slot));
 }
 
@@ -192,7 +192,7 @@ function tickStep(length, ticks) {
 // and video sockets only where the model reads them.
 function adaptBeat(node) {
     const facts = modelFacts(node);
-    const opens = upstream(node, "chain") === null;
+    const opens = upstream(node, "sequence") === null;
     // A beat's node type already has only the inputs its models take; what's left is which it reads on this beat.
     const has = (name) => node.reactorDeclared?.has(name);
     const reads = (taken) => !facts || taken === "any" || (taken === "first" && opens);
@@ -216,12 +216,12 @@ function problems(beats, spans, facts) {
     beats.forEach((b, i) => {
         if (!facts) return;
         if (b.references?.length && !facts.references) add(i, "this model takes no references");
-        if (b.references?.length > 3) add(i, "a beat holds at most 3 references");
+        if (b.references?.length > 3) add(i, "a segment holds at most 3 references");
         if (spans[i][1] <= spans[i][0]) add(i, `shorter than one ${facts.frames_per_chunk}-frame chunk`);
         if (b.cut && i > 0 && !facts.supports_cuts) add(i, "this model has no hard cuts");
         if (b.image && facts.images === "none") add(i, "this model takes no reference images");
-        if (b.image && facts.images === "first" && i > 0) add(i, "this model reads an image only on the first beat");
-        if (!b.image && facts.image_required && i === 0) add(i, "this model needs an image on the first beat");
+        if (b.image && facts.images === "first" && i > 0) add(i, "this model reads an image only on the first segment");
+        if (!b.image && facts.image_required && i === 0) add(i, "this model needs an image on the first segment");
     });
     if (facts?.max_scene_chunks) {
         let first = 0;
@@ -454,7 +454,7 @@ function createViewer(node) {
             track.append(block);
             // Shot or cut is how this beat enters from the one before, so it is drawn on their boundary.
             if (i) track.append(el("div", { className: `reactor-tl-boundary ${b.cut ? "cut" : "shot"} locked`, style: `left:${pct(start)}`,
-                                            title: b.cut ? "Cut: starts fresh, with no blend." : "Shot: blends from the beat before." }));
+                                            title: b.cut ? "Cut: starts fresh, with no blend." : "Shot: blends from the segment before." }));
         });
 
         drawLanes(lanes, moves, { camera, facts: s.facts, length, pct, found: moveProblems(moves, s.facts), selectedMove: null,
@@ -464,12 +464,12 @@ function createViewer(node) {
         panel.className = "reactor-tl-note";
         if (selected !== null) {
             const [start, end] = spans[selected];
-            panel.textContent = `Beat ${selected + 1}, frames ${start} to ${end}: ${beats[selected].prompt || "(empty prompt)"}`;
+            panel.textContent = `Segment ${selected + 1}, frames ${start} to ${end}: ${beats[selected].prompt || "(empty prompt)"}`;
             if (found.has(selected)) panel.append(el("div", { className: "reactor-tl-problem", textContent: found.get(selected).join("; ") }));
         } else {
-            panel.textContent = s.chain === null ? "Connect a chain to draw it."
-                : s.chain === "unknown" ? "This timeline can't read the chain, so its beats aren't drawn."
-                : "Click a beat to read its prompt. Edit a beat and its camera moves on its chain node.";
+            panel.textContent = s.chain === null ? "Connect a sequence to draw it."
+                : s.chain === "unknown" ? "This timeline can't read the sequence, so its segments aren't drawn."
+                : "Click a segment to read its prompt. Edit a segment and its camera moves on its own node.";
         }
 
         footer.replaceChildren();
@@ -502,8 +502,8 @@ function createViewer(node) {
     // A Reactor Render of the same chain reports frames rendered over frames planned, and the planned
     // length is this ruler's length, so the ratio places the playhead.
     const rendersThis = (id) => {
-        const render = node.graph?.getNodeById(id), chain = upstream(node, "chain");
-        return !!chain && render?.comfyClass === "ReactorRender" && upstream(render, "chain") === chain;
+        const render = node.graph?.getNodeById(id), chain = upstream(node, "sequence");
+        return !!chain && render?.comfyClass === "ReactorRender" && upstream(render, "sequence") === chain;
     };
     const onProgress = ({ detail }) => {
         if (!rendersThis(detail.node)) return;
@@ -579,7 +579,7 @@ function createMoveEditor(node, inputName) {
 
         drawRuler(ruler, length, pct);
         drawLanes(lanes, value.moves, {
-            camera, facts, length, pct, at, found, selectedMove, pastEnd: "runs past the beat's end; cut there",
+            camera, facts, length, pct, at, found, selectedMove, pastEnd: "runs past the segment's end; cut there",
             edit: {
                 limit: length,
                 drag,
@@ -596,8 +596,8 @@ function createMoveEditor(node, inputName) {
             });
         } else {
             panel.className = "reactor-tl-note";
-            panel.textContent = !s.facts ? "Start this chain from a first link to add camera moves."
-                : "Click a lane to add a camera move. A move ends with this beat; add the same move at the start of the next beat to keep it going.";
+            panel.textContent = !s.facts ? "Start this sequence from a first segment to add camera moves."
+                : "Click a lane to add a camera move. A move ends with this segment; add the same move at the start of the next segment to keep it going.";
         }
     }
 
@@ -639,7 +639,7 @@ app.registerExtension({
         document.head.append(el("style", { textContent: STYLE }));
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name === "ReactorTimeline") {
+        if (nodeData.name === "ReactorSequenceVisualizer") {
             const onNodeCreated = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function (...args) {
                 const result = onNodeCreated?.apply(this, args);
@@ -656,18 +656,18 @@ app.registerExtension({
                 return onDrawForeground?.apply(this, args);
             };
         }
-        if (nodeData.name === "ReactorChainJoin") {
+        if (nodeData.name === "ReactorSequenceJoin") {
             const onConnectInput = nodeType.prototype.onConnectInput;
             nodeType.prototype.onConnectInput = function (slot, type, output, source, ...rest) {
-                // Refuse a chain for another model here, rather than only when the workflow runs.
+                // Refuse a sequence for another model here, rather than only when the workflow runs.
                 const model = chainModel(source);
                 const clash = model && this.inputs.some((input, i) => {
-                    const other = i !== slot && input.name.startsWith("chains.") && input.link != null && chainModel(this.getInputNode(i));
+                    const other = i !== slot && input.name.startsWith("sequences.") && input.link != null && chainModel(this.getInputNode(i));
                     return other && other !== model;
                 });
                 if (clash) {
-                    app.extensionManager.toast.add({ severity: "warn", summary: "Reactor Chain Join", life: 5000,
-                        detail: "That chain is for a different model than the chains already joined; join chains made for the same model." });
+                    app.extensionManager.toast.add({ severity: "warn", summary: "Reactor Sequence Join", life: 5000,
+                        detail: "That sequence is for a different model than the sequences already joined; join sequences made for the same model." });
                     return false;
                 }
                 return onConnectInput?.call(this, slot, type, output, source, ...rest);
@@ -675,10 +675,10 @@ app.registerExtension({
         }
         if (isBeat(nodeData.name)) {
             nodeType.prototype.reactorDeclared = new Set([...Object.keys(nodeData.input?.required ?? {}), ...Object.keys(nodeData.input?.optional ?? {})]);
-            const chain = nodeData.input?.optional?.chain?.[1] ?? {};
+            const chain = nodeData.input?.optional?.sequence?.[1] ?? {};
             Object.assign(MODEL_FACTS, chain.model_facts);
             nodeType.prototype.reactorModels = Object.keys(chain.model_facts ?? {});
-            // The model picker and the settings read only at start, which a later link hides.
+            // The model picker and the settings read only at start, which a later segment hides.
             nodeType.prototype.reactorStart = new Set(["model", ...(chain.start_settings ?? [])]);
             const onNodeCreated = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function (...args) {

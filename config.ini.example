@@ -1,2 +1,6 @@
 [API]
 REACTOR_API_KEY =
+
+[Sessions]
+# How many Reactor sessions this ComfyUI runs at once; the rest wait their turn.
+MAX_CONCURRENT = 1

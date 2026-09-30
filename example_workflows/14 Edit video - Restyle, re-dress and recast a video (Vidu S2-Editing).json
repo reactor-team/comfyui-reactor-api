@@ -1,0 +1,705 @@
+{
+  "id": "e56adfd8-44b0-4609-945f-f570c1a45cd8",
+  "revision": 0,
+  "last_node_id": 10,
+  "last_link_id": 8,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        760,
+        170
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Edit a video file with Vidu S2-Editing. It takes no prompt: each segment's reference image and edit type steer it. The first segment restyles the clip after the anime image, the second dresses her in the samurai armour, and the third recasts her as the marble statue. Each segment holds its edit for its frames; a switch takes a few seconds to show in the output, so give each segment several seconds.\n\nOnly the first segment's video is used. The clip is a LongLive-2.0 render from this plugin. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Edit a video file with Vidu S2-Editing. It takes no prompt: each segment's reference image and edit type steer it. The first segment restyles the clip after the anime image, the second dresses her in the samurai armour, and the third recasts her as the marble statue. Each segment holds its edit for its frames; a switch takes a few seconds to show in the output, so give each segment several seconds.\n\nOnly the first segment's video is used. The clip is a LongLive-2.0 render from this plugin. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "LoadVideo",
+      "pos": [
+        40,
+        674
+      ],
+      "size": [
+        283,
+        237
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "file",
+          "name": "file",
+          "type": "COMBO",
+          "widget": {
+            "name": "file"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "reactor_vidu_walk.mp4",
+        "image"
+      ],
+      "widgets_values_named": {
+        "file": "reactor_vidu_walk.mp4",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        383,
+        290
+      ],
+      "size": [
+        283,
+        314
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_style_anime.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_style_anime.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ReactorViduS2EditingSegment",
+      "pos": [
+        383,
+        674
+      ],
+      "size": [
+        380,
+        180
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1,
+          "shape": 7
+        },
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 2,
+          "shape": 7
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "frames"
+          }
+        },
+        {
+          "localized_name": "editing_type",
+          "name": "editing_type",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "editing_type"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorViduS2EditingSegment"
+      },
+      "widgets_values": [
+        120,
+        "style_transfer"
+      ],
+      "widgets_values_named": {
+        "frames": 120,
+        "editing_type": "style_transfer"
+      }
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        823,
+        290
+      ],
+      "size": [
+        283,
+        314
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            3
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_outfit_samurai_armor.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_outfit_samurai_armor.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 6,
+      "type": "ReactorViduS2EditingSegment",
+      "pos": [
+        823,
+        674
+      ],
+      "size": [
+        380,
+        102
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 3,
+          "shape": 7
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 4,
+          "shape": 7
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "frames"
+          }
+        },
+        {
+          "localized_name": "editing_type",
+          "name": "editing_type",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "editing_type"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorViduS2EditingSegment"
+      },
+      "widgets_values": [
+        200,
+        "virtual_tryon"
+      ],
+      "widgets_values_named": {
+        "frames": 200,
+        "editing_type": "virtual_tryon"
+      }
+    },
+    {
+      "id": 7,
+      "type": "LoadImage",
+      "pos": [
+        1263,
+        290
+      ],
+      "size": [
+        283,
+        314
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            5
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_character_marble_statue.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_character_marble_statue.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 8,
+      "type": "ReactorViduS2EditingSegment",
+      "pos": [
+        1263,
+        674
+      ],
+      "size": [
+        380,
+        102
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 5,
+          "shape": 7
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 6,
+          "shape": 7
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "frames"
+          }
+        },
+        {
+          "localized_name": "editing_type",
+          "name": "editing_type",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "editing_type"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorViduS2EditingSegment"
+      },
+      "widgets_values": [
+        253,
+        "subject_replacement"
+      ],
+      "widgets_values_named": {
+        "frames": 253,
+        "editing_type": "subject_replacement"
+      }
+    },
+    {
+      "id": 9,
+      "type": "ReactorRender",
+      "pos": [
+        1703,
+        674
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 7
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        7,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 7,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 10,
+      "type": "SaveVideo",
+      "pos": [
+        2163,
+        674
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 8
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/vidu_edit",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/vidu_edit",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      2,
+      0,
+      4,
+      1,
+      "VIDEO"
+    ],
+    [
+      3,
+      5,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      4,
+      0,
+      6,
+      1,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      5,
+      7,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      6,
+      6,
+      0,
+      8,
+      1,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      7,
+      8,
+      0,
+      9,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      8,
+      9,
+      0,
+      10,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.5,
+      "offset": [
+        200,
+        100
+      ]
+    }
+  },
+  "version": 0.4
+}

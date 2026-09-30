@@ -22,39 +22,39 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "A Helios scene in three beats from text alone, one chain node per beat. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes. Reactor Timeline draws the chain.\n\nSet your Reactor API key in this plugin's config.ini."
+        "A Helios scene in three segments from text alone, one node per segment. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes. Reactor Sequence Visualizer draws the sequence.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "A Helios scene in three beats from text alone. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "A Helios scene in three segments from text alone, one node per segment. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes. Reactor Sequence Visualizer draws the sequence.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
       "id": 3,
-      "type": "ReactorTimeline",
+      "type": "ReactorSequenceVisualizer",
       "pos": [
         40,
-        600
+        690
       ],
       "size": [
-        1260,
-        200
+        1320,
+        160
       ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 7
         }
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "ReactorTimeline"
+        "Node name for S&R": "ReactorSequenceVisualizer"
       },
       "widgets_values": []
     },
@@ -62,8 +62,8 @@
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1330,
-        240
+        1420,
+        300
       ],
       "size": [
         400,
@@ -74,9 +74,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 8
         },
         {
@@ -115,8 +115,8 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1330,
-        580
+        1880,
+        300
       ],
       "size": [
         270,
@@ -194,10 +194,10 @@
     },
     {
       "id": 6,
-      "type": "ReactorHeliosChain",
+      "type": "ReactorHeliosSegment",
       "pos": [
         40,
-        240
+        300
       ],
       "size": [
         400,
@@ -238,16 +238,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             5
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorHeliosChain"
+        "Node name for S&R": "ReactorHeliosSegment"
       },
       "widgets_values": [
         "A majestic lion named Leo stands regally in the heart of a dense jungle, embodying the essence of a king. Leo has a golden mane that flows gracefully around his broad shoulders, and his piercing amber eyes survey the landscape with confidence and authority. He is positioned on a rocky outcrop, towering over the lush greenery below. The background showcases a vibrant jungle scene with tall trees, cascading vines, and dappled sunlight filtering through the canopy. Leo's posture is proud and commanding, with his tail held high. The scene is captured from a medium close-up perspective, emphasizing Leo's powerful stance and the regal aura surrounding him.",
@@ -262,10 +262,10 @@
     },
     {
       "id": 7,
-      "type": "ReactorHeliosChain",
+      "type": "ReactorHeliosSegment",
       "pos": [
-        470,
-        240
+        500,
+        300
       ],
       "size": [
         400,
@@ -276,10 +276,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 5
         },
         {
@@ -313,16 +313,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             6
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorHeliosChain"
+        "Node name for S&R": "ReactorHeliosSegment"
       },
       "widgets_values": [
         "Leo shifts his powerful weight slightly on the rocky outcrop, his golden mane rippling as he does so. Suddenly, he opens his massive jaws to release a deep, resonant roar that vibrates through the humid air, revealing his formidable white teeth. The dappled sunlight filtering through the canopy dances across his fur as his chest expands with the effort. The vibrant jungle remains lush and green around him, with tall trees and cascading vines framing his commanding figure. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
@@ -337,10 +337,10 @@
     },
     {
       "id": 8,
-      "type": "ReactorHeliosChain",
+      "type": "ReactorHeliosSegment",
       "pos": [
-        900,
-        240
+        960,
+        300
       ],
       "size": [
         400,
@@ -351,10 +351,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 6
         },
         {
@@ -388,9 +388,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             7,
             8
@@ -398,7 +398,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorHeliosChain"
+        "Node name for S&R": "ReactorHeliosSegment"
       },
       "widgets_values": [
         "Leo maintains his regal position on the rocky outcrop as the humid jungle air settles around his broad shoulders. He suddenly lowers his massive head to sniff a vibrant blue butterfly that has fluttered near his nose, his piercing amber eyes momentarily softening with curiosity. The dappled sunlight continues to filter through the tall trees and cascading vines, illuminating the golden hues of his mane against the lush green background. His tail remains held high, a symbol of his enduring authority over the landscape. A medium close-up perspective emphasizing Leo's powerful stance and the regal aura surrounding him.",
@@ -427,7 +427,7 @@
       0,
       7,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       6,
@@ -435,7 +435,7 @@
       0,
       8,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       7,
@@ -443,7 +443,7 @@
       0,
       3,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       8,
@@ -451,7 +451,7 @@
       0,
       4,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ]
   ],
   "groups": [],

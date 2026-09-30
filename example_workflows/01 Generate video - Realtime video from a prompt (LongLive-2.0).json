@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Generate video live from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
+        "Generate video in real time from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Generate video live from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
+        "text": "Generate video in real time from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -35,7 +35,7 @@
       "type": "ReactorRealtime",
       "pos": [
         40,
-        240
+        300
       ],
       "size": [
         400,
@@ -103,8 +103,8 @@
       "widgets_values_named": {
         "model": "LongLive-2.0",
         "model.prompt": "A red fox trots through a snowy birch forest at dawn, its breath misting in the cold air, soft golden light slanting between the white trunks, the camera tracking alongside at the fox's height.",
-        "seed": "randomize",
-        "control_after_generate": "reactor/realtime",
+        "seed": 42,
+        "control_after_generate": "randomize",
         "filename_prefix": "reactor/realtime"
       }
     }

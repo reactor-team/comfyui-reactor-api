@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Edit your camera live with X2. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Edit the prompt in that window and press Apply to change the effect. With more than one camera, switch cameras mid-take from the camera menu next to Done. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nX2 prompts work best as one concrete change tied to something in view, then what to keep; see the X2 prompt guide. Connect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
+        "Edit your camera in real time with X2. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Edit the prompt in that window and press Apply to change the effect. With more than one camera, switch cameras mid-take from the camera menu next to Done. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nX2 prompts work best as one concrete change tied to something in view, then what to keep; see the X2 prompt guide. Connect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Edit your camera live with X2. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Edit the prompt in that window and press Apply to change the effect. With more than one camera, switch cameras mid-take from the camera menu next to Done. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nX2 prompts work best as one concrete change tied to something in view, then what to keep; see the X2 prompt guide. Connect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
+        "text": "Edit your camera in real time with X2. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Edit the prompt in that window and press Apply to change the effect. With more than one camera, switch cameras mid-take from the camera menu next to Done. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nX2 prompts work best as one concrete change tied to something in view, then what to keep; see the X2 prompt guide. Connect a Load Image to image to give X2 a reference character or outfit. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -34,8 +34,8 @@
       "id": 3,
       "type": "ReactorRealtime",
       "pos": [
-        40,
-        240
+        370,
+        300
       ],
       "size": [
         400,
@@ -124,8 +124,8 @@
       "widgets_values_named": {
         "model": "X2",
         "model.prompt": "Glowing blue butterfly wings unfold from the person's back and flutter gently as they move. Preserve the face, clothing, room and camera.",
-        "seed": "randomize",
-        "control_after_generate": "reactor/realtime",
+        "seed": 42,
+        "control_after_generate": "randomize",
         "filename_prefix": "reactor/realtime"
       }
     },
@@ -134,7 +134,7 @@
       "type": "ReactorCameraCapture",
       "pos": [
         40,
-        330
+        300
       ],
       "size": [
         270,

@@ -302,7 +302,7 @@ class Plan:
 def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[str, object] | None = None) -> Plan:
     spec = MODELS[model]
     if not beats:
-        raise ValueError("The timeline has no beats.")
+        raise ValueError("The sequence has no segments.")
     for i, beat in enumerate(beats):
         if beat.image is not None and spec.images == "none":
             raise ValueError(f"{model} does not take reference images.")
@@ -314,11 +314,11 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
             raise ValueError(f"{model} has no {unknown} setting.")
         # The first beat opens the video, so there is nothing for it to cut from.
         if i and beat.cut and not spec.supports_cuts:
-            raise ValueError(f"{model} has no hard cuts; use a shot beat instead.")
+            raise ValueError(f"{model} has no hard cuts; use a shot segment instead.")
     if spec.image_required and beats[0].image is None:
-        raise ValueError(f"{model} needs an image on the first beat.")
+        raise ValueError(f"{model} needs an image on the first segment.")
     if spec.video_required and beats[0].video is None:
-        raise ValueError(f"{model} needs a video on the first beat.")
+        raise ValueError(f"{model} needs a video on the first segment.")
     if spec.pattern == "call":
         # A call's settings are fields of its `start_call`, and it has no camera.
         return compile_call(model, beats, settings or {})
@@ -326,13 +326,13 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
         beats = list(beats)
         for i, start in enumerate(itertools.accumulate(b.frames for b in beats[:-1]), 1):
             if beats[i].image is not None:
-                logging.warning("%s reads its image only at start; dropping the image on the beat at frame %d.", model, start)
+                logging.warning("%s reads its image only at start; dropping the image on the segment at frame %d.", model, start)
                 beats[i] = replace(beats[i], image=None)
     if spec.videos == "first":
         beats = list(beats)
         for i, start in enumerate(itertools.accumulate(b.frames for b in beats[:-1]), 1):
             if beats[i].video is not None:
-                logging.warning("%s reads its video only at start; dropping the video on the beat at frame %d.", model, start)
+                logging.warning("%s reads its video only at start; dropping the video on the segment at frame %d.", model, start)
                 beats[i] = replace(beats[i], video=None)
     moves = []
     if any(beat.moves for beat in beats):
@@ -342,7 +342,7 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
             for m in beat.moves:
                 start = offset + m.start_frame
                 if start >= stop:
-                    logging.warning("%s: dropping the %s move at frame %d of a beat, after the beat ends.", model, m.lane, m.start_frame)
+                    logging.warning("%s: dropping the %s move at frame %d of a segment, after the segment ends.", model, m.lane, m.start_frame)
                     continue
                 moves.append(replace(m, start_frame=start, frames=min(start + m.frames, stop) - start))
     plan = COMPILERS[model](model, spec, beats, seed)
@@ -430,7 +430,7 @@ def join_chains(chains: list[Timeline]) -> Timeline:
     joined = first
     for i, chain in enumerate(rest, 2):
         if chain.model != first.model:
-            raise ValueError(f"Chain {i} is for {chain.model} and chain 1 for {first.model}; join chains made for the same model.")
+            raise ValueError(f"Sequence {i} is for {chain.model} and sequence 1 for {first.model}; join sequences made for the same model.")
         joined = replace(joined, beats=(*joined.beats, *chain.beats))
     return joined
 
@@ -450,7 +450,7 @@ def scheduled_chunks(spec: ModelSpec, beats: list[Beat]) -> tuple[int, list[int]
         bounds.append(scene_chunk + spec.chunks_for(total - scene_frames))
     for i, (start, end) in enumerate(zip(bounds, bounds[1:])):
         if end <= start:
-            raise ValueError(f"Beat {i + 1} lasts {beats[i].frames} frames, less than one {spec.frames_per_chunk}-frame chunk.")
+            raise ValueError(f"Segment {i + 1} lasts {beats[i].frames} frames, less than one {spec.frames_per_chunk}-frame chunk.")
     return bounds[-1], bounds[:-1]
 
 
@@ -459,7 +459,7 @@ def compile_longlive(model: str, spec: ModelSpec, beats: list[Beat], seed: int) 
     bounds = [0] + [c for b, c in zip(beats[1:], at[1:]) if b.cut] + [chunks]
     for start, end in zip(bounds, bounds[1:]):
         if end - start > spec.max_scene_chunks:
-            raise ValueError(f"{model} plays at most {spec.frames_in(spec.max_scene_chunks)} frames without a cut; add a cut beat to go longer.")
+            raise ValueError(f"{model} plays at most {spec.frames_in(spec.max_scene_chunks)} frames without a cut; add a cut segment to go longer.")
     plan = Plan(setup=[("set_seed", {"seed": seed}), ("set_shot", {"prompt": beats[0].prompt})], chunks=chunks)
     for beat, chunk in zip(beats[1:], at[1:]):
         command = "schedule_scene_cut" if beat.cut else "schedule_shot"
@@ -565,32 +565,34 @@ def call_setup(model: str, image: bytes | None, settings: dict[str, object]) -> 
 def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> Plan:
     """A scripted call: the first beat's image becomes the character, and each beat's prompt is said to it in turn.
 
-    A call's `chunks` count the character's replies. The first answers the call opening, so beat i
-    goes out after i + 1, and its reply plays for at least the beat's frames. A beat's references
+    A call's `chunks` count the character's replies. With a greeting the first reply is the opening, so
+    beat i goes out after i + 1; without one the character waits for beat 0. Each beat's reply plays for
+    at least the beat's frames. A beat's references
     are what the character has on during it: before its line, any the beat before had and it lacks
     are cleared, and any new are set.
     """
     for i, beat in enumerate(beats):
         if not beat.prompt.strip():
-            raise ValueError(f"Beat {i + 1} says nothing; give it a prompt.")
+            raise ValueError(f"Segment {i + 1} says nothing; give it a prompt.")
         if i and beat.image is not None:
-            raise ValueError(f"{model} reads a beat's image only as the person, on the first beat; use a Reactor Vidu S2-Avatar Reference for later beats.")
-    plan = Plan(setup=call_setup(model, beats[0].image, settings), chunks=len(beats) + 1,
-                holds=[0] + [beat.frames for beat in beats])
+            raise ValueError(f"{model} reads a segment's image only as the person, on the first segment; use a Reactor Vidu S2-Avatar Reference for later segments.")
+    opening = 1 if settings.get("greeting") else 0
+    plan = Plan(setup=call_setup(model, beats[0].image, settings), chunks=len(beats) + opening,
+                holds=[0] * opening + [beat.frames for beat in beats])
     held = {}
     for i, beat in enumerate(beats):
         # An id names a reference by its content, so one a beat keeps from the beat before is never resent.
         refs = {hashlib.sha256(r.png + f"{r.kind}|{r.text}".encode()).hexdigest()[:32]: r for r in beat.references}
         if len(refs) > 3:
-            raise ValueError(f"Beat {i + 1} has {len(refs)} references; {model} holds at most 3.")
+            raise ValueError(f"Segment {i + 1} has {len(refs)} references; {model} holds at most 3.")
         if gone := [ref_id for ref_id in held if ref_id not in refs]:
-            plan.timed.append((i + 1, "clear_reference_images", {"image_ids": gone}))
+            plan.timed.append((i + opening, "clear_reference_images", {"image_ids": gone}))
         # The docs cap `text` at 200 characters.
         new = [{"image_url": data_url(r.png), "image_id": ref_id, "kind": r.kind, **({"text": r.text[:200]} if r.text else {})}
                for ref_id, r in refs.items() if ref_id not in held]
         if new:
-            plan.timed.append((i + 1, "set_reference_images", {"images": new}))
-        plan.timed.append((i + 1, "say", {"text": beat.prompt}))
+            plan.timed.append((i + opening, "set_reference_images", {"images": new}))
+        plan.timed.append((i + opening, "say", {"text": beat.prompt}))
         held = refs
     return plan
 

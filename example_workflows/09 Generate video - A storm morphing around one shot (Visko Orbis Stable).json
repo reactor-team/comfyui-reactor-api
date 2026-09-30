@@ -22,39 +22,39 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "A Visko Orbis Stable scene in three beats, one chain node per beat. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one beat to the next instead of cutting. Reactor Timeline draws the chain.\n\nLoad Image feeds the first node. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "A Visko Orbis Stable scene in three segments, one node per segment. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one segment to the next instead of cutting. Reactor Sequence Visualizer draws the sequence.\n\nLoad Image feeds the first node. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "A Visko Orbis Stable scene in three beats. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one beat to the next instead of cutting.\n\nLoad Image feeds image_0. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "text": "A Visko Orbis Stable scene in three segments, one node per segment. The image pins the first frame, and each later prompt keeps the same fisherman, boat and camera while the storm changes, so the video morphs from one segment to the next instead of cutting. Reactor Sequence Visualizer draws the sequence.\n\nLoad Image feeds the first node. Copy example_inputs/reactor_fisherman.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
       "id": 3,
-      "type": "ReactorTimeline",
+      "type": "ReactorSequenceVisualizer",
       "pos": [
-        40,
-        600
+        370,
+        684
       ],
       "size": [
-        1260,
-        200
+        1320,
+        160
       ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 9
         }
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "ReactorTimeline"
+        "Node name for S&R": "ReactorSequenceVisualizer"
       },
       "widgets_values": []
     },
@@ -62,8 +62,8 @@
       "id": 4,
       "type": "ReactorRender",
       "pos": [
-        1330,
-        240
+        1750,
+        300
       ],
       "size": [
         400,
@@ -74,9 +74,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 10
         },
         {
@@ -115,8 +115,8 @@
       "id": 5,
       "type": "SaveVideo",
       "pos": [
-        1330,
-        580
+        2210,
+        300
       ],
       "size": [
         270,
@@ -196,8 +196,8 @@
       "id": 6,
       "type": "LoadImage",
       "pos": [
-        -300,
-        240
+        40,
+        300
       ],
       "size": [
         270,
@@ -252,14 +252,14 @@
     },
     {
       "id": 7,
-      "type": "ReactorViskoOrbisChain",
+      "type": "ReactorViskoOrbisSegment",
       "pos": [
-        40,
-        240
+        370,
+        300
       ],
       "size": [
         400,
-        320
+        234
       ],
       "flags": {},
       "order": 0,
@@ -322,16 +322,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             7
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorViskoOrbisChain"
+        "Node name for S&R": "ReactorViskoOrbisSegment"
       },
       "widgets_values": [
         "Visko Orbis Stable",
@@ -350,24 +350,24 @@
     },
     {
       "id": 8,
-      "type": "ReactorViskoOrbisChain",
+      "type": "ReactorViskoOrbisSegment",
       "pos": [
-        470,
-        240
+        830,
+        300
       ],
       "size": [
         400,
-        320
+        166
       ],
       "flags": {},
       "order": 0,
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 7
         },
         {
@@ -420,27 +420,27 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             8
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorViskoOrbisChain"
+        "Node name for S&R": "ReactorViskoOrbisSegment"
       },
       "widgets_values": [
         "Visko Orbis Stable",
-        "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
+        "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow \u2014 foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
         198,
         true,
         ""
       ],
       "widgets_values_named": {
         "model": "Visko Orbis Stable",
-        "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow — foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
+        "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The towering wave peaks and crests over the bow \u2014 foam surges straight into the lens, the deck pitches hard down the backside of the swell, and the fisherman rides it out at the rail as another roller builds on the horizon. Visceral, relentless, a single unbroken take.",
         "frames": 198,
         "audio": true,
         "audio_prompt": ""
@@ -448,24 +448,24 @@
     },
     {
       "id": 9,
-      "type": "ReactorViskoOrbisChain",
+      "type": "ReactorViskoOrbisSegment",
       "pos": [
-        900,
-        240
+        1290,
+        300
       ],
       "size": [
         400,
-        320
+        166
       ],
       "flags": {},
       "order": 0,
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 8
         },
         {
@@ -518,9 +518,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             9,
             10
@@ -528,18 +528,18 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorViskoOrbisChain"
+        "Node name for S&R": "ReactorViskoOrbisSegment"
       },
       "widgets_values": [
         "Visko Orbis Stable",
-        "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
+        "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him \u2014 rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
         198,
         true,
         ""
       ],
       "widgets_values_named": {
         "model": "Visko Orbis Stable",
-        "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him — rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
+        "prompt": "The same fisherman on the same boat, the same camera rocking with the deck. The squall thickens around him \u2014 rain sheets near-horizontal across the gunwale, visibility collapses toward the bow, lightning flickers inside the cloud mass ahead, the next wave arrives almost unseen until spray explodes off the rail. Relentless, atmospheric, a single unbroken take.",
         "frames": 198,
         "audio": true,
         "audio_prompt": ""
@@ -569,7 +569,7 @@
       0,
       8,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       8,
@@ -577,7 +577,7 @@
       0,
       9,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       9,
@@ -585,7 +585,7 @@
       0,
       3,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       10,
@@ -593,7 +593,7 @@
       0,
       4,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ]
   ],
   "groups": [],

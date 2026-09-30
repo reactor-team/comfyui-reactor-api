@@ -22,20 +22,20 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Each Reactor LongLive-2.0 Chain node is one beat: it plays its prompt for its frames, starting where the beat before it ends. The first link sets the model and its settings, later links take them from the chain, and the last one feeds Reactor Render.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+        "Each Reactor LongLive-2.0 Segment node is one segment: it plays its prompt for its frames, starting where the segment before it ends. The first segment sets the model and its settings, later segments take them from the first, and the last one feeds Reactor Render.\n\nkind is how a segment enters from the one before: shot blends softly, cut starts a fresh scene. The first segment just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Each Reactor LongLive-2.0 Chain node is one beat: it plays its prompt for its frames, starting where the beat before it ends. The first link sets the model and its settings, later links take them from the chain, and the last one feeds Reactor Render.\n\nkind is how a beat enters from the one before: shot blends softly, cut starts a fresh scene. The first beat just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Each Reactor LongLive-2.0 Segment node is one segment: it plays its prompt for its frames, starting where the segment before it ends. The first segment sets the model and its settings, later segments take them from the first, and the last one feeds Reactor Render.\n\nkind is how a segment enters from the one before: shot blends softly, cut starts a fresh scene. The first segment just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
       "id": 2,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
         40,
-        220
+        270
       ],
       "size": [
         300,
@@ -46,10 +46,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": null
         },
         {
@@ -82,16 +82,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             1
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "A powerful Bengal tiger prowls slowly through tall sun-bleached savanna grass at golden hour, muscles rolling beneath its orange-and-black striped fur, amber eyes fixed ahead, whiskers catching the light. Warm low sunlight rakes through the swaying grass. Long telephoto, very shallow depth of field, slow tracking dolly, rich golden-amber palette, fine fur detail, photoreal nature-documentary look.",
@@ -106,10 +106,10 @@
     },
     {
       "id": 3,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        370,
-        220
+        400,
+        270
       ],
       "size": [
         300,
@@ -120,10 +120,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 1
         },
         {
@@ -156,16 +156,16 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             2
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
         "A pod of bottlenose dolphins leaps in unison through the glittering turquoise surface of a calm open ocean, sleek grey bodies arcing clear of the water, sheets of spray catching the bright midday sun. Low angle just above the waterline, crisp high-shutter clarity, deep blue-green palette with sparkling highlights, photoreal.",
@@ -180,10 +180,10 @@
     },
     {
       "id": 4,
-      "type": "ReactorLongLive20Chain",
+      "type": "ReactorLongLive20Segment",
       "pos": [
-        700,
-        220
+        760,
+        270
       ],
       "size": [
         300,
@@ -194,10 +194,10 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
+          "localized_name": "sequence",
+          "name": "sequence",
           "shape": 7,
-          "type": "REACTOR_CHAIN",
+          "type": "REACTOR_SEQUENCE",
           "link": 2
         },
         {
@@ -230,24 +230,24 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_CHAIN",
-          "name": "REACTOR_CHAIN",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
           "links": [
             5
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Chain"
+        "Node name for S&R": "ReactorLongLive20Segment"
       },
       "widgets_values": [
-        "A herd of African elephants — towering adults sheltering a small calf — wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
+        "A herd of African elephants \u2014 towering adults sheltering a small calf \u2014 wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
         317,
         "cut"
       ],
       "widgets_values_named": {
-        "prompt": "A herd of African elephants — towering adults sheltering a small calf — wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
+        "prompt": "A herd of African elephants \u2014 towering adults sheltering a small calf \u2014 wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
         "frames": 317,
         "kind": "cut"
       }
@@ -256,8 +256,8 @@
       "id": 7,
       "type": "ReactorRender",
       "pos": [
-        320,
-        470
+        1120,
+        270
       ],
       "size": [
         400,
@@ -268,9 +268,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "chain",
-          "name": "chain",
-          "type": "REACTOR_CHAIN",
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
           "link": 5
         },
         {
@@ -309,8 +309,8 @@
       "id": 8,
       "type": "SaveVideo",
       "pos": [
-        760,
-        470
+        1580,
+        270
       ],
       "size": [
         270,
@@ -374,13 +374,13 @@
       ],
       "properties": {},
       "widgets_values": [
-        "reactor/beats",
+        "reactor/segments",
         "auto",
         "auto",
         "auto"
       ],
       "widgets_values_named": {
-        "filename_prefix": "reactor/beats",
+        "filename_prefix": "reactor/segments",
         "format": "auto",
         "format.codec": "auto",
         "codec": "auto"
@@ -394,7 +394,7 @@
       0,
       7,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       6,
@@ -410,7 +410,7 @@
       0,
       3,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ],
     [
       2,
@@ -418,7 +418,7 @@
       0,
       4,
       0,
-      "REACTOR_CHAIN"
+      "REACTOR_SEQUENCE"
     ]
   ],
   "groups": [],

@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Edit your camera live with Vidu S2-Editing, steered by a reference image instead of a prompt. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Pick another edit type or a new image in that window and press Apply to switch the look. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nsubject_replacement puts the person in the image in your place. style_transfer takes its look, virtual_tryon an outfit, and background_replacement a new background. Copy example_inputs/reactor_fisherman.jpg into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "Edit your camera in real time with Vidu S2-Editing, steered by a reference image instead of a prompt. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Pick another edit type or a new image in that window and press Apply to switch the look. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nsubject_replacement puts the person in the image in your place. style_transfer takes its look, virtual_tryon an outfit, and background_replacement a new background. Copy example_inputs/reactor_fisherman.jpg into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Edit your camera live with Vidu S2-Editing. It takes no prompt: a reference image and an edit type steer it. Here subject_replacement turns you into the fisherman in the image; style_transfer, virtual_tryon and background_replacement use the image as a look, an item to wear, or a place behind you. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window.\n\nIn the window, pick another edit type or a new image and press Apply to switch the look mid-take. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving. The edit has a time limit, and a take that reaches it is saved up to there. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+        "text": "Edit your camera in real time with Vidu S2-Editing, steered by a reference image instead of a prompt. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Pick another edit type or a new image in that window and press Apply to switch the look. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nsubject_replacement puts the person in the image in your place. style_transfer takes its look, virtual_tryon an outfit, and background_replacement a new background. Copy example_inputs/reactor_fisherman.jpg into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -35,10 +35,10 @@
       "type": "LoadImage",
       "pos": [
         40,
-        240
+        300
       ],
       "size": [
-        282.798828125,
+        283,
         314
       ],
       "flags": {},
@@ -97,7 +97,7 @@
       "type": "ReactorCameraCapture",
       "pos": [
         40,
-        600
+        684
       ],
       "size": [
         270,
@@ -141,12 +141,12 @@
       "id": 4,
       "type": "ReactorRealtime",
       "pos": [
-        400,
-        240
+        383,
+        300
       ],
       "size": [
         400,
-        240
+        262
       ],
       "flags": {},
       "order": 3,

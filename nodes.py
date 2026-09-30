@@ -25,8 +25,7 @@ from .reactor_render.timeline import MODELS, Beat, Timeline, compile_timeline, e
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
 
-ReactorTimelineType = io.Custom("REACTOR_TIMELINE")
-ReactorBeatsType = io.Custom("REACTOR_BEATS")
+ReactorChainType = io.Custom("REACTOR_CHAIN")
 ReactorModelType = io.Custom("REACTOR_MODEL")
 # A browser camera, by its label; the widget lists the cameras the browser can see.
 ReactorCameraType = io.Custom("REACTOR_CAMERA")
@@ -89,15 +88,16 @@ class ReactorModel(io.ComfyNode):
         return io.NodeOutput((name, {key: model[key] for key in MODELS[name].settings if key in model}))
 
 
-class ReactorBeat(io.ComfyNode):
+class ReactorChain(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="ReactorBeat",
-            display_name="Reactor Beat",
+            node_id="ReactorChain",
+            display_name="Reactor Chain",
             category="Reactor",
-            description="One beat of a Reactor timeline. Chain beats together and feed the last one to Reactor Timeline.",
+            description="One beat of a Reactor chain. Connect a Reactor Model to the first beat, chain the others after it, and feed the last one to Reactor Render.",
             inputs=[
+                ReactorModelType.Input("model", optional=True, tooltip="The model the chain is for, which sets the inputs and camera moves its beats can use. Connect it to the first beat; later beats take it from the chain."),
                 io.String.Input("prompt", multiline=True),
                 io.Int.Input("frames", default=120, min=1, max=100000,
                              tooltip="How many frames of video this beat plays. It starts where the beat before it in the chain ends; both ends round to the nearest chunk."),
@@ -106,16 +106,20 @@ class ReactorBeat(io.ComfyNode):
                 io.Image.Input("image", optional=True, tooltip="Reference image, for models that take one."),
                 io.Video.Input("video", optional=True, tooltip="Source clip to edit, for video-to-video models. Only the first beat's is used."),
                 MoveEditor.Input("moves", tooltip="Camera moves during this beat, for models with camera controls. A move ends with its beat; continue it on the next beat to keep it going."),
-                ReactorBeatsType.Input("chain", optional=True),
+                ReactorChainType.Input("chain", optional=True),
             ],
-            outputs=[ReactorBeatsType.Output()],
+            outputs=[ReactorChainType.Output()],
         )
 
     @classmethod
-    def execute(cls, prompt, frames, kind, moves, image=None, video=None, chain=None) -> io.NodeOutput:
+    def execute(cls, prompt, frames, kind, moves, model=None, image=None, video=None, chain=None) -> io.NodeOutput:
+        if chain is None and model is None:
+            raise ValueError("Connect a Reactor Model to the first beat of a chain.")
+        if chain is not None and model is not None and model != (chain.model, chain.settings):
+            raise ValueError("This beat's Reactor Model doesn't match the one its chain started with; later beats take the model from the chain, so disconnect it.")
         beat = Beat(prompt, frames, cut=kind == "cut", image=None if image is None else image_to_png(image),
                     video=None if video is None else video_to_mp4(video), moves=tuple(editor_moves(moves)))
-        return io.NodeOutput((*(chain or ()), beat))
+        return io.NodeOutput(Timeline(model[0], (beat,), model[1]) if chain is None else replace(chain, beats=(*chain.beats, beat)))
 
 
 class ReactorTimeline(io.ComfyNode):
@@ -127,21 +131,25 @@ class ReactorTimeline(io.ComfyNode):
             category="Reactor",
             description="Lay out the beats of a Reactor render on a timeline, snapped to the model's chunks.",
             inputs=[
-                ReactorModelType.Input("model"),
+                ReactorModelType.Input("model", optional=True, tooltip="The model to render on. With a chain connected, the chain's model is used instead."),
                 BeatEditor.Input("beats"),
-                ReactorBeatsType.Input("chain", optional=True, tooltip="Beats from a Reactor Beat chain. When connected, they and their camera moves are the timeline, and the beats and moves drawn here are not used."),
+                ReactorChainType.Input("chain", optional=True, tooltip="Beats from a Reactor Chain. When connected, they and their camera moves are the timeline, and the beats and moves drawn here are not used."),
                 io.Autogrow.Input("images", optional=True, template=io.Autogrow.TemplatePrefix(
                     input=io.Image.Input("image", tooltip="Reference image a beat can pick, for models that take one."),
                     prefix="image_", min=0, max=100)),
             ],
-            outputs=[ReactorTimelineType.Output()],
+            outputs=[ReactorChainType.Output()],
         )
 
     @classmethod
-    def execute(cls, model, beats, chain=None, images=None) -> io.NodeOutput:
-        name, settings = model
+    def execute(cls, beats, model=None, chain=None, images=None) -> io.NodeOutput:
         if chain is not None:
-            return io.NodeOutput(Timeline(name, tuple(chain), settings))
+            if model is not None and model != (chain.model, chain.settings):
+                raise ValueError("This timeline's Reactor Model doesn't match the one its chain started with; with a chain connected, disconnect the timeline's model.")
+            return io.NodeOutput(chain)
+        if model is None:
+            raise ValueError("Connect a Reactor Model or a Reactor Chain.")
+        name, settings = model
         pngs = {slot: image_to_png(image) for slot, image in (images or {}).items() if image is not None}
         return io.NodeOutput(Timeline(name, tuple(editor_beats(beats, pngs)), settings, tuple(editor_moves(beats))))
 
@@ -173,20 +181,20 @@ class ReactorRender(io.ComfyNode):
             node_id="ReactorRender",
             display_name="Reactor Render",
             category="Reactor",
-            description="Renders a timeline on a Reactor model, with the API key from the REACTOR_API_KEY environment variable or this plugin's config.ini.",
+            description="Renders a Reactor chain or timeline on its model, with the API key from the REACTOR_API_KEY environment variable or this plugin's config.ini.",
             inputs=[
-                ReactorTimelineType.Input("timeline"),
+                ReactorChainType.Input("chain", tooltip="The last beat of a Reactor Chain, or a Reactor Timeline."),
                 io.Int.Input("seed", default=42, min=0, max=2**31 - 1, control_after_generate=True),
             ],
             outputs=[io.Video.Output()],
         )
 
     @classmethod
-    async def execute(cls, timeline, seed) -> io.NodeOutput:
+    async def execute(cls, chain, seed) -> io.NodeOutput:
         connect = connect_args()
-        spec = MODELS[timeline.model]
-        beats = [replace(b, image=spec.fit_png(b.image)) if b.image is not None else b for b in timeline.beats]
-        plan = compile_timeline(timeline.model, beats, seed, timeline.settings, list(timeline.moves))
+        spec = MODELS[chain.model]
+        beats = [replace(b, image=spec.fit_png(b.image)) if b.image is not None else b for b in chain.beats]
+        plan = compile_timeline(chain.model, beats, seed, chain.settings, list(chain.moves))
         out_path = os.path.join(folder_paths.get_temp_directory(), f"reactor_{uuid.uuid4().hex}.mp4")
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         pbar = comfy.utils.ProgressBar(1)
@@ -307,6 +315,8 @@ class ReactorRealtime(io.ComfyNode):
         spec = MODELS[name]
         if not spec.live:
             raise ValueError(f"{name} isn't available in Reactor Realtime yet; render it with Reactor Render instead.")
+        if video is not None and camera is not None:
+            raise ValueError("Reactor Realtime takes one source: disconnect the Load Video or the Reactor Camera Capture.")
         if image is not None and spec.images == "none":
             logging.warning("%s has no image input; ignoring it.", name)
             image = None
@@ -317,8 +327,6 @@ class ReactorRealtime(io.ComfyNode):
             return await live_output("drive", name, prompt, live.drive_setup(name, prompt, seed, png, settings), None, filename_prefix)
         if video is None and camera is None:
             raise ValueError(f"{name} needs a source: connect a Load Video or a Reactor Camera Capture.")
-        if video is not None and camera is not None:
-            raise ValueError(f"{name} takes one source: disconnect the Load Video or the Reactor Camera Capture.")
         clip = None
         if video is not None:
             mp4 = video_to_mp4(video)
@@ -330,7 +338,7 @@ class ReactorRealtime(io.ComfyNode):
 class ReactorExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [ReactorModel, ReactorBeat, ReactorTimeline, ReactorRender, ReactorCameraCapture, ReactorRealtime]
+        return [ReactorModel, ReactorChain, ReactorTimeline, ReactorRender, ReactorCameraCapture, ReactorRealtime]
 
 
 async def comfy_entrypoint() -> ReactorExtension:

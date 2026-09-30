@@ -6,6 +6,7 @@ let MODEL_FACTS = {};
 
 const STYLE = `
 .reactor-tl { display: flex; flex-direction: column; gap: 6px; font: 12px sans-serif; color: var(--input-text); }
+.reactor-tl[hidden] { display: none; }
 .reactor-tl-ruler { position: relative; flex: none; height: 16px; border-bottom: 1px solid var(--border-color); }
 .reactor-tl-tick { position: absolute; top: 0; height: 100%; border-left: 1px solid var(--border-color); padding-left: 2px; font-size: 10px; opacity: 0.8; }
 .reactor-tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--p-primary-color, #4a9eff); pointer-events: none; z-index: 1; }
@@ -60,16 +61,40 @@ function inputValue(node, name) {
 }
 
 // The model's grid facts, or null when the model link does not come straight from a Reactor Model.
+// The facts of the model a node is for: its own Reactor Model, or the one its chain started with.
 function modelFacts(node) {
-    const source = upstream(node, "model");
-    return source?.comfyClass === "ReactorModel" ? MODEL_FACTS[widgetValue(source, "model")] ?? null : null;
+    for (let n = node; n; n = upstream(n, "chain")) {
+        const source = upstream(n, "model");
+        if (source) return source.comfyClass === "ReactorModel" ? MODEL_FACTS[widgetValue(source, "model")] ?? null : null;
+    }
+    return null;
 }
 
-// The beats of a Reactor Beat chain ending at `last`, first to last, or "unknown" when the chain can't be read.
+// Shows an optional socket only while the node reads it; a linked socket stays so its link isn't dropped.
+function showInput(node, name, type, shown) {
+    const slot = node.inputs?.findIndex((i) => i.name === name) ?? -1;
+    if (!shown && slot >= 0 && node.inputs[slot].link == null) node.removeInput(slot);
+    else if (shown && slot < 0) node.addInput(name, type);
+    else return false;
+    return true;
+}
+
+// Fits a node's optional sockets to what it reads, as [name, type, shown]; a linked socket it won't read is labelled.
+function fitInputs(node, sockets) {
+    let changed = false;
+    for (const [name, type, shown] of sockets) {
+        changed = showInput(node, name, type, shown) || changed;
+        const input = node.inputs?.find((i) => i.name === name);
+        if (input) input.label = shown ? undefined : `${name} (unused)`;
+    }
+    return changed;
+}
+
+// The beats of a Reactor Chain ending at `last`, first to last, or "unknown" when the chain can't be read.
 function beatsUpTo(last) {
     const beats = [];
     for (let beat = last; beat; beat = upstream(beat, "chain")) {
-        if (beat.comfyClass !== "ReactorBeat") return "unknown";
+        if (beat.comfyClass !== "ReactorChain") return "unknown";
         const prompt = inputValue(beat, "prompt") ?? "(linked prompt)", frames = inputValue(beat, "frames"), kind = widgetValue(beat, "kind");
         if (typeof prompt !== "string" || typeof frames !== "number") return "unknown";
         beats.push({ prompt, frames, cut: kind === "cut", image: upstream(beat, "image") ? "image" : null, moves: widgetValue(beat, "moves")?.moves ?? [] });
@@ -77,10 +102,17 @@ function beatsUpTo(last) {
     return beats.reverse();
 }
 
-// Beats from a connected Reactor Beat chain, first to last: null with no chain, "unknown" when the chain can't be read.
+// Beats from a connected Reactor Chain, first to last: null with no chain, "unknown" when the chain can't be read.
 function chainBeats(node) {
     const slot = node.inputs?.findIndex((i) => i.name === "chain") ?? -1;
     return slot < 0 || node.inputs[slot].link == null ? null : beatsUpTo(node.getInputNode(slot));
+}
+
+// Shows the Autogrow image sockets only while the drawn beats can take an image; linked ones stay.
+function showImages(node, shown) {
+    const sockets = (node.inputs ?? []).map((input, slot) => [input, slot]).filter(([input]) => input.name.startsWith("images."));
+    if (!shown) for (const [input, slot] of sockets.reverse()) { if (input.link == null) node.removeInput(slot); }
+    else if (!sockets.length) node.addInput("images.image_0", "IMAGE");
 }
 
 function connectedImageSlots(node) {
@@ -130,30 +162,21 @@ function tickStep(length, ticks) {
     return [1, 2, 5, 10].map((k) => k * step).find((t) => length / t <= ticks) ?? 10 * step;
 }
 
-// The facts of the model a Reactor Beat's chain feeds, or null when it doesn't reach a Reactor Timeline.
-function downstreamFacts(node) {
-    for (let next = node.getOutputNodes?.(0)?.[0]; next; next = next.getOutputNodes?.(0)?.[0]) {
-        if (next.comfyClass === "ReactorTimeline") return modelFacts(next);
-        if (next.comfyClass !== "ReactorBeat") return null;
-    }
-    return null;
-}
-
-// Fits a Reactor Beat's inputs to the model its chain feeds: whole-chunk lengths, no cuts where the
-// model has none, and an image socket labelled when the model won't read it.
+// Fits a Reactor Chain beat's inputs to its model: whole-chunk lengths, no cuts where the model has none,
+// a model socket only on the first beat, and image and video sockets only where the model reads them.
 function adaptBeat(node) {
-    const facts = downstreamFacts(node);
+    const facts = modelFacts(node);
     const opens = upstream(node, "chain") === null;
     const frames = node.widgets?.find((w) => w.name === "frames");
     const kind = node.widgets?.find((w) => w.name === "kind");
-    const key = JSON.stringify([facts, opens, kind?.value]);
-    if (!frames || !kind || key === node.reactorFacts) return;
+    const reads = (taken) => !facts || taken === "any" || (taken === "first" && opens);
+    const changed = fitInputs(node, [["model", "REACTOR_MODEL", opens], ["image", "IMAGE", reads(facts?.images)], ["video", "VIDEO", reads(facts?.videos)]]);
+    if (changed) node.setSize?.([node.size[0], node.computeSize()[1]]);
+    const key = JSON.stringify([facts, kind?.value]);
+    if (!frames || !kind || (key === node.reactorFacts && !changed)) return;
     node.reactorFacts = key;
     frames.options.step2 = facts ? facts.frames_per_chunk : 1;
     kind.disabled = !!facts && !facts.supports_cuts && kind.value !== "cut";
-    const image = node.inputs?.find((i) => i.name === "image");
-    const unread = facts && (facts.images === "none" || (facts.images === "first" && !opens));
-    if (image) image.label = unread ? "image (unused)" : undefined;
     node.setDirtyCanvas?.(true, true);
 }
 
@@ -483,7 +506,7 @@ function createEditor(node, inputName, inputData) {
             panel.className = "reactor-tl-note";
             panel.textContent = s.chain === "unknown"
                 ? "Beats come from the chain input, which this editor can't read. Edit them upstream."
-                : selected !== null ? beats[selected].prompt || "(empty prompt)" : "Beats come from the chain input, in chain order. Edit them and their camera moves on their Reactor Beat nodes.";
+                : selected !== null ? beats[selected].prompt || "(empty prompt)" : "Beats come from the chain input, in chain order. Edit them and their camera moves on their Reactor Chain nodes.";
         } else if (selected !== null) {
             const beat = value.beats[selected];
             const prompt = el("textarea", { value: beat.prompt, placeholder: "Prompt" });
@@ -501,8 +524,10 @@ function createEditor(node, inputName, inputData) {
             image.addEventListener("change", () => { beat.image = image.value || null; changed(); });
             const remove = el("button", { textContent: "Delete beat" });
             remove.addEventListener("click", () => { value.beats.splice(selected, 1); selected = null; changed(); });
+            // A picked image stays pickable so it can be cleared; problems() flags it.
+            const takesImage = !s.facts || s.facts.images === "any" || (s.facts.images === "first" && selected === 0) || beat.image;
             panel.append(prompt, el("span", { textContent: "frames" }), frames, el("span", { textContent: "enters as" }), kind,
-                         el("span", { textContent: "image" }), image, el("span"), remove);
+                         ...(takesImage ? [el("span", { textContent: "image" }), image] : []), el("span"), remove);
         } else {
             panel.className = "reactor-tl-note";
             panel.textContent = (beats.length ? HINT : "No beats yet. Add one to start the timeline.")
@@ -520,7 +545,7 @@ function createEditor(node, inputName, inputData) {
             });
             footer.append(add);
         } else {
-            footer.append(el("span", { className: "reactor-tl-badge", textContent: "Read-only", title: "Beats come from the chain input; edit them on their Reactor Beat nodes." }));
+            footer.append(el("span", { className: "reactor-tl-badge", textContent: "Read-only", title: "Beats come from the chain input; edit them on their Reactor Chain nodes." }));
         }
         if (s.chain !== "unknown") footer.append(el("span", { className: "reactor-tl-note", textContent: s.facts ? `${length} frames, ${(length / s.facts.fps).toFixed(1)} s at ${s.facts.fps} fps` : `${length} frames` }));
         if (!s.facts) footer.append(el("span", { className: "reactor-tl-note", textContent: "Connect a Reactor Model to snap to its chunks." }));
@@ -570,7 +595,7 @@ function createEditor(node, inputName, inputData) {
     return { widget };
 }
 
-// A Reactor Beat's camera lanes: moves counted from the beat's own start, on the lanes of the model
+// A Reactor Chain beat's camera lanes: moves counted from the beat's own start, on the lanes of the model
 // its chain feeds, and ending with the beat.
 function createMoveEditor(node, inputName) {
     let value = { moves: [] };
@@ -594,13 +619,18 @@ function createMoveEditor(node, inputName) {
         node.graph?.setDirtyCanvas(true, true);
     };
     const drag = dragger(changed);
-    const state = () => ({ facts: downstreamFacts(node), beats: beatsUpTo(node), width: lanes.clientWidth });
+    const state = () => ({ facts: modelFacts(node), beats: beatsUpTo(node), width: lanes.clientWidth });
 
     function render() {
         const s = state();
         const camera = s.facts?.camera ?? {};
         const shown = Object.keys(camera).length > 0 || value.moves.length > 0;
         ruler.hidden = !shown;
+        // A model without camera controls gets no move editor at all.
+        if (root.hidden !== (!!s.facts && !shown)) {
+            root.hidden = !!s.facts && !shown;
+            node.setSize?.([node.size[0], node.computeSize()[1]]);
+        }
         if (selectedMove !== null && selectedMove >= value.moves.length) selectedMove = null;
         // Past a scene's first chunk every chunk is full length, so a beat that doesn't open its scene
         // snaps its moves to a grid of whole chunks from its start.
@@ -634,8 +664,7 @@ function createMoveEditor(node, inputName) {
             });
         } else {
             panel.className = "reactor-tl-note";
-            panel.textContent = !s.facts ? "Feed this chain to a Reactor Timeline to add camera moves."
-                : !shown ? "This model has no camera controls."
+            panel.textContent = !s.facts ? "Connect a Reactor Model to the first beat of this chain to add camera moves."
                 : "Click a lane to add a camera move. A move ends with this beat; add the same move at the start of the next beat to keep it going.";
         }
     }
@@ -647,7 +676,7 @@ function createMoveEditor(node, inputName) {
             selectedMove = null;
             changed();
         },
-        getMinHeight: () => 60 + 28 * new Set([...Object.keys(downstreamFacts(node)?.camera ?? {}), ...value.moves.map((m) => m.lane)]).size,
+        getMinHeight: () => root.hidden ? 0 : 60 + 28 * new Set([...Object.keys(modelFacts(node)?.camera ?? {}), ...value.moves.map((m) => m.lane)]).size,
         onDraw: () => {
             const s = state();
             const next = JSON.stringify([s.facts, s.beats, s.width]);
@@ -668,7 +697,28 @@ app.registerExtension({
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name === "ReactorModel") MODEL_FACTS = nodeData.input.required.model[1].model_facts ?? {};
-        if (nodeData.name === "ReactorBeat") {
+        if (nodeData.name === "ReactorRealtime") {
+            const onDrawForeground = nodeType.prototype.onDrawForeground;
+            nodeType.prototype.onDrawForeground = function (...args) {
+                // A camera is a live source video: it goes wherever a video does, and only one of the two is used.
+                const facts = modelFacts(this), takes = (t) => !facts || t !== "none";
+                const video = upstream(this, "video"), camera = upstream(this, "camera");
+                fitInputs(this, [["image", "IMAGE", takes(facts?.images)], ["video", "VIDEO", takes(facts?.videos) && !camera],
+                                 ["camera", "REACTOR_CAMERA", takes(facts?.videos) && !video]]);
+                return onDrawForeground?.apply(this, args);
+            };
+        }
+        if (nodeData.name === "ReactorTimeline") {
+            const onDrawForeground = nodeType.prototype.onDrawForeground;
+            nodeType.prototype.onDrawForeground = function (...args) {
+                // A connected chain brings its own model and images, and the drawn beats' images go unused.
+                const drawn = !upstream(this, "chain");
+                showInput(this, "model", "REACTOR_MODEL", drawn);
+                showImages(this, drawn && modelFacts(this)?.images !== "none");
+                return onDrawForeground?.apply(this, args);
+            };
+        }
+        if (nodeData.name === "ReactorChain") {
             const onNodeCreated = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function (...args) {
                 const result = onNodeCreated?.apply(this, args);
@@ -676,7 +726,7 @@ app.registerExtension({
                 const callback = frames?.callback;
                 if (frames)
                     frames.callback = (value, ...rest) => {
-                        const facts = downstreamFacts(this);
+                        const facts = modelFacts(this);
                         if (facts) frames.value = snapLength(value, facts);
                         return callback?.call(frames, frames.value, ...rest);
                     };

@@ -198,10 +198,12 @@ MODELS = {
 
 def model_facts(spec: ModelSpec) -> dict:
     """What the timeline editor needs to draw a model's chunk grid and flag beats it would reject."""
+    # A model without chunks plays each beat for exactly its frames, which the editor draws as one-frame chunks.
+    frames_per_chunk = spec.frames_per_chunk or 1
     return {
         "fps": spec.fps,
-        "frames_per_chunk": spec.frames_per_chunk,
-        "first_chunk_frames": spec.first_chunk_frames or spec.frames_per_chunk,
+        "frames_per_chunk": frames_per_chunk,
+        "first_chunk_frames": spec.first_chunk_frames or frames_per_chunk,
         "supports_cuts": spec.supports_cuts,
         "max_scene_chunks": spec.max_scene_chunks,
         "images": spec.images,

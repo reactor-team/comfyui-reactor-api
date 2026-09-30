@@ -2,7 +2,7 @@
   "id": "e33d237f-5db8-4201-aff0-16ef389f9ad0",
   "revision": 0,
   "last_node_id": 24,
-  "last_link_id": 35,
+  "last_link_id": 36,
   "nodes": [
     {
       "id": 1,
@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a beat's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Beat frames sets every beat's length.\n\nDawn and Sunrise are the shared opening, with no animal in it, so nothing carries over into an ending. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Timeline and Reactor Render, so one change to the opening or the season reaches every cut. Mute an ending's Save Video to skip rendering it.\n\nSet your Reactor API key in this plugin's config.ini."
+        "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a beat's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Beat frames sets every beat's length.\n\nDawn and Sunrise are the shared opening, with no animal in it, so nothing carries over into an ending. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Render, so one change to the opening or the season reaches every cut. Mute an ending's Save Video to skip rendering it.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a beat's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Beat frames sets every beat's length.\n\nDawn and Heron are the shared opening. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Timeline and Reactor Render, so one change to the opening or the season reaches every cut. Bypass a Save Video's render to skip that ending.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "One opening, three endings: a park ad cut for three audiences, rendered in one run.\n\nSeason sets the time of year in every prompt; add your own in its option fields. Look holds the camera and style once. Each Format Text node is a beat's prompt template: {a} is the season and {b} the look, so every shot restates the lake as the LongLive-2.0 prompt guide advises. Beat frames sets every beat's length.\n\nDawn and Sunrise are the shared opening, with no animal in it, so nothing carries over into an ending. Families and Quiet are shots that carry the lake on. Adventure is a cut to a new scene, so its template writes its own look. Each ending has its own Reactor Render, so one change to the opening or the season reaches every cut. Mute an ending's Save Video to skip rendering it.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -230,9 +230,7 @@
           "name": "REACTOR_MODEL",
           "type": "REACTOR_MODEL",
           "links": [
-            22,
-            27,
-            32
+            36
           ]
         }
       ],
@@ -315,7 +313,7 @@
     },
     {
       "id": 7,
-      "type": "ReactorBeat",
+      "type": "ReactorChain",
       "pos": [
         1000,
         20
@@ -329,18 +327,17 @@
       "mode": 0,
       "inputs": [
         {
-          "label": "image (unused)",
-          "localized_name": "image",
-          "name": "image",
+          "localized_name": "model",
+          "name": "model",
           "shape": 7,
-          "type": "IMAGE",
-          "link": null
+          "type": "REACTOR_MODEL",
+          "link": 36
         },
         {
           "localized_name": "chain",
           "name": "chain",
           "shape": 7,
-          "type": "REACTOR_BEATS",
+          "type": "REACTOR_CHAIN",
           "link": null
         },
         {
@@ -382,9 +379,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_BEATS",
-          "name": "REACTOR_BEATS",
-          "type": "REACTOR_BEATS",
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
           "links": [
             20
           ]
@@ -392,7 +389,7 @@
       ],
       "title": "Dawn",
       "properties": {
-        "Node name for S&R": "ReactorBeat"
+        "Node name for S&R": "ReactorChain"
       },
       "widgets_values": [
         "",
@@ -475,37 +472,29 @@
         "The sun clears the granite ridge above the mountain lake {a}, and golden light floods down the valley as the camera glides slowly along the reedy shore, mist curling off the still water and a light breeze stirring the reeds. {b}"
       ],
       "widgets_values_named": {
-        "f_string": "A grey heron stands motionless among the reeds at the edge of the mountain lake {a}, then spreads its wide grey wings and lifts off, trailing drops of water as it flaps slowly low across the mirrored surface towards the far pine shore. {b}"
+        "f_string": "The sun clears the granite ridge above the mountain lake {a}, and golden light floods down the valley as the camera glides slowly along the reedy shore, mist curling off the still water and a light breeze stirring the reeds. {b}"
       }
     },
     {
       "id": 9,
-      "type": "ReactorBeat",
+      "type": "ReactorChain",
       "pos": [
         1000,
         320
       ],
       "size": [
         320,
-        220
+        200
       ],
       "flags": {},
       "order": 11,
       "mode": 0,
       "inputs": [
         {
-          "label": "image (unused)",
-          "localized_name": "image",
-          "name": "image",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
           "localized_name": "chain",
           "name": "chain",
           "shape": 7,
-          "type": "REACTOR_BEATS",
+          "type": "REACTOR_CHAIN",
           "link": 20
         },
         {
@@ -547,9 +536,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_BEATS",
-          "name": "REACTOR_BEATS",
-          "type": "REACTOR_BEATS",
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
           "links": [
             21,
             26,
@@ -559,7 +548,7 @@
       ],
       "title": "Sunrise",
       "properties": {
-        "Node name for S&R": "ReactorBeat"
+        "Node name for S&R": "ReactorChain"
       },
       "widgets_values": [
         "",
@@ -642,37 +631,29 @@
         "The camera drifts along the shore of the mountain lake {a} to a mossy fallen log at the water's edge, where two young otter cubs tumble and play, wrestling, sliding into the shallow water with a splash and scrambling back out, their wet brown fur glistening in the morning light. {b}"
       ],
       "widgets_values_named": {
-        "f_string": "Two young otter cubs tumble and play on a mossy fallen log at the edge of the mountain lake {a}, wrestling, sliding into the shallow water with a splash and scrambling back out, their wet brown fur glistening in the morning light. {b}"
+        "f_string": "The camera drifts along the shore of the mountain lake {a} to a mossy fallen log at the water's edge, where two young otter cubs tumble and play, wrestling, sliding into the shallow water with a splash and scrambling back out, their wet brown fur glistening in the morning light. {b}"
       }
     },
     {
       "id": 11,
-      "type": "ReactorBeat",
+      "type": "ReactorChain",
       "pos": [
         1000,
         620
       ],
       "size": [
         320,
-        220
+        200
       ],
       "flags": {},
       "order": 12,
       "mode": 0,
       "inputs": [
         {
-          "label": "image (unused)",
-          "localized_name": "image",
-          "name": "image",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
           "localized_name": "chain",
           "name": "chain",
           "shape": 7,
-          "type": "REACTOR_BEATS",
+          "type": "REACTOR_CHAIN",
           "link": 21
         },
         {
@@ -714,17 +695,17 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_BEATS",
-          "name": "REACTOR_BEATS",
-          "type": "REACTOR_BEATS",
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
           "links": [
-            23
+            24
           ]
         }
       ],
       "title": "Families (shot)",
       "properties": {
-        "Node name for S&R": "ReactorBeat"
+        "Node name for S&R": "ReactorChain"
       },
       "widgets_values": [
         "",
@@ -805,32 +786,24 @@
     },
     {
       "id": 13,
-      "type": "ReactorBeat",
+      "type": "ReactorChain",
       "pos": [
         1000,
         960
       ],
       "size": [
         320,
-        220
+        200
       ],
       "flags": {},
       "order": 13,
       "mode": 0,
       "inputs": [
         {
-          "label": "image (unused)",
-          "localized_name": "image",
-          "name": "image",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
           "localized_name": "chain",
           "name": "chain",
           "shape": 7,
-          "type": "REACTOR_BEATS",
+          "type": "REACTOR_CHAIN",
           "link": 26
         },
         {
@@ -872,17 +845,17 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_BEATS",
-          "name": "REACTOR_BEATS",
-          "type": "REACTOR_BEATS",
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
           "links": [
-            28
+            29
           ]
         }
       ],
       "title": "Adventure (cut)",
       "properties": {
-        "Node name for S&R": "ReactorBeat"
+        "Node name for S&R": "ReactorChain"
       },
       "widgets_values": [
         "",
@@ -965,37 +938,29 @@
         "Evening falls over the mountain lake {a}. A red fox trots quietly into view along the pebble shoreline, pausing to sniff the air as the last amber light fades from the peaks and the water turns deep blue and still. {b}"
       ],
       "widgets_values_named": {
-        "f_string": "Evening falls over the mountain lake {a}, and a red fox trots quietly along the pebble shoreline, pausing to sniff the air as the last amber light fades from the peaks and the water turns deep blue and still. {b}"
+        "f_string": "Evening falls over the mountain lake {a}. A red fox trots quietly into view along the pebble shoreline, pausing to sniff the air as the last amber light fades from the peaks and the water turns deep blue and still. {b}"
       }
     },
     {
       "id": 15,
-      "type": "ReactorBeat",
+      "type": "ReactorChain",
       "pos": [
         1000,
         1300
       ],
       "size": [
         320,
-        220
+        200
       ],
       "flags": {},
       "order": 14,
       "mode": 0,
       "inputs": [
         {
-          "label": "image (unused)",
-          "localized_name": "image",
-          "name": "image",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
           "localized_name": "chain",
           "name": "chain",
           "shape": 7,
-          "type": "REACTOR_BEATS",
+          "type": "REACTOR_CHAIN",
           "link": 31
         },
         {
@@ -1037,17 +1002,17 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_BEATS",
-          "name": "REACTOR_BEATS",
-          "type": "REACTOR_BEATS",
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
           "links": [
-            33
+            34
           ]
         }
       ],
       "title": "Quiet (shot)",
       "properties": {
-        "Node name for S&R": "ReactorBeat"
+        "Node name for S&R": "ReactorChain"
       },
       "widgets_values": [
         "",
@@ -1067,82 +1032,10 @@
       }
     },
     {
-      "id": 16,
-      "type": "ReactorTimeline",
-      "pos": [
-        1380,
-        620
-      ],
-      "size": [
-        640,
-        256
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "REACTOR_MODEL",
-          "link": 22
-        },
-        {
-          "localized_name": "chain",
-          "name": "chain",
-          "shape": 7,
-          "type": "REACTOR_BEATS",
-          "link": 23
-        },
-        {
-          "localized_name": "image_0",
-          "name": "images.image_0",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
-          "localized_name": "beats",
-          "name": "beats",
-          "type": "REACTOR_BEAT_EDITOR",
-          "widget": {
-            "name": "beats"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_TIMELINE",
-          "name": "REACTOR_TIMELINE",
-          "type": "REACTOR_TIMELINE",
-          "links": [
-            24
-          ]
-        }
-      ],
-      "title": "Timeline: Families",
-      "properties": {
-        "Node name for S&R": "ReactorTimeline"
-      },
-      "widgets_values": [
-        {
-          "beats": [],
-          "moves": []
-        }
-      ],
-      "widgets_values_named": {
-        "beats": {
-          "beats": [],
-          "moves": []
-        }
-      }
-    },
-    {
       "id": 17,
       "type": "ReactorRender",
       "pos": [
-        2080,
+        1380,
         620
       ],
       "size": [
@@ -1154,9 +1047,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "timeline",
-          "name": "timeline",
-          "type": "REACTOR_TIMELINE",
+          "localized_name": "chain",
+          "name": "chain",
+          "type": "REACTOR_CHAIN",
           "link": 24
         },
         {
@@ -1195,7 +1088,7 @@
       "id": 18,
       "type": "SaveVideo",
       "pos": [
-        2540,
+        1820,
         620
       ],
       "size": [
@@ -1222,20 +1115,20 @@
           "link": null
         },
         {
-          "localized_name": "codec",
-          "name": "format.codec",
-          "type": "COMFY_DYNAMICCOMBO_V3",
-          "widget": {
-            "name": "format.codec"
-          },
-          "link": null
-        },
-        {
           "localized_name": "format",
           "name": "format",
           "type": "COMFY_DYNAMICCOMBO_V3",
           "widget": {
             "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
           },
           "link": null
         },
@@ -1273,82 +1166,10 @@
       }
     },
     {
-      "id": 19,
-      "type": "ReactorTimeline",
-      "pos": [
-        1380,
-        960
-      ],
-      "size": [
-        640,
-        256
-      ],
-      "flags": {},
-      "order": 16,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "REACTOR_MODEL",
-          "link": 27
-        },
-        {
-          "localized_name": "chain",
-          "name": "chain",
-          "shape": 7,
-          "type": "REACTOR_BEATS",
-          "link": 28
-        },
-        {
-          "localized_name": "image_0",
-          "name": "images.image_0",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
-          "localized_name": "beats",
-          "name": "beats",
-          "type": "REACTOR_BEAT_EDITOR",
-          "widget": {
-            "name": "beats"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_TIMELINE",
-          "name": "REACTOR_TIMELINE",
-          "type": "REACTOR_TIMELINE",
-          "links": [
-            29
-          ]
-        }
-      ],
-      "title": "Timeline: Adventure",
-      "properties": {
-        "Node name for S&R": "ReactorTimeline"
-      },
-      "widgets_values": [
-        {
-          "beats": [],
-          "moves": []
-        }
-      ],
-      "widgets_values_named": {
-        "beats": {
-          "beats": [],
-          "moves": []
-        }
-      }
-    },
-    {
       "id": 20,
       "type": "ReactorRender",
       "pos": [
-        2080,
+        1380,
         960
       ],
       "size": [
@@ -1360,9 +1181,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "timeline",
-          "name": "timeline",
-          "type": "REACTOR_TIMELINE",
+          "localized_name": "chain",
+          "name": "chain",
+          "type": "REACTOR_CHAIN",
           "link": 29
         },
         {
@@ -1401,7 +1222,7 @@
       "id": 21,
       "type": "SaveVideo",
       "pos": [
-        2540,
+        1820,
         960
       ],
       "size": [
@@ -1428,20 +1249,20 @@
           "link": null
         },
         {
-          "localized_name": "codec",
-          "name": "format.codec",
-          "type": "COMFY_DYNAMICCOMBO_V3",
-          "widget": {
-            "name": "format.codec"
-          },
-          "link": null
-        },
-        {
           "localized_name": "format",
           "name": "format",
           "type": "COMFY_DYNAMICCOMBO_V3",
           "widget": {
             "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
           },
           "link": null
         },
@@ -1479,82 +1300,10 @@
       }
     },
     {
-      "id": 22,
-      "type": "ReactorTimeline",
-      "pos": [
-        1380,
-        1300
-      ],
-      "size": [
-        640,
-        256
-      ],
-      "flags": {},
-      "order": 17,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "model",
-          "name": "model",
-          "type": "REACTOR_MODEL",
-          "link": 32
-        },
-        {
-          "localized_name": "chain",
-          "name": "chain",
-          "shape": 7,
-          "type": "REACTOR_BEATS",
-          "link": 33
-        },
-        {
-          "localized_name": "image_0",
-          "name": "images.image_0",
-          "shape": 7,
-          "type": "IMAGE",
-          "link": null
-        },
-        {
-          "localized_name": "beats",
-          "name": "beats",
-          "type": "REACTOR_BEAT_EDITOR",
-          "widget": {
-            "name": "beats"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_TIMELINE",
-          "name": "REACTOR_TIMELINE",
-          "type": "REACTOR_TIMELINE",
-          "links": [
-            34
-          ]
-        }
-      ],
-      "title": "Timeline: Quiet",
-      "properties": {
-        "Node name for S&R": "ReactorTimeline"
-      },
-      "widgets_values": [
-        {
-          "beats": [],
-          "moves": []
-        }
-      ],
-      "widgets_values_named": {
-        "beats": {
-          "beats": [],
-          "moves": []
-        }
-      }
-    },
-    {
       "id": 23,
       "type": "ReactorRender",
       "pos": [
-        2080,
+        1380,
         1300
       ],
       "size": [
@@ -1566,9 +1315,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "timeline",
-          "name": "timeline",
-          "type": "REACTOR_TIMELINE",
+          "localized_name": "chain",
+          "name": "chain",
+          "type": "REACTOR_CHAIN",
           "link": 34
         },
         {
@@ -1607,7 +1356,7 @@
       "id": 24,
       "type": "SaveVideo",
       "pos": [
-        2540,
+        1820,
         1300
       ],
       "size": [
@@ -1634,20 +1383,20 @@
           "link": null
         },
         {
-          "localized_name": "codec",
-          "name": "format.codec",
-          "type": "COMFY_DYNAMICCOMBO_V3",
-          "widget": {
-            "name": "format.codec"
-          },
-          "link": null
-        },
-        {
           "localized_name": "format",
           "name": "format",
           "type": "COMFY_DYNAMICCOMBO_V3",
           "widget": {
             "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
           },
           "link": null
         },
@@ -1687,196 +1436,36 @@
   ],
   "links": [
     [
-      1,
-      2,
-      0,
-      6,
-      0,
-      "STRING"
-    ],
-    [
-      2,
-      3,
-      0,
-      6,
-      1,
-      "STRING"
-    ],
-    [
-      3,
-      6,
-      0,
-      7,
-      2,
-      "STRING"
-    ],
-    [
-      4,
-      4,
-      0,
-      7,
-      3,
-      "INT"
-    ],
-    [
-      5,
-      2,
-      0,
-      8,
-      0,
-      "STRING"
-    ],
-    [
-      6,
-      3,
-      0,
-      8,
-      1,
-      "STRING"
-    ],
-    [
-      7,
-      8,
-      0,
-      9,
-      2,
-      "STRING"
-    ],
-    [
-      8,
-      4,
-      0,
-      9,
-      3,
-      "INT"
-    ],
-    [
-      9,
-      2,
-      0,
-      10,
-      0,
-      "STRING"
-    ],
-    [
-      10,
-      3,
-      0,
-      10,
-      1,
-      "STRING"
-    ],
-    [
-      11,
-      10,
-      0,
-      11,
-      2,
-      "STRING"
-    ],
-    [
-      12,
-      4,
-      0,
-      11,
-      3,
-      "INT"
-    ],
-    [
-      13,
-      2,
-      0,
-      12,
-      0,
-      "STRING"
-    ],
-    [
-      14,
-      12,
-      0,
-      13,
-      2,
-      "STRING"
-    ],
-    [
-      15,
-      4,
-      0,
-      13,
-      3,
-      "INT"
-    ],
-    [
-      16,
-      2,
-      0,
-      14,
-      0,
-      "STRING"
-    ],
-    [
-      17,
-      3,
-      0,
-      14,
-      1,
-      "STRING"
-    ],
-    [
-      18,
-      14,
-      0,
-      15,
-      2,
-      "STRING"
-    ],
-    [
-      19,
-      4,
-      0,
-      15,
-      3,
-      "INT"
-    ],
-    [
-      20,
-      7,
-      0,
-      9,
-      1,
-      "REACTOR_BEATS"
-    ],
-    [
-      21,
-      9,
-      0,
-      11,
-      1,
-      "REACTOR_BEATS"
-    ],
-    [
-      22,
-      5,
-      0,
-      16,
-      0,
-      "REACTOR_MODEL"
-    ],
-    [
-      23,
-      11,
-      0,
-      16,
-      1,
-      "REACTOR_BEATS"
-    ],
-    [
       24,
-      16,
+      11,
       0,
       17,
       0,
-      "REACTOR_TIMELINE"
+      "REACTOR_CHAIN"
+    ],
+    [
+      29,
+      13,
+      0,
+      20,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      34,
+      15,
+      0,
+      23,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      13,
+      2,
+      0,
+      12,
+      0,
+      "STRING"
     ],
     [
       25,
@@ -1887,38 +1476,6 @@
       "VIDEO"
     ],
     [
-      26,
-      9,
-      0,
-      13,
-      1,
-      "REACTOR_BEATS"
-    ],
-    [
-      27,
-      5,
-      0,
-      19,
-      0,
-      "REACTOR_MODEL"
-    ],
-    [
-      28,
-      13,
-      0,
-      19,
-      1,
-      "REACTOR_BEATS"
-    ],
-    [
-      29,
-      19,
-      0,
-      20,
-      0,
-      "REACTOR_TIMELINE"
-    ],
-    [
       30,
       20,
       0,
@@ -1927,44 +1484,196 @@
       "VIDEO"
     ],
     [
-      31,
-      9,
-      0,
-      15,
-      1,
-      "REACTOR_BEATS"
-    ],
-    [
-      32,
-      5,
-      0,
-      22,
-      0,
-      "REACTOR_MODEL"
-    ],
-    [
-      33,
-      15,
-      0,
-      22,
-      1,
-      "REACTOR_BEATS"
-    ],
-    [
-      34,
-      22,
-      0,
-      23,
-      0,
-      "REACTOR_TIMELINE"
-    ],
-    [
       35,
       23,
       0,
       24,
       0,
       "VIDEO"
+    ],
+    [
+      1,
+      2,
+      0,
+      6,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      3,
+      0,
+      6,
+      1,
+      "STRING"
+    ],
+    [
+      5,
+      2,
+      0,
+      8,
+      0,
+      "STRING"
+    ],
+    [
+      6,
+      3,
+      0,
+      8,
+      1,
+      "STRING"
+    ],
+    [
+      9,
+      2,
+      0,
+      10,
+      0,
+      "STRING"
+    ],
+    [
+      10,
+      3,
+      0,
+      10,
+      1,
+      "STRING"
+    ],
+    [
+      16,
+      2,
+      0,
+      14,
+      0,
+      "STRING"
+    ],
+    [
+      17,
+      3,
+      0,
+      14,
+      1,
+      "STRING"
+    ],
+    [
+      36,
+      5,
+      0,
+      7,
+      0,
+      "REACTOR_MODEL"
+    ],
+    [
+      3,
+      6,
+      0,
+      7,
+      2,
+      "STRING"
+    ],
+    [
+      4,
+      4,
+      0,
+      7,
+      3,
+      "INT"
+    ],
+    [
+      20,
+      7,
+      0,
+      9,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      7,
+      8,
+      0,
+      9,
+      1,
+      "STRING"
+    ],
+    [
+      8,
+      4,
+      0,
+      9,
+      2,
+      "INT"
+    ],
+    [
+      21,
+      9,
+      0,
+      11,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      11,
+      10,
+      0,
+      11,
+      1,
+      "STRING"
+    ],
+    [
+      12,
+      4,
+      0,
+      11,
+      2,
+      "INT"
+    ],
+    [
+      26,
+      9,
+      0,
+      13,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      14,
+      12,
+      0,
+      13,
+      1,
+      "STRING"
+    ],
+    [
+      15,
+      4,
+      0,
+      13,
+      2,
+      "INT"
+    ],
+    [
+      31,
+      9,
+      0,
+      15,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      18,
+      14,
+      0,
+      15,
+      1,
+      "STRING"
+    ],
+    [
+      19,
+      4,
+      0,
+      15,
+      2,
+      "INT"
     ]
   ],
   "groups": [],

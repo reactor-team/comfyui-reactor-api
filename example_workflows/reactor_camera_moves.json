@@ -100,7 +100,7 @@
           "localized_name": "chain",
           "name": "chain",
           "shape": 7,
-          "type": "REACTOR_BEATS",
+          "type": "REACTOR_CHAIN",
           "link": null
         },
         {
@@ -122,9 +122,9 @@
       ],
       "outputs": [
         {
-          "localized_name": "REACTOR_TIMELINE",
-          "name": "REACTOR_TIMELINE",
-          "type": "REACTOR_TIMELINE",
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
           "links": [
             2
           ]
@@ -252,9 +252,9 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "timeline",
-          "name": "timeline",
-          "type": "REACTOR_TIMELINE",
+          "localized_name": "chain",
+          "name": "chain",
+          "type": "REACTOR_CHAIN",
           "link": 2
         },
         {
@@ -444,7 +444,7 @@
       0,
       4,
       0,
-      "REACTOR_TIMELINE"
+      "REACTOR_CHAIN"
     ],
     [
       3,

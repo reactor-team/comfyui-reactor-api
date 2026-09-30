@@ -82,9 +82,11 @@ priority over `config.ini`. The key is stored in plain text, and `config.ini` is
 - **Reactor Model** picks the model and shows its settings.
 - **Reactor Timeline** is a visual editor. It shows beats on a frame ruler, snapped to the model's
   chunks, with camera lanes underneath for models that have camera controls.
-- **Reactor Beat** is a single beat. Chain beats together instead of drawing them. Each beat has
-  its own camera moves, and a move that continues onto the next beat plays as one move.
-- **Reactor Render** runs the timeline and outputs a video.
+- **Reactor Chain** is a single beat. Chain beats together instead of drawing them. The first beat
+  takes the Reactor Model, which sets the inputs and camera lanes every beat in the chain offers.
+  Each beat has its own camera moves, and a move that continues onto the next beat plays as one move.
+- **Reactor Render** renders a chain, from the last Reactor Chain or from a Reactor Timeline, and
+  outputs a video.
 - **Reactor Realtime** opens a live session you steer while it plays, and saves each take as a video.
 - **Reactor Camera Capture** picks a camera on this browser to stream into Reactor Realtime.
 
@@ -95,26 +97,27 @@ each one, drag the edges to set how long it plays, and draw camera moves in the 
 The whole video lives in one node. `reactor_timeline_editor` and `reactor_camera_moves` work this
 way.
 
-**Chain Reactor Beat nodes.** Use this for more control. Each beat is its own node, so the rest of
+**Build it from Reactor Chain nodes.** Use this for more control. Each beat is its own node, so the rest of
 the graph can feed it:
 
 - **ComfyUI nodes build the beats.** A beat's prompt, length, and image are ordinary inputs. Fill
   them from any other node, such as text built from templates, a prompt from a language model node,
   or an image you generated or edited earlier in the graph. For example, write each prompt as a
   Format Text template and feed it a character from a Custom Combo. Picking another character then
-  recasts every beat. The chain compiles into the timeline when it runs.
+  recasts every beat.
 - **Narratives can fork.** A beat's output can feed more than one next beat. Branch a shared opening
-  into different endings. Give each branch its own Reactor Timeline and Reactor Render to get every
-  ending, or pick one with ComfyUI's If/Else Switch (still experimental). Only the chosen ending runs.
+  into different endings. Give each branch its own Reactor Render to get every ending, or
+  pick one with ComfyUI's If/Else Switch (still experimental). Only the chosen ending runs.
 
-Connect the last beat, or the switch, to Reactor Timeline's `chain` input. The chain then replaces
-anything drawn on that timeline. `reactor_beat_chain`, `reactor_camera_beats`,
+Connect the Reactor Model to the first beat; later beats take it from the chain. Then connect the
+last beat, or the switch, to Reactor Render. `reactor_beat_chain`, `reactor_camera_beats`,
 `reactor_camera_events` and `reactor_ad_variants` work this way.
 
 ## Realtime
 
 Reactor Realtime opens a window in ComfyUI that plays the model's output live. Edit the prompt there
-and press Apply to change it mid-take; press Done to save the take under `reactor/realtime`.
+and press Apply to change it mid-take; press Done to save the take under `reactor/realtime`, or
+Cancel to drop it. With more than one camera, the window can switch cameras mid-take.
 
 - **Video-to-video** models edit a source you stream in. Connect a Reactor Camera Capture to stream
   a camera, or a Load Video to stream a file, which loops until you press Done. X2 also takes a
@@ -142,13 +145,15 @@ loads `example_outputs/reactor_camera_beats.mp4` the same way.
 | Workflow | Model | Scene |
 | --- | --- | --- |
 | `reactor_timeline_editor` | LongLive-2.0 | Martian outpost: nine beats drawn on the timeline, shots and cuts |
-| `reactor_beat_chain` | LongLive-2.0 | Wildlife montage: three Reactor Beats in a chain, joined by cuts |
+| `reactor_beat_chain` | LongLive-2.0 | Wildlife montage: a chain of three beats, joined by cuts |
 | `reactor_camera_moves` | LingBot World 2 | Jet ski cruise: beats and camera moves drawn on the timeline |
 | `reactor_camera_beats` | LingBot World 2 | The same jet ski cruise as a chain of beats, each with its own moves |
 | `reactor_camera_events` | LingBot World 2 | The jet ski ride on one camera path, with an event you pick: meteors, dolphins, a whale or a seaplane |
 | `reactor_ad_variants` | LongLive-2.0 | Park ad: one opening, three audience endings rendered in one run, and a season you pick |
 | `reactor_visko_orbis_stable` | Visko Orbis Stable | Fisherman in a storm, from an image |
 | `reactor_helios` | Helios | King of the Jungle, from text |
+| `reactor_video_edit` | Sana Streaming | The jet ski render edited, with a prompt change partway through |
+| `reactor_realtime_prompt` | LongLive-2.0 | A live video from a prompt you change while it plays |
 | `reactor_realtime_camera` | X2 | Live effect on your camera |
 | `reactor_realtime_video` | X2 | The jet ski render restyled live as a woodblock print |
 | `reactor_realtime_control` | LingBot World 2 | Drive the jet ski world live with the keyboard |

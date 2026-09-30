@@ -201,6 +201,11 @@ def test_a_follow_up_video_is_dropped_with_a_warning_when_the_model_reads_its_vi
     assert "dropping the video on the beat at frame 48" in caplog.text
 
 
+def test_model_facts_give_a_model_without_chunks_one_frame_chunks():
+    facts = model_facts(MODELS["Sana Streaming"])
+    assert (facts["frames_per_chunk"], facts["first_chunk_frames"]) == (1, 1)
+
+
 def test_model_facts_carry_the_chunk_grid_compile_timeline_snaps_to():
     facts = model_facts(MODELS["LongLive-2.0"])
     assert facts == {"fps": 24.0, "frames_per_chunk": 32, "first_chunk_frames": 29,

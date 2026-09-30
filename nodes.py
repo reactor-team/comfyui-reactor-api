@@ -379,23 +379,20 @@ class ReactorRealtime(io.ComfyNode):
             description="Runs a Reactor model live in a modal in your browser tab, and you change the prompt as it plays. "
                         "Pick a model and it shows that model's inputs. A video-to-video model restyles a clip or a camera; you talk with an "
                         "avatar out loud or by typed message; any other model generates from the prompt and image, "
-                        "with keyboard controls on a world model. Each run records a take.",
+                        "with keyboard controls on a world model. Each run records a take; with the seed fixed and no input changed, "
+                        "a rerun keeps the last take.",
             not_idempotent=True,
             is_output_node=True,
             inputs=[
                 io.DynamicCombo.Input("model", options=[live_option(name) for name, spec in MODELS.items() if spec.live],
                                       tooltip="The model to run live, with the inputs and settings it takes."),
-                io.Int.Input("seed", default=42, min=0, max=2**31 - 1),
+                io.Int.Input("seed", default=42, min=0, max=2**31 - 1,
+                             tooltip="A new seed records a new take. Fixed, with no input changed, a rerun keeps the last take."),
                 io.String.Input("filename_prefix", default="reactor/realtime",
                                 tooltip="Where each take is saved, under ComfyUI's output folder."),
             ],
             outputs=[io.Video.Output()],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        # Every queue records a new take.
-        return uuid.uuid4().hex
 
     @classmethod
     async def execute(cls, model, seed, filename_prefix) -> io.NodeOutput:

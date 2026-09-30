@@ -166,6 +166,8 @@ Reactor Realtime takes no chain: pick the model on the node and fill in the inpu
 opens a window in ComfyUI that plays the model's output live. Edit the prompt there
 and press Apply to change it mid-take; press Done to save the take under `reactor/realtime`, or
 Cancel to drop it. With more than one camera, the window can switch cameras mid-take.
+Each queue records a new take while `seed` is set to randomize. With the seed fixed and no input
+changed, a rerun keeps the last take instead of opening the window.
 
 - **Video-to-video** models edit a source you stream in. Connect a Reactor Camera Capture to stream
   a camera, or connect a video to stream a file, which loops until you press Done. X2 also takes a

@@ -1,0 +1,515 @@
+{
+  "id": "5681c2b4-0bf7-4f82-acdc-13250c1bdde3",
+  "revision": 0,
+  "last_node_id": 8,
+  "last_link_id": 6,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        700,
+        190
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Edit a video file with Sana Streaming. Load Video feeds the first beat of the Reactor Chain, and the render streams the clip through the model. Each beat's prompt is an edit: the second beat changes it partway through the clip, on the frame where that beat starts.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. Only the first beat's video is used. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Edit a video file with Sana Streaming. Load Video feeds the first beat of the Reactor Chain, and the render streams the clip through the model. Each beat's prompt is an edit: the second beat changes it partway through the clip, on the frame where that beat starts.\n\nA Sana prompt is one edit: open with its verb, give two to four concrete details, and name what stays fixed; see the Sana Streaming prompt guide. Only the first beat's video is used. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_beats.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "LoadVideo",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        282.798828125,
+        237.1531700721154
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "file",
+          "name": "file",
+          "type": "COMBO",
+          "widget": {
+            "name": "file"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "reactor_camera_beats.mp4",
+        "image"
+      ],
+      "widgets_values_named": {
+        "file": "reactor_camera_beats.mp4",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorModel",
+      "pos": [
+        40,
+        660
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_MODEL",
+          "name": "REACTOR_MODEL",
+          "type": "REACTOR_MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorModel"
+      },
+      "widgets_values": [
+        "Sana Streaming"
+      ],
+      "widgets_values_named": {
+        "model": "Sana Streaming"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ReactorChain",
+      "pos": [
+        360,
+        240
+      ],
+      "size": [
+        430,
+        240
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "shape": 7,
+          "type": "REACTOR_MODEL",
+          "link": 1
+        },
+        {
+          "localized_name": "video",
+          "name": "video",
+          "shape": 7,
+          "type": "VIDEO",
+          "link": 2
+        },
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_CHAIN",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "kind",
+          "name": "kind",
+          "type": "COMBO",
+          "widget": {
+            "name": "kind"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "moves",
+          "name": "moves",
+          "type": "REACTOR_MOVE_EDITOR",
+          "widget": {
+            "name": "moves"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorChain"
+      },
+      "widgets_values": [
+        "Apply a Japanese ukiyo-e woodblock print style with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski and all original motion and camera movement.",
+        120,
+        "shot",
+        {
+          "moves": []
+        }
+      ],
+      "widgets_values_named": {
+        "prompt": "Apply a Japanese ukiyo-e woodblock print style with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski and all original motion and camera movement.",
+        "frames": 120,
+        "kind": "shot",
+        "moves": {
+          "moves": []
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "ReactorChain",
+      "pos": [
+        810,
+        240
+      ],
+      "size": [
+        430,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "shape": 7,
+          "type": "REACTOR_CHAIN",
+          "link": 3
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "kind",
+          "name": "kind",
+          "type": "COMBO",
+          "widget": {
+            "name": "kind"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "moves",
+          "name": "moves",
+          "type": "REACTOR_MOVE_EDITOR",
+          "widget": {
+            "name": "moves"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_CHAIN",
+          "name": "REACTOR_CHAIN",
+          "type": "REACTOR_CHAIN",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorChain"
+      },
+      "widgets_values": [
+        "Make it night in a neon-lit harbour, with pink and teal reflections on the water and glowing signs along the shore. Keep the rider, the jet ski, its wake and the camera motion unchanged.",
+        120,
+        "shot",
+        {
+          "moves": []
+        }
+      ],
+      "widgets_values_named": {
+        "prompt": "Make it night in a neon-lit harbour, with pink and teal reflections on the water and glowing signs along the shore. Keep the rider, the jet ski, its wake and the camera motion unchanged.",
+        "frames": 120,
+        "kind": "shot",
+        "moves": {
+          "moves": []
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "ReactorRender",
+      "pos": [
+        360,
+        660
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "chain",
+          "name": "chain",
+          "type": "REACTOR_CHAIN",
+          "link": 5
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        42,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 8,
+      "type": "SaveVideo",
+      "pos": [
+        800,
+        660
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 6
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/video_edit",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/video_edit",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    }
+  ],
+  "links": [
+    [
+      5,
+      5,
+      0,
+      7,
+      0,
+      "REACTOR_CHAIN"
+    ],
+    [
+      6,
+      7,
+      0,
+      8,
+      0,
+      "VIDEO"
+    ],
+    [
+      1,
+      3,
+      0,
+      4,
+      0,
+      "REACTOR_MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      4,
+      1,
+      "VIDEO"
+    ],
+    [
+      3,
+      4,
+      0,
+      5,
+      0,
+      "REACTOR_CHAIN"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.45,
+      "offset": [
+        595.6076388888888,
+        133.95833333333334
+      ]
+    }
+  },
+  "version": 0.4
+}

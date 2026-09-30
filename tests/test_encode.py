@@ -38,3 +38,47 @@ def test_no_frames_is_an_error(tmp_path):
     writer = FrameWriter(str(tmp_path / "out.mp4"), 24.0)
     with pytest.raises(RuntimeError, match="no video frames"):
         writer.close()
+
+
+def tone(seconds, rate=48000):
+    t = np.arange(round(seconds * rate)) / rate
+    return (np.sin(2 * np.pi * 440 * t) * 8000).astype(np.int16).reshape(-1, 1)
+
+
+def test_audio_is_muxed_in_and_cut_to_the_videos_length(tmp_path):
+    out = tmp_path / "out.mp4"
+    writer = FrameWriter(str(out), 18.0)
+    for _ in range(36):
+        writer.push(np.full((32, 32, 3), 200, dtype=np.uint8))
+    for block in np.split(tone(3.0), 300):
+        writer.push_audio(block, 48000)
+    writer.close()
+    with av.open(str(out)) as c:
+        (audio,) = c.streams.audio
+        samples = sum(f.samples for f in c.decode(audio=0))
+    assert audio.sample_rate == 48000
+    assert samples == pytest.approx(2 * 48000, abs=2048)
+    assert len(read(out)) == 36
+
+
+def test_audio_before_the_first_frame_is_left_out(tmp_path):
+    out = tmp_path / "out.mp4"
+    writer = FrameWriter(str(out), 18.0)
+    writer.push_audio(np.zeros((96000, 1), dtype=np.int16), 48000)
+    for _ in range(18):
+        writer.push(np.full((32, 32, 3), 200, dtype=np.uint8))
+    writer.push_audio(tone(1.0), 48000)
+    writer.close()
+    with av.open(str(out)) as c:
+        samples = sum(f.samples for f in c.decode(audio=0))
+    assert samples == pytest.approx(48000, abs=2048)
+
+
+def test_silent_audio_is_left_out(tmp_path):
+    out = tmp_path / "out.mp4"
+    writer = FrameWriter(str(out), 18.0)
+    writer.push(np.full((32, 32, 3), 200, dtype=np.uint8))
+    writer.push_audio(np.zeros((4800, 1), dtype=np.int16), 48000)
+    writer.close()
+    with av.open(str(out)) as c:
+        assert not c.streams.audio

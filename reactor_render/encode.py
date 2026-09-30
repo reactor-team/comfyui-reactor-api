@@ -1,3 +1,4 @@
+import os
 import queue
 import threading
 import time
@@ -13,6 +14,7 @@ class FrameWriter:
     `push` is called on the SDK's media thread, so it only queues; encoding runs on a thread of
     its own. Every frame is scaled to the first one's size, since WebRTC may change resolution.
     Frames are kept in arrival order: cloud frames carry no frame id or timestamp to place them by.
+    Audio pushed with `push_audio` is muxed in on `close`, from the first video frame to the video's end.
     """
 
     def __init__(self, path: str, fps: float):
@@ -23,6 +25,8 @@ class FrameWriter:
         self.last_frame_at: float | None = None
         self.error: BaseException | None = None
         self.frames: queue.Queue[np.ndarray | None] = queue.Queue()
+        self.audio: list[np.ndarray] = []
+        self.sample_rate = 0
         self.thread = threading.Thread(target=self._encode, daemon=True)
         self.thread.start()
 
@@ -37,6 +41,14 @@ class FrameWriter:
             self.frames.put(frame)
         self.previous = frame
 
+    def push_audio(self, pcm: np.ndarray, sample_rate: int) -> None:
+        """Keep a block of `(samples, channels)` int16 PCM, as the SDK hands it over."""
+        # The stream carries silence until the first chunk, whose sound arrives with its first frame.
+        if self.received == 0:
+            return
+        self.audio.append(pcm.copy())
+        self.sample_rate = sample_rate
+
     def close(self) -> None:
         """Finish the file. Raises what the encoder raised, or if no frame ever arrived."""
         self.frames.put(None)
@@ -45,6 +57,10 @@ class FrameWriter:
             raise self.error
         if self.received == 0:
             raise RuntimeError("The session streamed no video frames.")
+        pcm = np.concatenate(self.audio)[:round(min(self.received, self.limit or self.received) / self.fps * self.sample_rate)] if self.audio else None
+        # A model with its sound turned off still streams silence, which is left out.
+        if pcm is not None and pcm.any():
+            add_audio(self.path, pcm, self.sample_rate)
 
     def _encode(self) -> None:
         try:
@@ -72,3 +88,20 @@ class FrameWriter:
             # Keep draining so `push` never backs up behind a dead encoder.
             while self.frames.get() is not None:
                 pass
+
+
+def add_audio(path: str, pcm: np.ndarray, sample_rate: int) -> None:
+    """Rewrite the MP4 at `path` with `(samples, channels)` int16 PCM as an AAC track beside its video."""
+    tmp = path + ".audio.mp4"
+    with av.open(path) as src, av.open(tmp, "w") as dst:
+        video = dst.add_stream_from_template(src.streams.video[0])
+        audio = dst.add_stream("aac", rate=sample_rate, layout="mono" if pcm.shape[1] == 1 else "stereo")
+        for packet in src.demux(src.streams.video[0]):
+            if packet.dts is not None:
+                packet.stream = video
+                dst.mux(packet)
+        frame = av.AudioFrame.from_ndarray(np.ascontiguousarray(pcm).reshape(1, -1), format="s16", layout=audio.layout.name)
+        frame.sample_rate = sample_rate
+        dst.mux(audio.encode(frame))
+        dst.mux(audio.encode())
+    os.replace(tmp, path)

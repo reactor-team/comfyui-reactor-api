@@ -206,7 +206,7 @@ async def closing_session(reactor: Reactor):
 
 async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progress, on_status: Callable[[str], None],
                  check_interrupt: Callable[[], None], **connect) -> None:
-    """Run one Reactor session through `plan` and encode its streamed video to `out_path`.
+    """Run one Reactor session through `plan` and encode its streamed video, and any sound, to `out_path`.
 
     `connect` is passed to `Reactor` as-is: `api_key` for the cloud, `local`/`api_url` for
     `reactor run`. The session is ended on the way out, so an interrupt or an error never
@@ -223,9 +223,11 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
         session.messages.put_nowait(msg)
 
     @reactor.on_track
-    def capture_video(track) -> None:
+    def capture(track) -> None:
         if track.kind == "video" and track.direction == "recvonly":
             track.on_frame(lambda frame: session.capturing and writer.push(frame))
+        if track.kind == "audio" and track.direction == "recvonly":
+            track.on_frame(lambda pcm, sample_rate: session.capturing and writer.push_audio(pcm, sample_rate))
 
     try:
         async with closing_session(reactor):

@@ -13,9 +13,9 @@ import numpy as np
 from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
 
 from .encode import FrameWriter
-from .session import (CALL_PHASES, CALL_SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, call_phase,
+from .session import (SETUP_PHASES, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       closing_session, connect_with_retry)
-from .timeline import MODELS, Beat, ModelSpec, compile_timeline
+from .timeline import MODELS, Beat, ModelSpec, compile_timeline, edit_setup
 
 # A live take is capped at half an hour; the SDK ends the session when the token hits this.
 LIVE_SESSION_LIMIT_SECONDS = 1800
@@ -89,8 +89,11 @@ def drive_setup(model: str, beat: Beat, seed: int, settings: dict[str, object]) 
     return compile_timeline(model, [replace(beat, frames=MODELS[model].frames_in(1), moves=())], seed, settings).setup
 
 
-def style_setup(spec: ModelSpec, prompt: str, seed: int, image: bytes | None) -> list[tuple[str, dict]]:
+def style_setup(spec: ModelSpec, prompt: str, seed: int, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
     """The commands that open a live style run."""
+    if not spec.prompted:
+        # A model without a prompt is steered by its image and settings alone, as an edit is.
+        return edit_setup(image, settings.get("editing_type"))
     if not spec.starts:
         # X2 generates once a prompt is set and source frames arrive.
         commands = [("set_keep_backlog", {"keep_backlog": False})]
@@ -98,6 +101,19 @@ def style_setup(spec: ModelSpec, prompt: str, seed: int, image: bytes | None) ->
             commands.append(("set_reference_image", {"reference_image": image}))
         return commands + [("set_prompt", {"prompt": prompt})]
     return [("set_seed", {"seed": seed}), ("set_prompt", {"prompt": prompt}), ("start", {})]
+
+
+def switch_controls(spec: ModelSpec, settings: dict[str, object]) -> dict | None:
+    """What the modal's switch controls send mid-take, for a model steered by an image and settings instead of a prompt.
+
+    `image` is the field of `prompt_command` a new image goes in, and each of `settings` is a setting of
+    that command with its options and the value the take starts at.
+    """
+    if spec.prompted:
+        return None
+    return {"image": spec.switch_image,
+            "settings": [{"field": setting.field or name, "options": list(setting.options), "value": settings.get(name, setting.default)}
+                         for name, setting in spec.beat_settings.items() if setting.command == spec.prompt_command and setting.options]}
 
 
 class LiveRun:
@@ -114,10 +130,13 @@ class LiveRun:
     """
 
     def __init__(self, mode: str, spec: ModelSpec, path: str, prompt: str, setup: list[tuple[str, dict]],
-                 input_size: tuple[int, int] | None, connect: dict, clip: list[np.ndarray] | None = None):
+                 input_size: tuple[int, int] | None, connect: dict, clip: list[np.ndarray] | None = None,
+                 settings: dict[str, object] | None = None):
         self.run_id = uuid.uuid4().hex
         self.mode, self.spec, self.path = mode, spec, path
         self.prompt, self.setup = prompt, setup
+        # The beat settings the take starts with, which the modal's switch controls open at.
+        self.settings = settings or {}
         self.input_size, self.clip = input_size, clip
         self.connect = connect
         # The output's expected size, which the modal lays the preview out at until video arrives.
@@ -169,9 +188,10 @@ class LiveRun:
         try:
             await self._poll(self._connected, BROWSER_TIMEOUT_SECONDS, OPEN_TAB_ERROR, check_interrupt)
             # On a call, the text box sends the character a message, as if spoken, instead of a new prompt.
-            command, field = ("say", "text") if self.mode == "call" else (self.spec.prompt_command, "prompt")
+            command, field = ("say", "text") if self.mode == "call" else (self.spec.prompt_command, "prompt" if self.spec.prompted else None)
             self._send_json({"type": "config", "mode": self.mode, "prompt": self.prompt,
                              "lanes": drive_lanes(self.spec), "prompt_command": command, "prompt_field": field,
+                             "switch": switch_controls(self.spec, self.settings),
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else
                                       {"width": self.input_size[0], "height": self.input_size[1], "fps": INPUT_FPS}})
@@ -228,25 +248,23 @@ class LiveRun:
                     self._send_json({"type": "join", "model": self.spec.slug, "session_id": reactor.session_id, "jwt": jwt,
                                      "local": "api_key" not in self.connect, "tracks": model_tracks(self.spec),
                                      "publish": publish})
-                    source = None
                     if publish:
                         await self._poll(self._published, PUBLISH_TIMEOUT_SECONDS,
                                          f"The browser did not start its {'microphone' if self.mode == 'call' else 'camera'} in time.",
                                          check_interrupt)
                     elif self.mode == "style":
-                        source = await reactor.publish_track(self.spec.source_track)
+                        # The clip flows from before setup, as a camera does, for a model that warms up on its source.
+                        push = asyncio.create_task(self._push_clip(await reactor.publish_track(self.spec.source_track)))
+                        push.add_done_callback(self._push_failed)
                     for command, data in self.setup:
                         await self._send_command(command, data)
-                        if command in CALL_PHASES:
-                            self._status("Starting the call…")
-                            await self._wait_for_phase(CALL_PHASES[command], check_interrupt)
+                        if command in SETUP_PHASES:
+                            self._status("Starting the call…" if self.mode == "call" else "Starting…")
+                            await self._wait_for_phase(SETUP_PHASES[command], check_interrupt)
                     if self.mode == "call":
                         await self._wait_for_character(check_interrupt)
                         writer.fill_gaps = True
                     self.capturing = True
-                    if source is not None:
-                        push = asyncio.create_task(self._push_clip(source))
-                        push.add_done_callback(self._push_failed)
                     self._status("")
                     # From here the browser sends the model its prompt and drive commands itself.
                     self._send_json({"type": "started"})
@@ -296,22 +314,30 @@ class LiveRun:
         while not self._finished.is_set():
             check_interrupt()
             while not self._messages.empty():
-                call_phase(self._messages.get_nowait())
+                try:
+                    session_phase(self._messages.get_nowait())
+                except SessionEnded as e:
+                    if e.phase != "ended":
+                        raise
+                    # The model ended the take itself, as an edit does at its time limit; the take keeps what it has.
+                    logging.warning("Reactor live: %s; saving the take.", e)
+                    self._done = True
+                    return
             await asyncio.sleep(0.1)
 
     async def _wait_for_phase(self, phase: str, check_interrupt) -> None:
-        give_up = time.monotonic() + CALL_SETUP_SECONDS
+        give_up = time.monotonic() + SETUP_SECONDS
         while True:
             check_interrupt()
             if self._finished.is_set():
                 raise RuntimeError(self._error or "Cancelled.")
             if time.monotonic() > give_up:
-                raise RuntimeError(f"The avatar call never reached {phase}.")
+                raise RuntimeError(f"The session never reached {phase}.")
             try:
                 msg = await asyncio.wait_for(self._messages.get(), timeout=0.25)
             except asyncio.TimeoutError:
                 continue
-            if call_phase(msg) == phase:
+            if session_phase(msg) == phase:
                 return
 
     async def _wait_for_character(self, check_interrupt) -> None:

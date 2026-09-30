@@ -201,7 +201,7 @@ def make_run(fake, monkeypatch, mode, model, path, prompt="a", seed=42, image=No
     monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
     fake.tokens = []
     monkeypatch.setattr(live, "session_token", lambda *args: fake.tokens.append(args) or "jwt-test")
-    setup = (live.style_setup(MODELS[model], prompt, seed, image) if mode == "style"
+    setup = (live.style_setup(MODELS[model], prompt, seed, image, {}) if mode == "style"
              else live.drive_setup(model, timeline.Beat(prompt, 1, image=image), seed, {}))
     return live.LiveRun(mode, MODELS[model], str(path), prompt, setup, size, connect or {"api_key": "rk_test"})
 
@@ -234,7 +234,7 @@ async def test_a_camera_run_has_the_browser_publish_and_records_the_take(tmp_pat
     assert fake.sent == [("set_keep_backlog", {"keep_backlog": False}), ("set_prompt", {"prompt": "make it noir"})]
     messages = texts(sent)
     assert messages[0] == {"type": "config", "mode": "style", "prompt": "make it noir", "lanes": [],
-                           "prompt_command": "set_prompt", "prompt_field": "prompt", "preview": {"width": 1480, "height": 832},
+                           "prompt_command": "set_prompt", "prompt_field": "prompt", "switch": None, "preview": {"width": 1480, "height": 832},
                            "input": {"width": 1480, "height": 832, "fps": 24}}
     assert [m["text"] for m in messages if m["type"] == "status"] == ["Connecting to Reactor…", ""]
     assert [m for m in messages if m["type"] == "ended"] == [
@@ -377,7 +377,7 @@ async def test_a_drive_run_uploads_the_image_and_sends_lane_changes(tmp_path, mo
     assert await asyncio.wait_for(task, 10) == str(tmp_path / "take.mp4")
     messages = texts(sent)
     assert messages[0] == {"type": "config", "mode": "drive", "prompt": "explore", "lanes": live.drive_lanes(WORLD_2),
-                           "prompt_command": "set_prompt", "prompt_field": "prompt", "preview": {"width": 1664, "height": 960}, "input": None}
+                           "prompt_command": "set_prompt", "prompt_field": "prompt", "switch": None, "preview": {"width": 1664, "height": 960}, "input": None}
     assert join(sent)["publish"] is None
     assert frames_in(tmp_path / "take.mp4")
 
@@ -396,6 +396,16 @@ async def test_a_promptable_model_leaves_mid_run_prompts_to_the_browser(tmp_path
     assert texts(sent)[0]["lanes"] == [] and texts(sent)[0]["prompt_command"] == "set_shot"
 
 
+def test_an_edit_starts_from_its_image_and_offers_its_switch_controls():
+    spec = MODELS["Vidu S2-Editing"]
+    assert live.style_setup(spec, "", 0, b"clay", {"editing_type": "virtual_tryon"}) == [
+        ("start_edit", {"reference_image": b"clay", "editing_type": "virtual_tryon"})]
+    assert live.switch_controls(spec, {"editing_type": "virtual_tryon"}) == {
+        "image": "reference_image",
+        "settings": [{"field": "editing_type", "options": list(timeline.EDIT_TYPES), "value": "virtual_tryon"}]}
+    assert live.switch_controls(MODELS["X2"], {}) is None
+
+
 async def test_a_source_clip_loops_in_place_of_the_camera(tmp_path, monkeypatch):
     fake = FakeLiveReactor()
     clip = [np.full((64, 96, 3), level, dtype=np.uint8) for level in (10, 20, 30)]
@@ -403,7 +413,7 @@ async def test_a_source_clip_loops_in_place_of_the_camera(tmp_path, monkeypatch)
     monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
     monkeypatch.setattr(live, "session_token", lambda *args: "jwt-test")
     run = live.LiveRun("style", MODELS["X2"], str(tmp_path / "take.mp4"), "a",
-                       live.style_setup(MODELS["X2"], "a", 42, None), None, {"api_key": "rk_test"}, clip)
+                       live.style_setup(MODELS["X2"], "a", 42, None, {}), None, {"api_key": "rk_test"}, clip)
     task = asyncio.create_task(run.run(lambda: None))
     sent = []
     run.connected(sent.append)
@@ -446,7 +456,7 @@ async def test_a_call_waits_for_the_browser_mic_and_records_the_character_once_i
         assert container.streams.audio
 
 
-async def test_a_call_that_ends_on_the_server_ends_the_run(tmp_path, monkeypatch):
+async def test_a_call_the_model_ends_saves_the_take(tmp_path, monkeypatch):
     fake = FakeLiveCall()
     monkeypatch.setattr(live, "Reactor", fake)
     monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
@@ -459,6 +469,23 @@ async def test_a_call_that_ends_on_the_server_ends_the_run(tmp_path, monkeypatch
     run.receive('{"type":"published"}')
     assert await until(lambda: {"type": "started"} in texts(sent))
     fake.message_handler({"type": "session_state", "data": {"phase": "ended", "end_reason": "idle_timeout"}})
-    with pytest.raises(RuntimeError, match="idle_timeout"):
+    assert await asyncio.wait_for(task, 10) == str(tmp_path / "take.mp4")
+    assert {"type": "ended", "error": None} in texts(sent)
+
+
+async def test_a_call_that_fails_on_the_server_fails_the_run(tmp_path, monkeypatch):
+    fake = FakeLiveCall()
+    monkeypatch.setattr(live, "Reactor", fake)
+    monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
+    monkeypatch.setattr(live, "session_token", lambda *args: "jwt-test")
+    setup = timeline.call_setup("Vidu S2-Avatar", b"face", {"persona": "A fisherman."})
+    run = live.LiveRun("call", MODELS["Vidu S2-Avatar"], str(tmp_path / "take.mp4"), "", setup, None, {"api_key": "rk_test"})
+    task = asyncio.create_task(run.run(lambda: None))
+    sent = []
+    run.connected(sent.append)
+    run.receive('{"type":"published"}')
+    assert await until(lambda: {"type": "started"} in texts(sent))
+    fake.message_handler({"type": "session_state", "data": {"phase": "failed", "last_error": {"reason": "upstream error"}}})
+    with pytest.raises(RuntimeError, match="upstream error"):
         await asyncio.wait_for(task, 10)
-    assert {"type": "ended", "error": "The avatar call ended: idle_timeout"} in texts(sent)
+    assert {"type": "ended", "error": "The session failed: upstream error"} in texts(sent)

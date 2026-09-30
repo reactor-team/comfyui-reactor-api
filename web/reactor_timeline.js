@@ -106,7 +106,10 @@ function beatsUpTo(last) {
             return parts.includes("unknown") ? "unknown" : [...parts.flat(), ...beats.reverse()];
         }
         if (!isBeat(beat.comfyClass)) return "unknown";
-        const prompt = inputValue(beat, "prompt") ?? "(linked prompt)", frames = inputValue(beat, "frames"), kind = widgetValue(beat, "kind");
+        // A model without a prompt has no prompt input, and its beats are drawn as "(no prompt)".
+        const prompted = beat.inputs?.some((i) => i.name === "prompt") || beat.widgets?.some((w) => w.name === "prompt");
+        const prompt = prompted ? inputValue(beat, "prompt") ?? "(linked prompt)" : "(no prompt)";
+        const frames = inputValue(beat, "frames"), kind = widgetValue(beat, "kind");
         if (typeof prompt !== "string" || typeof frames !== "number") return "unknown";
         beats.push({ prompt, frames, cut: kind === "cut", image: upstream(beat, "image") ? "image" : null, moves: widgetValue(beat, "moves")?.moves ?? [],
                      references: connectedSlots(beat, "references") });

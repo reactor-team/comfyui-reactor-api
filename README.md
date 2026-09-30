@@ -89,6 +89,17 @@ beat that adds one a long hold.
 [Overview](https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/overview) ·
 [Prompt guide](https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/prompt-guide)
 
+### Vidu S2-Editing
+
+Edit a video or a camera from one reference image, with no prompt. `editing_type` says how the image
+is used: `style_transfer` restyles the whole scene, `virtual_tryon` puts on an item the person
+wears, `subject_replacement` changes how the person looks, and `background_replacement` swaps the
+scene behind them. The first link takes the clip. A later link that changes the image or
+`editing_type` switches the look from its first frame. The edit has a time limit, and a video
+that runs past it ends there.
+[Overview](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/overview) ·
+[Prompt guide](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/prompt-guide)
+
 | Model | Image | Cuts | Camera moves |
 | --- | --- | --- | --- |
 | LongLive-2.0 | — | yes | — |
@@ -98,6 +109,7 @@ beat that adds one a long hold.
 | Visko Orbis Dynamic | first beat | — | — |
 | Visko Orbis Stable | first beat | — | — |
 | Vidu S2-Avatar | first beat, required; its references on any beat | — | — |
+| Vidu S2-Editing | any link, required on the first | — | — |
 
 ## Install
 
@@ -156,7 +168,9 @@ Cancel to drop it. With more than one camera, the window can switch cameras mid-
 
 - **Video-to-video** models edit a source you stream in. Connect a Reactor Camera Capture to stream
   a camera, or connect a video to stream a file, which loops until you press Done. X2 also takes a
-  reference image. Sana Streaming isn't available in Realtime yet; render it with Reactor Render.
+  reference image. Vidu S2-Editing takes no prompt: its window has an `editing_type` picker and a
+  new-image picker in place of the prompt box, and Apply switches the look. Sana Streaming isn't
+  available in Realtime yet; render it with Reactor Render.
 - **Generating** models start from a prompt, and from an image where the model takes one. For
   models with camera lanes, click the video and drive with the keys shown under it: W, A, S and D move, the arrow keys look,
   and Q and E orbit on LingBot World 2. Models without camera lanes are steered by prompt alone.
@@ -195,6 +209,7 @@ loads `example_outputs/reactor_camera_beats.mp4` the same way.
 | `reactor_realtime_prompt` | LongLive-2.0 | A live video from a prompt you change while it plays |
 | `reactor_realtime_camera` | X2 | Live effect on your camera |
 | `reactor_realtime_video` | X2 | The jet ski render restyled live as a woodblock print |
+| `reactor_realtime_edit` | Vidu S2-Editing | Your camera, restyled from a reference image, with the look switched live |
 | `reactor_realtime_control` | LingBot World 2 | Drive the jet ski world live with the keyboard |
 
 Each graph screenshot below has its workflow embedded. Drag one onto the ComfyUI canvas to load it.

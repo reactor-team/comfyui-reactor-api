@@ -114,7 +114,9 @@ class ModelSpec:
     `native` is the commands, sent before `start`, that keep the video at the model's native size, or its nearest.
     `settings` are the settings the model reads only at start, set on a chain's first link. `beat_settings` are settings the
     model takes mid-run, so each beat sets its own and a value holds until a later beat changes it. `camera` maps each camera lane,
-    named by its command's field, to the lane. `prompt_command` changes the prompt mid-run.
+    named by its command's field, to the lane. `prompt_command` changes the prompt mid-run. `prompted` is whether the model
+    takes a prompt at all. `switch_image` names the field of `prompt_command` that takes a new image mid-run, for a model whose
+    live change is an image and settings rather than a prompt.
     """
     slug: str
     pattern: str
@@ -139,6 +141,8 @@ class ModelSpec:
     beat_settings: dict[str, Setting] = field(default_factory=dict)
     camera: dict[str, Lane] = field(default_factory=dict)
     prompt_command: str = "set_prompt"
+    prompted: bool = True
+    switch_image: str | None = None
 
     def frame_size(self, width: int, height: int) -> tuple[int, int]:
         """The size a width x height input is sent at."""
@@ -203,6 +207,9 @@ AVATAR_SETTINGS = {"persona": Setting("start_call", (), ""),
                    "greeting": Setting("start_call", (), "")}
 
 
+EDIT_TYPES = ("style_transfer", "virtual_tryon", "subject_replacement", "background_replacement")
+
+
 MODELS = {
     # Measured on cloud sessions: a scene's first chunk is 29 frames and every later one 32, where the docs say 29,
     # and `frames_emitted` counts the whole session.
@@ -238,6 +245,12 @@ MODELS = {
     # An avatar takes a photo of any shape, so only its short side is fitted.
     "Vidu S2-Avatar": ModelSpec("reactor/vidu-s2-avatar", "call", 25.0, "first", False, references=True, image_required=True, size=(864, 1152),
                                 keeps_aspect=True, settings=AVATAR_SETTINGS),
+    # The docs give its output as 7:4, measured at 952x544. Its reference image is not a frame, so only its short side is fitted.
+    # TODO: Vidu S2-Editing publishes no frame rate, so the 24 the clip is pushed and the output file plays at is a placeholder.
+    "Vidu S2-Editing": ModelSpec("reactor/vidu-s2-editing", "source", 24.0, "any", False, image_required=True, videos="first",
+                                 video_required=True, source_track="camera", size=(952, 544), keeps_aspect=True, prompted=False,
+                                 prompt_command="switch_reference", switch_image="reference_image",
+                                 beat_settings={"editing_type": Setting("switch_reference", EDIT_TYPES, "style_transfer")}),
 }
 
 
@@ -340,9 +353,10 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
 
     plan.setup[at_start():at_start()] = [*spec.native] + [(spec.settings[name].command, {spec.settings[name].field or name: value})
                                             for name, value in (settings or {}).items()]
-    # A beat's setting goes out only when it changes, so the model's default is never sent.
+    # A beat's setting goes out only when it changes, so the model's default is never sent. A "source" model's
+    # compiler sends its own, as its beats start on source frames rather than chunks.
     held = {name: setting.default for name, setting in spec.beat_settings.items()}
-    for beat, chunk in zip(beats, scheduled_chunks(spec, beats)[1] if spec.beat_settings else []):
+    for beat, chunk in zip(beats, scheduled_chunks(spec, beats)[1] if spec.beat_settings and spec.pattern != "source" else []):
         for name, value in beat.settings.items():
             if value == held[name]:
                 continue
@@ -508,6 +522,27 @@ def compile_x2(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Pla
     return plan
 
 
+def edit_setup(image: bytes, editing_type: str | None) -> list[tuple[str, dict]]:
+    """The command that starts an edit of the camera track from `image`; the model drops a command holding a null."""
+    return [("start_edit", {"reference_image": image, **({"editing_type": editing_type} if editing_type else {})})]
+
+
+def compile_edit(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
+    """An edit of the clip: the first beat starts it, and each later beat switches only the image and edit type it changes."""
+    plan = Plan(setup=edit_setup(beats[0].image, beats[0].settings.get("editing_type")),
+                chunks=sum(beat.frames for beat in beats), source=beats[0].video)
+    image, editing_type = beats[0].image, beats[0].settings.get("editing_type", "style_transfer")
+    for start, beat in zip(itertools.accumulate(beat.frames for beat in beats[:-1]), beats[1:]):
+        switch = {}
+        if beat.image is not None and beat.image != image:
+            switch["reference_image"] = image = beat.image
+        if beat.settings.get("editing_type", editing_type) != editing_type:
+            switch["editing_type"] = editing_type = beat.settings["editing_type"]
+        if switch:
+            plan.timed.append((start, "switch_reference", switch))
+    return plan
+
+
 def data_url(png: bytes) -> str:
     """The image as an inline JPEG `data:` URL.
 
@@ -562,4 +597,4 @@ def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> 
 
 COMPILERS = {"LongLive-2.0": compile_longlive, "Helios": compile_helios, "LingBot": compile_live,
              "LingBot World 2": compile_live, "Visko Orbis Dynamic": compile_live, "Visko Orbis Stable": compile_live,
-             "Sana Streaming": compile_sana, "X2": compile_x2}
+             "Sana Streaming": compile_sana, "X2": compile_x2, "Vidu S2-Editing": compile_edit}

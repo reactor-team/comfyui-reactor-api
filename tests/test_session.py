@@ -369,6 +369,54 @@ async def test_source_frames_are_pushed_in_order(tmp_path, monkeypatch, fast_gra
     assert all(f.shape == (832, 832, 3) and f.dtype == np.uint8 for f in pushed)
 
 
+async def test_an_edit_holds_the_first_frame_until_live_then_plays_the_clip(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=0, whole_chunks=1)
+    sent = fake.send_command
+
+    async def send_command(command, data):
+        reply = await sent(command, data)
+        if command == "start_edit":
+            # The model warms up on a few source frames before it goes live.
+            async def go_live():
+                while len(fake.published.pushed) < 3:
+                    await asyncio.sleep(0.001)
+                fake.handler({"type": "session_state", "data": {"phase": "live"}})
+            asyncio.get_running_loop().create_task(go_live())
+        return reply
+
+    fake.send_command = send_command
+    plan = Plan(setup=[("start_edit", {"reference_image": b"clay"})], chunks=3, source=source_clip([40, 80, 120]))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="Vidu S2-Editing", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    levels = [round(int(f.mean()) / 40) for f in fake.published.pushed]
+    held = levels.index(2)
+    assert held >= 3 and set(levels[:held]) == {1} and levels[held:held + 2] == [2, 3]
+    assert len(frames_in(tmp_path / "out.mp4")) == 3
+
+
+async def test_an_edit_the_model_ends_keeps_the_video_so_far(tmp_path, monkeypatch, fast_grace):
+    fake = FakeReactor(chunks=0, whole_chunks=1)
+    sent = fake.send_command
+
+    async def send_command(command, data):
+        reply = await sent(command, data)
+        if command == "start_edit":
+            fake.handler({"type": "session_state", "data": {"phase": "live"}})
+        return reply
+
+    def on_push(pushed):
+        fake.track.push(np.full((16, 16, 3), 255, dtype=np.uint8))
+        if pushed == 3:
+            fake.handler({"type": "session_state", "data": {"phase": "ended", "end_reason": "max_duration"}})
+
+    fake.send_command = send_command
+    fake._return_whole_chunks = on_push
+    plan = Plan(setup=[("start_edit", {"reference_image": b"clay"})], chunks=10, source=source_clip([40] * 10))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="Vidu S2-Editing", fps=1000)
+    await asyncio.wait_for(coro, timeout=10)
+    assert 0 < len(frames_in(tmp_path / "out.mp4")) < 10
+
+
 async def test_source_frames_past_the_planned_count_are_never_pushed(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=2, frames=1)
     plan = Plan(setup=[], chunks=2, source=source_clip([i * 40 for i in range(6)]))

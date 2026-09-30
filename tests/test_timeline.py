@@ -172,6 +172,28 @@ def test_x2_without_an_image_sends_no_reference_image():
     assert plan.setup == [("set_keep_backlog", {"keep_backlog": True}), ("set_prompt", {"prompt": "a"})]
 
 
+def test_an_edit_starts_from_the_first_image_and_switches_only_what_a_later_beat_changes():
+    beats = [Beat("", 48, video=b"mp4", image=b"clay", settings={"editing_type": "style_transfer"}),
+             Beat("", 24, settings={"editing_type": "style_transfer"}),
+             Beat("", 24, image=b"jacket", settings={"editing_type": "virtual_tryon"}),
+             Beat("", 24, image=b"jacket", settings={"editing_type": "background_replacement"})]
+    plan = compile_timeline("Vidu S2-Editing", beats, seed=0)
+    assert plan.setup == [("start_edit", {"reference_image": b"clay", "editing_type": "style_transfer"})]
+    assert plan.timed == [(72, "switch_reference", {"reference_image": b"jacket", "editing_type": "virtual_tryon"}),
+                          (96, "switch_reference", {"editing_type": "background_replacement"})]
+    assert plan.chunks == 120 and plan.source == b"mp4"
+
+
+def test_an_edit_without_an_edit_type_sends_none():
+    plan = compile_timeline("Vidu S2-Editing", [Beat("", 48, video=b"mp4", image=b"clay")], seed=0)
+    assert plan.setup == [("start_edit", {"reference_image": b"clay"})]
+
+
+def test_an_edit_needs_a_reference_image():
+    with pytest.raises(ValueError, match="needs an image on the first beat"):
+        compile_timeline("Vidu S2-Editing", [Beat("", 48, video=b"mp4")], seed=0)
+
+
 def test_a_model_without_video_rejects_one():
     with pytest.raises(ValueError, match="LongLive-2.0 does not take a source video"):
         compile_timeline("LongLive-2.0", [Beat("a", 120, video=b"mp4")], seed=0)

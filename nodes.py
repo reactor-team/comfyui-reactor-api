@@ -90,7 +90,7 @@ def chain_node(family: str) -> type[io.ComfyNode]:
                             "and feed the last one to Reactor Render, and to a Reactor Timeline to see it.",
                 inputs=[
                     *([io.Combo.Input("model", options=models, tooltip="The model the chain runs on. Read on the first link.")] if len(models) > 1 else []),
-                    io.String.Input("prompt", multiline=True),
+                    *([io.String.Input("prompt", multiline=True)] if spec.prompted else []),
                     io.Int.Input("frames", default=max(1, round(120 / step)) * step, min=1, max=100000, step=step,
                                  tooltip="How many frames of video this beat plays. It starts where the beat before it in the chain ends"
                                          + ("; both ends round to the nearest chunk." + length if spec.frames_per_chunk else ".")),
@@ -115,7 +115,7 @@ def chain_node(family: str) -> type[io.ComfyNode]:
             )
 
         @classmethod
-        def execute(cls, prompt, frames, model=models[0], chain=None, kind="shot", image=None, video=None, moves=None, references=None, **settings) -> io.NodeOutput:
+        def execute(cls, frames, prompt="", model=models[0], chain=None, kind="shot", image=None, video=None, moves=None, references=None, **settings) -> io.NodeOutput:
             # A later link's model and start settings are the first link's, so its own are not read.
             name = model if chain is None else chain.model
             if name not in models:
@@ -285,7 +285,8 @@ async def live_socket(request):
 
 
 async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str, dict]],
-                      clip: list[np.ndarray] | None, filename_prefix: str, camera: str | None = None) -> io.NodeOutput:
+                      clip: list[np.ndarray] | None, filename_prefix: str, camera: str | None = None,
+                      settings: dict[str, object] | None = None) -> io.NodeOutput:
     """A new take recorded in a live run, saved under the output directory like SaveVideo's files."""
     sid = PromptServer.instance.client_id
     if sid is None:
@@ -297,7 +298,7 @@ async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str,
     # The browser asks its camera for this size, a 16:9 frame at the model's native size, and holds
     # it: a live session dies on a resolution change mid-chunk.
     input_size = spec.frame_size(1920, 1080) if mode == "style" and clip is None else None
-    run = live.LiveRun(mode, spec, path, prompt, setup, input_size, connect_args(), clip)
+    run = live.LiveRun(mode, spec, path, prompt, setup, input_size, connect_args(), clip, settings)
     live.RUNS[run.run_id] = run
     try:
         PromptServer.instance.send_sync("reactor.live.open",
@@ -331,8 +332,8 @@ def live_option(name: str) -> io.DynamicCombo.Option:
     spec = MODELS[name]
     source = spec.pattern == "source"
     return io.DynamicCombo.Option(name, [
-        io.String.Input("prompt", multiline=True, tooltip="What you say to the character first." if spec.pattern == "call"
-                        else "The prompt the video starts from. Change it in the window as it plays."),
+        *([io.String.Input("prompt", multiline=True, tooltip="What you say to the character first." if spec.pattern == "call"
+                           else "The prompt the video starts from. Change it in the window as it plays.")] if spec.prompted else []),
         *([io.Image.Input("image", optional=not spec.image_required,
                           tooltip="The person the character is made from." if spec.pattern == "call" else "Reference image.")]
           if spec.images != "none" else []),
@@ -340,7 +341,8 @@ def live_option(name: str) -> io.DynamicCombo.Option:
            ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera instead of a clip.")]
           if source else []),
         *[setting_input(key, setting, "Read at start.") for key, setting in spec.settings.items()],
-        *[setting_input(key, setting, "Read at start.") for key, setting in spec.beat_settings.items()],
+        *[setting_input(key, setting, "Read at start." if spec.prompted else "Change it in the window as it plays.")
+          for key, setting in spec.beat_settings.items()],
     ])
 
 
@@ -374,23 +376,25 @@ class ReactorRealtime(io.ComfyNode):
 
     @classmethod
     async def execute(cls, model, seed, filename_prefix) -> io.NodeOutput:
-        name, prompt, image, video, camera = model["model"], model["prompt"], model.get("image"), model.get("video"), model.get("camera")
+        name, prompt, image, video, camera = model["model"], model.get("prompt", ""), model.get("image"), model.get("video"), model.get("camera")
         spec = MODELS[name]
         settings = {key: model[key] for key in spec.settings if model.get(key) is not None}
+        beat_settings = {key: model[key] for key in spec.beat_settings if model.get(key) is not None}
         png = None if image is None else spec.fit_png(image_to_png(image))
         if spec.pattern == "call":
             return await live_output("call", name, prompt, call_setup(name, png, settings), None, filename_prefix)
         if spec.pattern != "source":
-            beat = Beat(prompt, 1, image=png, settings={key: model[key] for key in spec.beat_settings if model.get(key) is not None})
+            beat = Beat(prompt, 1, image=png, settings=beat_settings)
             return await live_output("drive", name, prompt, live.drive_setup(name, beat, seed, settings), None, filename_prefix)
         if (video is None) == (camera is None):
-            raise ValueError(f"{name} restyles one source: connect a video or a Reactor Camera Capture.")
+            raise ValueError(f"{name} edits one source: connect a video or a Reactor Camera Capture.")
         clip = None
         if video is not None:
             # Converted off the loop: a long clip would stall the server's other requests.
             clip = await asyncio.to_thread(lambda: [np.asarray(spec.fit(Image.fromarray(np.clip(255.0 * f.cpu().numpy(), 0, 255).astype(np.uint8))))
                                                     for f in video.get_components().images])
-        return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png), clip, filename_prefix, camera)
+        return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png, beat_settings), clip, filename_prefix,
+                                 camera, beat_settings)
 
 
 class ReactorExtension(ComfyExtension):

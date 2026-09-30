@@ -22,7 +22,8 @@ const STYLE = `
 .reactor-live-key.up { grid-row: 1; }
 .reactor-live-key.on { opacity: 1; background: var(--p-primary-color, #3b82f6); border-color: var(--p-primary-color, #3b82f6); color: #fff; }
 .reactor-live-stats { opacity: 0.6; font-variant-numeric: tabular-nums; }
-.reactor-live textarea, .reactor-live button { background: var(--comfy-input-bg); color: var(--input-text); border: 1px solid var(--border-color); border-radius: 3px; font: inherit; }
+.reactor-live-switch { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.reactor-live textarea, .reactor-live button, .reactor-live select { background: var(--comfy-input-bg); color: var(--input-text); border: 1px solid var(--border-color); border-radius: 3px; font: inherit; }
 .reactor-live textarea { min-height: 52px; resize: vertical; }
 .reactor-live button { padding: 4px 12px; cursor: pointer; }
 .reactor-live button:disabled { cursor: default; opacity: 0.5; }
@@ -60,11 +61,13 @@ function openLive({ run_id, mode, title, camera }) {
                       pad([null, ["ArrowUp", "↑"], null], [["ArrowLeft", "←"], ["ArrowDown", "↓"], ["ArrowRight", "→"]]));
     const stats = el("div", { className: "reactor-live-stats" });
     const prompt = el("textarea");
+    // Controls for a model steered by an image and settings instead of a prompt, filled from the config.
+    const switcher = el("div", { className: "reactor-live-switch", hidden: true });
     const apply = el("button", { textContent: "Apply", disabled: true });
     const done = el("button", { textContent: "Done" });
     const cancel = el("button", { textContent: "Cancel" });
     const buttons = el("div", { className: "reactor-live-row" }, done, cancel);
-    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, prompt,
+    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, prompt, switcher,
                          el("div", { className: "reactor-live-row end" }, apply), buttons, stats));
     document.body.append(backdrop);
 
@@ -77,6 +80,7 @@ function openLive({ run_id, mode, title, camera }) {
     let lanes = [];          // the model's drive lanes, from the config
     let promptCommand = null;
     let promptField = null;
+    let switchControls = null;   // the switch's image field and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
     const lastSent = new Map();  // each lane's field to the value last sent
     let reactor = null;      // this browser's own client in the session
@@ -306,6 +310,18 @@ function openLive({ run_id, mode, title, camera }) {
             }
             for (const pad of [...legend.children]) if (!pad.children.length) pad.remove();
             prompt.value = message.prompt;
+            if (message.switch) {
+                prompt.hidden = true;
+                const file = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", title: "A new reference image" });
+                const pickers = message.switch.settings.map((setting) => {
+                    const select = el("select", { title: setting.field },
+                                      ...setting.options.map((option) => el("option", { value: option, textContent: option, selected: option === setting.value })));
+                    return { setting, select, sent: setting.value };
+                });
+                switchControls = { image: message.switch.image, file, pickers };
+                switcher.append(...pickers.map(({ select }) => select), el("label", { textContent: "New image " }, file));
+                switcher.hidden = false;
+            }
             if (caps.size) {
                 legend.hidden = false;
                 preview.tabIndex = 0;
@@ -355,11 +371,30 @@ function openLive({ run_id, mode, title, camera }) {
         else stay("Connection lost.", true);
     });
 
-    apply.onclick = () => {
+    apply.onclick = async () => {
+        if (switchControls) return void switchTo(switchControls);
         command(promptCommand, { [promptField]: prompt.value });
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
     };
+    // Sends only what changed, once: the model keeps the previous look when a switch fails.
+    async function switchTo({ image, file, pickers }) {
+        const data = {};
+        for (const picker of pickers) if (picker.select.value !== picker.sent) data[picker.setting.field] = picker.select.value;
+        apply.disabled = true;
+        try {
+            if (file.files[0]) data[image] = await reactor.uploadFile(file.files[0]);
+        } catch (e) {
+            status.textContent = `That image could not be uploaded: ${e?.message ?? e}`;
+            return;
+        } finally {
+            apply.disabled = false;
+        }
+        if (!Object.keys(data).length) return;
+        command(promptCommand, data);
+        for (const picker of pickers) picker.sent = picker.select.value;
+        file.value = "";
+    }
     done.onclick = () => {
         done.disabled = true;
         send({ type: "done" });

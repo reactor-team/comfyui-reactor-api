@@ -54,8 +54,8 @@ To choose:
   model takes mid-run is a `beat_settings` entry.
 - A single value that applies to the whole run → a `settings` entry, read on the first link.
 - A value with several fields of its own → that model's factory node, into a chain input.
-- Every chain node has prompt and frames. Other inputs appear only on the nodes whose models take
-  them.
+- Every chain node has frames, and a prompt unless its model takes none (`prompted`). Other inputs
+  appear only on the nodes whose models take them.
 - A shared node takes something only when most models take it in the same shape. Until then it
   stays with the model.
 

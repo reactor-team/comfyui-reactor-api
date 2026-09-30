@@ -31,10 +31,10 @@ DISCONNECT_TIMEOUT_SECONDS = 10.0
 # How often a render reports progress, with its newest frame as a preview.
 PROGRESS_INTERVAL_SECONDS = 0.125
 
-# The phase each of a call's setup commands ends in, and how long it may take. Creating an avatar
-# took 33 s on a cloud session.
-CALL_PHASES = {"create_avatar": "avatar_ready", "start_call": "live"}
-CALL_SETUP_SECONDS = 180.0
+# The phase each setup command that reports one through `session_state` ends in, and how long it may
+# take. Creating an avatar took 33 s on a cloud session.
+SETUP_PHASES = {"create_avatar": "avatar_ready", "start_call": "live", "start_edit": "live"}
+SETUP_SECONDS = 180.0
 # A reply is over once the character's sound has been quiet this long; replies measured on cloud
 # sessions paused at most 0.5 s, and began about 3 s after the line was said.
 REPLY_QUIET_SECONDS = 1.0
@@ -146,17 +146,19 @@ async def run_chunked(session: Session, spec: ModelSpec, plan: Plan) -> None:
 
 async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
     """Drive a model that transforms a live source track; its clock is the source frames pushed."""
+    # The clip decodes on a thread: a blocking PyAV decode between pushes would starve the message loop.
+    frames = await asyncio.to_thread(
+        lambda: [np.asarray(spec.fit(f.to_image())) for f in av.open(io.BytesIO(plan.source)).decode(video=0)])
     # The source track is up before setup, so a model's `start` finds it.
     track = await session.reactor.publish_track(spec.source_track)
     for command, data in plan.setup:
         await session.send(command, data)
+        if command in SETUP_PHASES:
+            await hold_until(session, spec, track, frames[0], SETUP_PHASES[command])
     timed = sorted(plan.timed, key=lambda t: t[0])
     session.capturing = True
     pushed = 0
     model_done_at = None
-    # The clip decodes on a thread: a blocking PyAV decode between pushes would starve the message loop.
-    frames = await asyncio.to_thread(
-        lambda: [np.asarray(spec.fit(f.to_image())) for f in av.open(io.BytesIO(plan.source)).decode(video=0)])
     clip = min(len(frames), plan.chunks)
     # A model can hold back the clip's tail (it generates whole chunks, and frames sit in flight), so the last
     # frame repeats until the clip's length is back; the writer's limit drops what the repeats produce.
@@ -175,6 +177,14 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
         next_frame_at += 1 / spec.fps
         # The wait between frames is the message wait, so a polled message never stalls the pacing.
         msg = await session.next_message(max(next_frame_at - time.monotonic(), 0.0))
+        try:
+            session_phase(msg)
+        except SessionEnded as e:
+            if e.phase != "ended":
+                raise
+            # An edit has a time limit, and the video keeps what came before it.
+            logging.warning("Reactor: %s; the video ends there.", e)
+            break
         if msg is not None and msg.get("type") in ("generation_complete", "generation_stopped"):
             model_done_at = model_done_at or time.monotonic()
         track.push_frame(frames[min(pushed, clip - 1)])
@@ -185,13 +195,37 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
         await session.next_message()
 
 
-def call_phase(msg: dict | None) -> str | None:
-    """The phase a call's `session_state` reports, if `msg` is one. Raises once the call has failed or ended."""
+class SessionEnded(RuntimeError):
+    """The model ended its call or edit on its own, or it failed; `phase` says which."""
+
+    def __init__(self, phase: str, reason: object):
+        # `last_error` is an object with a `reason` on some models, and a string on others.
+        reason = reason.get("reason") if isinstance(reason, dict) else reason
+        super().__init__(f"The session {phase}: {reason}")
+        self.phase = phase
+
+
+async def hold_until(session: Session, spec: ModelSpec, track, frame: np.ndarray, phase: str) -> None:
+    """Push `frame` at the model's frame rate until the session reaches `phase`, so a model that needs its
+    source flowing to get there has it, and the clip itself starts once the model takes it."""
+    give_up = time.monotonic() + SETUP_SECONDS
+    next_frame_at = time.monotonic()
+    while True:
+        if time.monotonic() > give_up:
+            raise RuntimeError(f"The session never reached {phase}.")
+        next_frame_at += 1 / spec.fps
+        if session_phase(await session.next_message(max(next_frame_at - time.monotonic(), 0.0))) == phase:
+            return
+        track.push_frame(frame)
+
+
+def session_phase(msg: dict | None) -> str | None:
+    """The phase a `session_state` reports, if `msg` is one. Raises SessionEnded once the session has failed or ended."""
     if msg is None or msg.get("type") != "session_state":
         return None
     data = msg.get("data") or {}
     if data.get("phase") in ("failed", "ended"):
-        raise RuntimeError(f"The avatar call {data['phase']}: {data.get('last_error') or data.get('end_reason')}")
+        raise SessionEnded(data["phase"], data.get("last_error") or data.get("end_reason"))
     return data.get("phase")
 
 
@@ -199,10 +233,10 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
     """Drive a call model; its clock is the character's replies, each over once its sound goes quiet and its hold has played."""
     for command, data in plan.setup:
         await session.send(command, data)
-        give_up = time.monotonic() + CALL_SETUP_SECONDS
-        while call_phase(await session.next_message()) != CALL_PHASES[command]:
+        give_up = time.monotonic() + SETUP_SECONDS
+        while session_phase(await session.next_message()) != SETUP_PHASES[command]:
             if time.monotonic() > give_up:
-                raise RuntimeError(f"The avatar call never reached {CALL_PHASES[command]}.")
+                raise RuntimeError(f"The session never reached {SETUP_PHASES[command]}.")
     # Observed on cloud sessions: a live call keeps streaming the connect placeholder for a few
     # seconds, until the character appears at a size of its own.
     placeholder = session.frame_shape
@@ -210,7 +244,7 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
     while session.frame_shape == placeholder:
         if time.monotonic() > give_up:
             raise RuntimeError("The avatar never appeared.")
-        call_phase(await session.next_message(timeout=0.05))
+        session_phase(await session.next_message(timeout=0.05))
     session.capturing = True
     session.writer.fill_gaps = True
     session.planned = sum(max(hold, round(REPLY_ESTIMATE_SECONDS * spec.fps)) for hold in plan.holds)
@@ -226,7 +260,7 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
                or session.writer.received < held):
             if session.sounded_at <= since and time.monotonic() > give_up:
                 raise RuntimeError("The avatar never answered.")
-            call_phase(await session.next_message())
+            session_phase(await session.next_message())
 
 
 RUNNERS = {"chunked": run_chunked, "source": run_source, "call": run_call}

@@ -34,6 +34,9 @@ PROGRESS_INTERVAL_SECONDS = 0.125
 # The phase each setup command that reports one through `session_state` ends in, and how long it may
 # take. Creating an avatar took 33 s on a cloud session.
 SETUP_PHASES = {"create_avatar": "avatar_ready", "start_call": "live", "start_edit": "live"}
+# The snapshot flag that turns true once the model's output has started, for a setup whose phase comes first:
+# a live edit streams a dark placeholder until its first edited frame (docs: vidu-s2-editing/schema).
+SETUP_READY = {"start_edit": "video_receiving"}
 SETUP_SECONDS = 180.0
 # A reply is over once the character's sound has been quiet this long; replies measured on cloud
 # sessions paused at most 0.5 s, and began about 3 s after the line was said.
@@ -154,7 +157,7 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
     for command, data in plan.setup:
         await session.send(command, data)
         if command in SETUP_PHASES:
-            await hold_until(session, spec, track, frames[0], SETUP_PHASES[command])
+            await hold_until(session, spec, track, frames[0], SETUP_PHASES[command], SETUP_READY.get(command))
     timed = sorted(plan.timed, key=lambda t: t[0])
     session.capturing = True
     pushed = 0
@@ -205,16 +208,17 @@ class SessionEnded(RuntimeError):
         self.phase = phase
 
 
-async def hold_until(session: Session, spec: ModelSpec, track, frame: np.ndarray, phase: str) -> None:
-    """Push `frame` at the model's frame rate until the session reaches `phase`, so a model that needs its
-    source flowing to get there has it, and the clip itself starts once the model takes it."""
+async def hold_until(session: Session, spec: ModelSpec, track, frame: np.ndarray, phase: str, ready: str | None = None) -> None:
+    """Push `frame` at the model's frame rate until the session reaches `phase`, with its `ready` flag set if one is
+    given, so a model that needs its source flowing to get there has it, and the clip itself starts once the model takes it."""
     give_up = time.monotonic() + SETUP_SECONDS
     next_frame_at = time.monotonic()
     while True:
         if time.monotonic() > give_up:
-            raise RuntimeError(f"The session never reached {phase}.")
+            raise RuntimeError(f"The session never reached {phase}{f' with {ready}' if ready else ''}.")
         next_frame_at += 1 / spec.fps
-        if session_phase(await session.next_message(max(next_frame_at - time.monotonic(), 0.0))) == phase:
+        msg = await session.next_message(max(next_frame_at - time.monotonic(), 0.0))
+        if session_phase(msg) == phase and (ready is None or msg["data"].get(ready)):
             return
         track.push_frame(frame)
 

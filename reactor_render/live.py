@@ -13,7 +13,7 @@ import numpy as np
 from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
 
 from .encode import FrameWriter
-from .session import (SETUP_PHASES, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
+from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       closing_session, connect_with_retry)
 from .timeline import MODELS, Beat, ModelSpec, compile_timeline, edit_setup
 
@@ -260,7 +260,7 @@ class LiveRun:
                         await self._send_command(command, data)
                         if command in SETUP_PHASES:
                             self._status("Starting the call…" if self.mode == "call" else "Starting…")
-                            await self._wait_for_phase(SETUP_PHASES[command], check_interrupt)
+                            await self._wait_for_phase(SETUP_PHASES[command], SETUP_READY.get(command), check_interrupt)
                     if self.mode == "call":
                         await self._wait_for_character(check_interrupt)
                         writer.fill_gaps = True
@@ -325,19 +325,19 @@ class LiveRun:
                     return
             await asyncio.sleep(0.1)
 
-    async def _wait_for_phase(self, phase: str, check_interrupt) -> None:
+    async def _wait_for_phase(self, phase: str, ready: str | None, check_interrupt) -> None:
         give_up = time.monotonic() + SETUP_SECONDS
         while True:
             check_interrupt()
             if self._finished.is_set():
                 raise RuntimeError(self._error or "Cancelled.")
             if time.monotonic() > give_up:
-                raise RuntimeError(f"The session never reached {phase}.")
+                raise RuntimeError(f"The session never reached {phase}{f' with {ready}' if ready else ''}.")
             try:
                 msg = await asyncio.wait_for(self._messages.get(), timeout=0.25)
             except asyncio.TimeoutError:
                 continue
-            if session_phase(msg) == phase:
+            if session_phase(msg) == phase and (ready is None or msg["data"].get(ready)):
                 return
 
     async def _wait_for_character(self, check_interrupt) -> None:

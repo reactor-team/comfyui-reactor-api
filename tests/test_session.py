@@ -369,18 +369,19 @@ async def test_source_frames_are_pushed_in_order(tmp_path, monkeypatch, fast_gra
     assert all(f.shape == (832, 832, 3) and f.dtype == np.uint8 for f in pushed)
 
 
-async def test_an_edit_holds_the_first_frame_until_live_then_plays_the_clip(tmp_path, monkeypatch, fast_grace):
+async def test_an_edit_holds_the_first_frame_until_edited_video_arrives_then_plays_the_clip(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=0, whole_chunks=1)
     sent = fake.send_command
 
     async def send_command(command, data):
         reply = await sent(command, data)
         if command == "start_edit":
-            # The model warms up on a few source frames before it goes live.
+            # The model warms up on a few source frames, goes live, and edits a few more before its output starts.
             async def go_live():
-                while len(fake.published.pushed) < 3:
-                    await asyncio.sleep(0.001)
-                fake.handler({"type": "session_state", "data": {"phase": "live"}})
+                for pushed, receiving in ((3, False), (6, True)):
+                    while len(fake.published.pushed) < pushed:
+                        await asyncio.sleep(0.001)
+                    fake.handler({"type": "session_state", "data": {"phase": "live", "video_receiving": receiving}})
             asyncio.get_running_loop().create_task(go_live())
         return reply
 
@@ -390,7 +391,7 @@ async def test_an_edit_holds_the_first_frame_until_live_then_plays_the_clip(tmp_
     await asyncio.wait_for(coro, timeout=10)
     levels = [round(int(f.mean()) / 40) for f in fake.published.pushed]
     held = levels.index(2)
-    assert held >= 3 and set(levels[:held]) == {1} and levels[held:held + 2] == [2, 3]
+    assert held >= 6 and set(levels[:held]) == {1} and levels[held:held + 2] == [2, 3]
     assert len(frames_in(tmp_path / "out.mp4")) == 3
 
 
@@ -401,7 +402,7 @@ async def test_an_edit_the_model_ends_keeps_the_video_so_far(tmp_path, monkeypat
     async def send_command(command, data):
         reply = await sent(command, data)
         if command == "start_edit":
-            fake.handler({"type": "session_state", "data": {"phase": "live"}})
+            fake.handler({"type": "session_state", "data": {"phase": "live", "video_receiving": True}})
         return reply
 
     def on_push(pushed):

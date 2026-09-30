@@ -24,8 +24,8 @@ BROWSER_TIMEOUT_SECONDS = 60.0
 INPUT_FPS = 24
 # How often the browser gets the model connection's stats.
 STATS_INTERVAL_SECONDS = 1.0
-# How long the browser gets to join the session and publish its camera.
-PUBLISH_TIMEOUT_SECONDS = 30.0
+# How long the browser gets to join the session and publish its camera, retries included.
+PUBLISH_TIMEOUT_SECONDS = 60.0
 
 OPEN_TAB_ERROR = "Open this workflow in a ComfyUI browser tab to record a live take."
 

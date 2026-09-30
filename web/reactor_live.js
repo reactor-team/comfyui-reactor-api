@@ -274,7 +274,18 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         }
         if (!join.publish || closed) return;
         const track = mic ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
-        await reactor.publishTrack(join.publish, track);
+        // The SDK gives up on a publish after a fixed 10 s, which a slow link can miss; try again before failing.
+        for (let attempt = 1; ; attempt++) {
+            try {
+                await reactor.publishTrack(join.publish, track);
+                break;
+            } catch (e) {
+                if (attempt === 3 || closed || !/timed out/.test(e?.message ?? e)) throw e;
+                console.warn(`Reactor: publishing ${join.publish} timed out, retrying.`, e);
+                await reactor.unpublishTrack(join.publish);
+            }
+        }
+        if (closed) return;
         const sender = reactor.getPeerConnection()?.getSenders().find((s) => s.track === track);
         if (sender && !mic) {
             // The model's input size is fixed for the session: drop frames on a slow link, never resolution.

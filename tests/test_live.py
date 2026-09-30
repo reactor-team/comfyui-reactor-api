@@ -15,6 +15,13 @@ WORLD_2 = MODELS["LingBot World 2"]
 LINGBOT = MODELS["LingBot"]
 
 
+def test_model_tracks_list_the_source_track_only_for_models_that_take_one():
+    assert live.model_tracks(MODELS["Sana Streaming"]) == [
+        {"name": "camera", "kind": "video", "direction": "sendonly"},
+        {"name": "main_video", "kind": "video", "direction": "recvonly"}]
+    assert live.model_tracks(WORLD_2) == [{"name": "main_video", "kind": "video", "direction": "recvonly"}]
+
+
 def lane(spec, field):
     return next(lane for lane in live.drive_lanes(spec) if lane["field"] == field)
 
@@ -167,7 +174,7 @@ async def test_a_camera_run_has_the_browser_publish_and_records_the_take(tmp_pat
     assert not run.connected(lambda m: None)
     assert await until(lambda: join(sent) is not None)
     assert join(sent) == {"type": "join", "model": "xmax/x2", "session_id": "session-1", "jwt": "jwt-test",
-                          "local": False, "publish": MODELS["X2"].source_track}
+                          "local": False, "tracks": live.model_tracks(MODELS["X2"]), "publish": "source"}
     assert fake.tokens == [("rk_test", "xmax/x2", "session-1")]
     # Setup waits for the browser's camera, and the server never publishes one of its own.
     await asyncio.sleep(0.1)

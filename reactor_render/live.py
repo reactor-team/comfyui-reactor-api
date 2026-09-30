@@ -31,6 +31,13 @@ OPEN_TAB_ERROR = "Open this workflow in a ComfyUI browser tab to record a live t
 RUNS: dict[str, "LiveRun"] = {}
 
 
+def model_tracks(spec: ModelSpec) -> list[dict]:
+    """The session's media tracks for a model, as the JS SDK's `modelTracks` must list them: its
+    source track, if it takes one, and the video it plays."""
+    source = [{"name": spec.source_track, "kind": "video", "direction": "sendonly"}] if spec.source_track else []
+    return source + [{"name": "main_video", "kind": "video", "direction": "recvonly"}]
+
+
 def session_token(api_key: str, model: str, session_id: str, api_url: str = DEFAULT_API_URL) -> str:
     """A token that can join only this session, for the browser to watch it and publish its camera."""
     body = {"expires_after": LIVE_SESSION_LIMIT_SECONDS + 60,
@@ -198,7 +205,8 @@ class LiveRun:
                     jwt = None if "api_key" not in self.connect else await asyncio.to_thread(
                         session_token, self.connect["api_key"], self.spec.slug, reactor.session_id)
                     self._send_json({"type": "join", "model": self.spec.slug, "session_id": reactor.session_id, "jwt": jwt,
-                                     "local": "api_key" not in self.connect, "publish": self.spec.source_track if camera else None})
+                                     "local": "api_key" not in self.connect, "tracks": model_tracks(self.spec),
+                                     "publish": self.spec.source_track if camera else None})
                     source = None
                     if camera:
                         await self._poll(self._published, PUBLISH_TIMEOUT_SECONDS,

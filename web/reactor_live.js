@@ -227,7 +227,7 @@ function openLive({ run_id, mode, title, camera }) {
         }
         const { Reactor } = await import("./vendor/reactor-sdk.mjs");
         if (closed) return;
-        reactor = new Reactor({ modelName: join.model, local: join.local, ...(join.publish ? {} : { modelTracks: [{ name: "main_video", kind: "video", direction: "recvonly" }] }) });
+        reactor = new Reactor({ modelName: join.model, local: join.local, modelTracks: join.tracks });
         reactor.on("trackReceived", (name, track, media) => {
             if (name !== join.publish && track.kind === "video") output.srcObject = media;
         });

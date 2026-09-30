@@ -90,6 +90,7 @@ class FakeLiveReactor:
         self.published = None
         self.disconnected = False
         self.track = RecvTrack()
+        self.events = {}
 
     def __call__(self, slug, **connect):
         self.slug, self.options = slug, connect
@@ -101,6 +102,13 @@ class FakeLiveReactor:
 
     def on_message(self, func):
         self.message_handler = func
+        return func
+
+    def on(self, event, func):
+        self.events[event] = func
+
+    def on_error(self, func):
+        self.events["error"] = func
         return func
 
     def on_status(self, status):
@@ -283,6 +291,22 @@ async def test_a_dropped_session_ends_the_run_and_tells_the_browser(tmp_path, mo
         await asyncio.wait_for(task, 10)
     assert [m for m in texts(sent) if m["type"] == "ended"] == [
         {"type": "ended", "error": "The Reactor session ended unexpectedly."}]
+
+
+async def test_reactor_ending_the_session_ends_the_run_with_its_reason(tmp_path, monkeypatch):
+    reason = "Session ended: your credits ran out. Add more to continue."
+    fake = FakeLiveReactor()
+    run = make_run(fake, monkeypatch, "drive", "LongLive-2.0", tmp_path / "take.mp4")
+    task = asyncio.create_task(run.run(lambda: None))
+    sent = []
+    run.connected(sent.append)
+    assert await until(lambda: run._writer is not None and run._writer.received > 0)
+    # Reactor sends its reason just before the transport closes.
+    fake.events["runtime_message"]({"type": "sessionEnded", "data": {"reason": reason}})
+    fake.dropped("disconnected")
+    with pytest.raises(RuntimeError, match=reason):
+        await asyncio.wait_for(task, 10)
+    assert [m for m in texts(sent) if m["type"] == "ended"] == [{"type": "ended", "error": reason}]
 
 
 async def test_a_local_runtime_is_joined_without_a_token(tmp_path, monkeypatch):

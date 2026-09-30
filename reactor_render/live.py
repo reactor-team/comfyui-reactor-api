@@ -5,6 +5,7 @@ import json
 import logging
 import threading
 import time
+import urllib.error
 import urllib.request
 import uuid
 from dataclasses import replace
@@ -14,7 +15,7 @@ from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
 
 from .encode import FrameWriter
 from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
-                      closing_session, connect_with_retry)
+                      api_message, closing_session, connect_with_retry, watch_for_failure)
 from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_setup
 
 # A live take is capped at half an hour; the SDK ends the session when the token hits this.
@@ -52,8 +53,11 @@ def session_token(api_key: str, model: str, session_id: str, api_url: str = DEFA
             "authorization_details": [{"type": "session", "resources": {"models": {"match": [model]}, "sessions": {"bind": [session_id]}}}]}
     request = urllib.request.Request(f"{api_url.rstrip('/')}/tokens", data=json.dumps(body).encode(), method="POST",
                                      headers={"Reactor-API-Key": api_key, "Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.loads(response.read())["jwt"]
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read())["jwt"]
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Reactor refused a token for the browser ({e.code}): {api_message(e.read().decode(errors='replace'))}") from e
 
 
 # Each two-way camera lane with its keys and options: (field, negative key, positive key, negative option, positive option).
@@ -229,6 +233,8 @@ class LiveRun:
         @reactor.on_message
         def queue_message(msg: dict) -> None:
             self._loop.call_soon_threadsafe(self._messages.put_nowait, msg)
+
+        watch_for_failure(reactor, lambda reason: self._loop.call_soon_threadsafe(self._dropped, reason))
 
         @reactor.on_status(ReactorStatus.DISCONNECTED)
         def dropped(_) -> None:
@@ -412,10 +418,10 @@ class LiveRun:
             self._error = error or "Cancelled."
         self._finished.set()
 
-    def _dropped(self) -> None:
+    def _dropped(self, reason: str = "The Reactor session ended unexpectedly.") -> None:
         """The server's side of the session went away mid-run; the take ends with what it has."""
         if self._watching:
-            self._cancel("The Reactor session ended unexpectedly.")
+            self._cancel(reason)
 
     def _finish(self, error: str | None) -> None:
         if not self.ended:

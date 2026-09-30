@@ -108,6 +108,16 @@ function openLive({ run_id, mode, title, camera, microphone }) {
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
 
+    // What to show for an SDK error: the sentence in the Reactor API reply it carries, with its link, or its own message.
+    function errorText(e) {
+        const text = e?.message ?? String(e);
+        try {
+            const body = JSON.parse(text.slice(text.indexOf("{")));
+            if (body?.message) return [body.message, body.url].filter(Boolean).join(" ");
+        } catch {}
+        return text;
+    }
+
     function stopKeys() {
         window.removeEventListener("keydown", onKeyDown, true);
         window.removeEventListener("keyup", onKeyUp, true);
@@ -151,7 +161,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     function command(name, data) {
         reactor?.sendCommand(name, data).then((reply) => {
             if (reply?.type === "command_error") status.textContent = `Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`;
-        });
+        }, (e) => { status.textContent = `Sending ${name} failed: ${errorText(e)}`; });
     }
 
     // Each lane follows the first of its key pairs with exactly one key held, and rests at idle otherwise.
@@ -282,11 +292,23 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         });
         reactor.on("statsUpdate", (stats) => { own = stats; });
         let joined = false;
+        // Why the session went away, when Reactor or the SDK said: the reason Reactor ended it, or the last error.
+        let lost = null;
+        reactor.on("runtimeMessage", (message) => {
+            if (message?.type === "sessionEnded") lost = message.data?.reason || "Reactor ended the session.";
+        });
+        reactor.on("error", (e) => {
+            console.error("Reactor:", e);
+            if (e?.recoverable || tornDown) return;
+            lost ??= errorText(e);
+            status.textContent = lost;
+            status.classList.add("error");
+        });
         const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
             if (s === "ready") resolve();
             // This browser's side dropped: end the run on the server too, so neither side outlives the other.
             if (s === "disconnected" && joined && !tornDown) {
-                const error = "This browser lost its connection to the Reactor session.";
+                const error = lost ?? "This browser lost its connection to the Reactor session.";
                 send({ type: "cancel", error });
                 teardown();
                 stay(error, true);
@@ -298,7 +320,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             joined = true;
         } catch (e) {
             console.error("Reactor: this browser could not join the session.", e);
-            throw new Error(`This browser could not join the Reactor session: ${e?.message ?? e}`);
+            throw new Error(`This browser could not join the Reactor session: ${errorText(e)}`);
         }
         keepPreview(join.tracks.filter((track) => track.direction === "recvonly").map((track) => track.name)).catch(() => {});
         if (!join.publish || closed) return;
@@ -503,7 +525,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             look.commit();
             status.textContent = "Switched; the new look shows in a moment.";
         } catch (e) {
-            status.textContent = `The switch failed: ${e?.message ?? e}`;
+            status.textContent = `The switch failed: ${errorText(e)}`;
         } finally {
             look.busy = false;
             apply.textContent = "Apply";

@@ -7,7 +7,7 @@ import io
 import numpy as np
 import pytest
 
-from reactor_sdk.errors import RateLimitedError
+from reactor_sdk.errors import BadRequestError, RateLimitedError
 
 from reactor_render import session
 from reactor_render.timeline import MODELS, Plan
@@ -45,10 +45,12 @@ class FakeReactor:
     far, as LongLive reports it, or with `per_chunk` only the chunk's, as Helios does. The first `refusals` connects raise a 429 carrying `retry_after_ms` and the message `refusal`.
     Each command's reply takes `reply_seconds`. With `whole_chunks`, the model instead returns a
     chunk of white frames only once that many more source frames are pushed, holding back a partial one.
+    `connect_error` is raised by every connect; with `ended`, Reactor ends the session with that reason after the first chunk.
     """
 
     def __init__(self, chunks, frames=2, first=None, per_chunk=False, replies=None, complete_after=None, stall=False,
-                 refusals=0, retry_after_ms=10, refusal="too many requests", reply_seconds=0, whole_chunks=None):
+                 refusals=0, retry_after_ms=10, refusal="too many requests", reply_seconds=0, whole_chunks=None,
+                 connect_error=None, ended=None):
         self.chunks, self.frames, self.first, self.per_chunk = chunks, frames, frames if first is None else first, per_chunk
         self.replies = replies or {}
         self.complete_after = complete_after
@@ -64,6 +66,7 @@ class FakeReactor:
         self.connects = self.closes = 0
         self.reply_seconds, self.in_flight, self.most_in_flight = reply_seconds, 0, 0
         self.whole_chunks = whole_chunks
+        self.connect_error, self.ended, self.events = connect_error, ended, {}
 
     def __call__(self, slug, **connect):
         self.slug, self.options = slug, connect
@@ -75,6 +78,13 @@ class FakeReactor:
 
     def on_track(self, func):
         self.track_handler = func
+        return func
+
+    def on(self, event, func):
+        self.events[event] = func
+
+    def on_error(self, func):
+        self.events["error"] = func
         return func
 
     async def publish_track(self, name):
@@ -96,6 +106,8 @@ class FakeReactor:
 
     async def connect(self):
         self.connects += 1
+        if self.connect_error is not None:
+            raise self.connect_error
         if self.connects <= self.refusals:
             raise RateLimitedError(self.refusal, retry_after_ms=self.retry_after_ms)
         self.track_handler(self.track)
@@ -126,6 +138,9 @@ class FakeReactor:
             emitted += size
             self.handler({"type": "chunk_complete", "data": {"chunk_index": float(i), "frames_emitted": float(size if self.per_chunk else emitted)}})
             await asyncio.sleep(0.01)
+            if self.ended is not None:
+                self.events["runtime_message"]({"type": "sessionEnded", "data": {"reason": self.ended}})
+                return
             if self.stall:
                 continue
             for _ in range(size):
@@ -233,6 +248,39 @@ async def test_rejected_command_raises_and_still_disconnects(tmp_path, monkeypat
     with pytest.raises(RuntimeError, match="bad prompt"):
         await coro
     assert fake.disconnected
+
+
+# A 402 as the Python SDK raises it, from a session refused for the account's credits.
+DEPLETED = ('connect: [BAD_REQUEST] unexpected HTTP status 402 from create session: '
+            '{"error": "credits_depleted", "message": "Your credits have been depleted. Please add credits to continue."}')
+
+
+async def test_a_connect_refused_for_credits_raises_the_api_sentence_and_where_to_add_them(tmp_path, monkeypatch):
+    fake = FakeReactor(chunks=1, connect_error=BadRequestError(DEPLETED, status=402))
+    _, coro = run(fake, Plan(setup=[START], chunks=1), tmp_path, monkeypatch)
+    with pytest.raises(RuntimeError) as raised:
+        await coro
+    assert str(raised.value) == "Your credits have been depleted. Please add credits to continue. https://reactor.inc/dashboard"
+    assert fake.connects == 1 and fake.disconnected
+
+
+async def test_reactor_ending_the_session_mid_render_raises_its_reason(tmp_path, monkeypatch):
+    reason = "Session ended: your credits ran out. Add more to continue."
+    fake = FakeReactor(chunks=5, ended=reason)
+    _, coro = run(fake, Plan(setup=[START], chunks=5), tmp_path, monkeypatch)
+    with pytest.raises(RuntimeError, match=reason):
+        await asyncio.wait_for(coro, timeout=10)
+    assert fake.disconnected
+
+
+@pytest.mark.parametrize("text, shown", [
+    ('create session: {"error": "billing_not_setup", "message": "Please complete your billing setup to start sessions.", "url": "https://reactor.inc/billing"}',
+     "Please complete your billing setup to start sessions. https://reactor.inc/billing"),
+    ("connect: [NETWORK_ERROR] connection refused", "connect: [NETWORK_ERROR] connection refused"),
+    ('404 from create session: {"error": "model not found"}', '404 from create session: {"error": "model not found"}'),
+])
+def test_an_api_error_shows_its_own_sentence_when_its_body_has_one(text, shown):
+    assert session.api_message(text) == shown
 
 
 class Interrupted(BaseException):
@@ -537,6 +585,12 @@ class FakeCall:
 
     def on_track(self, func):
         self.track_handler = func
+        return func
+
+    def on(self, event, func):
+        pass
+
+    def on_error(self, func):
         return func
 
     async def connect(self):

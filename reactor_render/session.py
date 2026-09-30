@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import io
+import json
 import logging
 import math
 import time
@@ -10,7 +11,7 @@ import av
 import numpy as np
 
 from reactor_sdk import Reactor
-from reactor_sdk.errors import RateLimitedError
+from reactor_sdk.errors import RateLimitedError, ReactorError, UnauthorizedError
 
 from .encode import FrameWriter
 from .timeline import ModelSpec, Plan
@@ -65,6 +66,8 @@ class Session:
         self.reported_at = -PROGRESS_INTERVAL_SECONDS
         # When the model's sound was last loud enough to be speech, on the SDK's media thread.
         self.sounded_at = 0.0
+        # Why Reactor ended the session or the SDK gave up on it, raised at the next message wait.
+        self.failure: str | None = None
 
     def push_video(self, frame: np.ndarray) -> None:
         self.frame_shape = frame.shape
@@ -93,6 +96,8 @@ class Session:
     async def next_message(self, timeout: float = PROGRESS_INTERVAL_SECONDS) -> dict | None:
         """The next model message, or None after `timeout` without one. Raises on a rejected command."""
         self.check_interrupt()
+        if self.failure is not None:
+            raise RuntimeError(self.failure)
         if self.writer.received != self.reported and time.monotonic() - self.reported_at >= PROGRESS_INTERVAL_SECONDS:
             self.reported, self.reported_at = self.writer.received, time.monotonic()
             self.on_progress(self.writer.received, self.writer.limit or self.planned, self.writer.previous)
@@ -270,6 +275,44 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
 RUNNERS = {"chunked": run_chunked, "source": run_source, "call": run_call}
 
 
+def api_message(text: str) -> str:
+    """The sentence in a Reactor API error reply's JSON body, with its link if it has one; `text` itself when it holds none."""
+    try:
+        body, _ = json.JSONDecoder().raw_decode(text, text.index("{"))
+    except ValueError:
+        return text
+    if not isinstance(body, dict) or not body.get("message"):
+        return text
+    return " ".join(filter(None, (body["message"], body.get("url"))))
+
+
+def reactor_error(e: ReactorError) -> str:
+    """What to show for a Reactor SDK error: the API's own sentence where its reply carries one."""
+    text = api_message(str(e))
+    if isinstance(e, UnauthorizedError):
+        return f"Reactor rejected the API key; check REACTOR_API_KEY. ({text})"
+    # A 402 is about credits or billing: point at the dashboard unless the reply links its own page.
+    if e.status == 402 and "https://" not in text:
+        return f"{text} https://reactor.inc/dashboard"
+    return text
+
+
+def watch_for_failure(reactor: Reactor, fail: Callable[[str], None]) -> None:
+    """Call `fail` with the reason when Reactor ends the session, as when the credits run out, or the SDK hits an error it can't recover from."""
+    def ended(msg: dict) -> None:
+        if msg.get("type") == "sessionEnded":
+            fail((msg.get("data") or {}).get("reason") or "Reactor ended the session.")
+
+    @reactor.on_error
+    def errored(e: ReactorError) -> None:
+        if e.recoverable:
+            logging.warning("Reactor: %s", e)
+        else:
+            fail(reactor_error(e))
+
+    reactor.on("runtime_message", ended)
+
+
 async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], None], on_status: Callable[[str], None]) -> None:
     """`reactor.connect()`, retried while Reactor refuses the new session with a 429."""
     give_up = time.monotonic() + CONNECT_RETRY_SECONDS
@@ -292,6 +335,8 @@ async def connect_with_retry(reactor: Reactor, check_interrupt: Callable[[], Non
             while (left := deadline - time.monotonic()) > 0:
                 check_interrupt()
                 await asyncio.sleep(min(left, 1.0))
+        except ReactorError as e:
+            raise RuntimeError(reactor_error(e)) from e
 
 
 @contextlib.asynccontextmanager
@@ -329,6 +374,8 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
     @reactor.on_message
     def queue_message(msg: dict) -> None:
         session.messages.put_nowait(msg)
+
+    watch_for_failure(reactor, lambda reason: setattr(session, "failure", session.failure or reason))
 
     @reactor.on_track
     def capture(track) -> None:

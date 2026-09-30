@@ -7,6 +7,7 @@ let MODEL_FACTS = {};
 const STYLE = `
 .reactor-tl { display: flex; flex-direction: column; gap: 6px; font: 12px sans-serif; color: var(--input-text); }
 .reactor-tl[hidden] { display: none; }
+.reactor-tl > * { flex-shrink: 0; }
 .reactor-tl-ruler { position: relative; flex: none; height: 16px; border-bottom: 1px solid var(--border-color); }
 .reactor-tl-tick { position: absolute; top: 0; height: 100%; border-left: 1px solid var(--border-color); padding-left: 2px; font-size: 10px; opacity: 0.8; }
 .reactor-tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--p-primary-color, #4a9eff); pointer-events: none; z-index: 1; }
@@ -111,8 +112,25 @@ function chainBeats(node) {
 // Shows the Autogrow image sockets only while the drawn beats can take an image; linked ones stay.
 function showImages(node, shown) {
     const sockets = (node.inputs ?? []).map((input, slot) => [input, slot]).filter(([input]) => input.name.startsWith("images."));
+    const count = node.inputs?.length;
     if (!shown) for (const [input, slot] of sockets.reverse()) { if (input.link == null) node.removeInput(slot); }
     else if (!sockets.length) node.addInput("images.image_0", "IMAGE");
+    return node.inputs?.length !== count;
+}
+
+// An editor's natural height: its visible rows and the gaps between them. Its rows neither stretch nor shrink.
+// Null until the editor is laid out, since an element that isn't rendered measures 0.
+function contentHeight(root) {
+    if (root.hidden) return 0;
+    if (!root.getClientRects().length) return null;
+    const rows = [...root.children].filter((c) => !c.hidden);
+    return rows.reduce((h, c) => h + c.offsetHeight, 0) + 6 * Math.max(0, rows.length - 1);
+}
+
+// Sizes a node to what its inputs and editors need, so an editor never clips or leaves a gap.
+function fitNode(node) {
+    const height = node.computeSize()[1];
+    if (Math.abs(height - node.size[1]) > 1) node.setSize([node.size[0], height]);
 }
 
 function connectedImageSlots(node) {
@@ -171,7 +189,7 @@ function adaptBeat(node) {
     const kind = node.widgets?.find((w) => w.name === "kind");
     const reads = (taken) => !facts || taken === "any" || (taken === "first" && opens);
     const changed = fitInputs(node, [["model", "REACTOR_MODEL", opens], ["image", "IMAGE", reads(facts?.images)], ["video", "VIDEO", reads(facts?.videos)]]);
-    if (changed) node.setSize?.([node.size[0], node.computeSize()[1]]);
+    if (changed) fitNode(node);
     const key = JSON.stringify([facts, kind?.value]);
     if (!frames || !kind || (key === node.reactorFacts && !changed)) return;
     node.reactorFacts = key;
@@ -373,6 +391,8 @@ function createEditor(node, inputName, inputData) {
     let selected = null;
     let selectedMove = null;
     let signature = "";
+    // Measured on each draw, since the editor may not be laid out when it renders; the default fits an empty editor until then.
+    let height = 120;
 
     const root = el("div", { className: "reactor-tl" });
     const ruler = el("div", { className: "reactor-tl-ruler" });
@@ -511,6 +531,8 @@ function createEditor(node, inputName, inputData) {
             const beat = value.beats[selected];
             const prompt = el("textarea", { value: beat.prompt, placeholder: "Prompt" });
             prompt.addEventListener("input", () => { beat.prompt = prompt.value; node.graph?.setDirtyCanvas(true, false); });
+            // Dragging the resize grip changes nothing on the canvas, so redraw to let the node refit.
+            new ResizeObserver(() => node.graph?.setDirtyCanvas(true, false)).observe(prompt);
             prompt.addEventListener("change", changed);
             const frames = el("input", { type: "number", min: 1, step: s.facts?.frames_per_chunk ?? 1, value: beat.frames });
             frames.addEventListener("change", () => { beat.frames = snapLength(Number(frames.value) || 0, s.facts); changed(); });
@@ -560,13 +582,18 @@ function createEditor(node, inputName, inputData) {
             selectedMove = null;
             changed();
         },
-        getMinHeight: () => 190 + 26 * new Set([...Object.keys(modelFacts(node)?.camera ?? {}), ...value.moves.map((m) => m.lane)]).size,
+        getMinHeight: () => height && height + 2 * widget.margin,
         onDraw: () => {
             const s = state();
             const next = JSON.stringify([s.chain, s.facts, s.slots, s.width]);
             if (next !== signature) {
                 signature = next;
                 render();
+            }
+            const measured = contentHeight(root);
+            if (measured !== null && measured !== height) {
+                height = measured;
+                fitNode(node);
             }
         },
     });
@@ -601,6 +628,8 @@ function createMoveEditor(node, inputName) {
     let value = { moves: [] };
     let selectedMove = null;
     let signature = "";
+    // Measured on each draw, since the editor may not be laid out when it renders; the default fits an empty editor until then.
+    let height = 120;
     const root = el("div", { className: "reactor-tl" });
     const ruler = el("div", { className: "reactor-tl-ruler" });
     const lanes = el("div", { className: "reactor-tl" });
@@ -627,10 +656,7 @@ function createMoveEditor(node, inputName) {
         const shown = Object.keys(camera).length > 0 || value.moves.length > 0;
         ruler.hidden = !shown;
         // A model without camera controls gets no move editor at all.
-        if (root.hidden !== (!!s.facts && !shown)) {
-            root.hidden = !!s.facts && !shown;
-            node.setSize?.([node.size[0], node.computeSize()[1]]);
-        }
+        root.hidden = !!s.facts && !shown;
         if (selectedMove !== null && selectedMove >= value.moves.length) selectedMove = null;
         // Past a scene's first chunk every chunk is full length, so a beat that doesn't open its scene
         // snaps its moves to a grid of whole chunks from its start.
@@ -676,13 +702,18 @@ function createMoveEditor(node, inputName) {
             selectedMove = null;
             changed();
         },
-        getMinHeight: () => root.hidden ? 0 : 60 + 28 * new Set([...Object.keys(modelFacts(node)?.camera ?? {}), ...value.moves.map((m) => m.lane)]).size,
+        getMinHeight: () => height && height + 2 * widget.margin,
         onDraw: () => {
             const s = state();
             const next = JSON.stringify([s.facts, s.beats, s.width]);
             if (next !== signature) {
                 signature = next;
                 render();
+            }
+            const measured = contentHeight(root);
+            if (measured !== null && measured !== height) {
+                height = measured;
+                fitNode(node);
             }
         },
     });
@@ -713,8 +744,7 @@ app.registerExtension({
             nodeType.prototype.onDrawForeground = function (...args) {
                 // A connected chain brings its own model and images, and the drawn beats' images go unused.
                 const drawn = !upstream(this, "chain");
-                showInput(this, "model", "REACTOR_MODEL", drawn);
-                showImages(this, drawn && modelFacts(this)?.images !== "none");
+                if (showInput(this, "model", "REACTOR_MODEL", drawn) | showImages(this, drawn && modelFacts(this)?.images !== "none")) fitNode(this);
                 return onDrawForeground?.apply(this, args);
             };
         }

@@ -15,7 +15,6 @@ from typing_extensions import override
 import comfy.model_management
 import comfy.utils
 import folder_paths
-from comfy.cli_args import args
 from comfy_api.latest import ComfyExtension, InputImpl, Types, io, ui
 from server import PromptServer
 
@@ -220,8 +219,9 @@ class ReactorRender(io.ComfyNode):
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         pbar = comfy.utils.ProgressBar(1)
         await render(spec, plan, out_path,
+                     # The preview widget never scales an image up, so frames go at full size to fill the node.
                      on_progress=lambda done, total, frame: pbar.update_absolute(
-                         done, total, None if frame is None else ("JPEG", Image.fromarray(frame), args.preview_size)),
+                         done, total, None if frame is None else ("JPEG", Image.fromarray(frame), max(frame.shape[:2]))),
                      on_status=lambda text: PromptServer.instance.send_progress_text(f"Status: {text}", cls.hidden.unique_id),
                      check_interrupt=comfy.model_management.throw_exception_if_processing_interrupted,
                      **connect)

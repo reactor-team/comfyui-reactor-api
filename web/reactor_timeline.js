@@ -784,6 +784,15 @@ app.registerExtension({
                 return onDrawForeground?.apply(this, args);
             };
         }
+        if (nodeData.name === "ReactorRender") {
+            const onDrawForeground = nodeType.prototype.onDrawForeground;
+            nodeType.prototype.onDrawForeground = function (...args) {
+                // The status line otherwise shares the node's spare height with the preview.
+                const status = this.widgets?.find((w) => w.name === "$$node-text-preview");
+                if (status && !status.options.getMaxHeight) status.options.getMaxHeight = status.options.getMinHeight;
+                return onDrawForeground?.apply(this, args);
+            };
+        }
         if (nodeData.name === "ReactorChainJoin") {
             const onConnectInput = nodeType.prototype.onConnectInput;
             nodeType.prototype.onConnectInput = function (slot, type, output, source, ...rest) {

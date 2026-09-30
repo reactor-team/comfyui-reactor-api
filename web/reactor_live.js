@@ -95,6 +95,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let promptField = null;
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
+    let markStarted;
+    const startedSignal = new Promise((resolve) => { markStarted = resolve; });
     const lastSent = new Map();  // each lane's field to the value last sent
     let reactor = null;      // this browser's own client in the session
     let input = null;        // the camera size and rate the server asked for
@@ -247,6 +249,18 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         stream = media;
     }
 
+    // The session can miss this browser's first request for the model's output, and then the preview stays
+    // black for the whole take while the recording is fine; ask again while no video has arrived.
+    async function keepPreview(names) {
+        await startedSignal;
+        for (let attempt = 1; attempt <= PREVIEW_RETRIES; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, PREVIEW_WAIT_MS));
+            if (tornDown || output.videoWidth) return;
+            console.warn(`Reactor: no preview video yet, asking for it again (${attempt} of ${PREVIEW_RETRIES}).`);
+            for (const name of names) await reactor.resumeTrack(name);
+        }
+    }
+
     async function joinSession(join) {
         const mic = join.tracks.find((track) => track.name === join.publish)?.kind === "audio";
         if (join.publish) {
@@ -286,6 +300,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             console.error("Reactor: this browser could not join the session.", e);
             throw new Error(`This browser could not join the Reactor session: ${e?.message ?? e}`);
         }
+        keepPreview(join.tracks.filter((track) => track.direction === "recvonly").map((track) => track.name)).catch(() => {});
         if (!join.publish || closed) return;
         const track = mic ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
         // The SDK gives up on a publish after a fixed 10 s, which a slow link can miss; try again before failing.
@@ -363,6 +378,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             status.textContent = message.text;
         } else if (message.type === "started") {
             started = true;
+            markStarted();
             apply.disabled = false;
             look?.refresh();
             if (held) drive();
@@ -505,6 +521,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
 }
 
 const DEFAULT_DEVICE = "Default";
+const PREVIEW_WAIT_MS = 4000;
+const PREVIEW_RETRIES = 3;
 let current = null;
 
 // The device combo on Reactor Camera Capture and Microphone Capture. Labels are readable only once

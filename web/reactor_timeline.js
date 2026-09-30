@@ -594,6 +594,8 @@ function createEditor(node, inputName, inputData) {
             changed();
         },
         getMinHeight: () => height && height + 2 * widget.margin,
+        // The Parameters panel draws a widget by setting its width to the panel's and never restores it.
+        hideInPanel: true,
         onDraw: () => {
             const s = state();
             const next = JSON.stringify([s.chain, s.facts, s.slots, s.width]);
@@ -715,6 +717,8 @@ function createMoveEditor(node, inputName) {
             changed();
         },
         getMinHeight: () => height && height + 2 * widget.margin,
+        // The Parameters panel draws a widget by setting its width to the panel's and never restores it.
+        hideInPanel: true,
         onDraw: () => {
             const s = state();
             const next = JSON.stringify([s.facts, s.beats, s.width]);

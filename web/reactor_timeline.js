@@ -67,15 +67,26 @@ function joinedChains(join) {
         .filter(([input]) => input.name.startsWith("chains.") && input.link != null).map(([, slot]) => join.getInputNode(slot));
 }
 
-// The model's grid facts, or null when the model link does not come straight from a Reactor Model.
-// The facts of the model a node is for: its own Reactor Model, or the one its chain started with.
-// Past a Reactor Chain Join that is its first chain's, since the join requires every chain's to match.
-function modelFacts(node) {
+// The Reactor Model a node is for: its own, or the one its chain started with; null when the model link
+// does not come straight from a Reactor Model. Past a Reactor Chain Join it is the first chain's, since
+// the join requires every chain's to match.
+function chainModel(node) {
     for (let n = node; n; n = n.comfyClass === "ReactorChainJoin" ? joinedChains(n)[0] : upstream(n, "chain")) {
         const source = upstream(n, "model");
-        if (source) return source.comfyClass === "ReactorModel" ? MODEL_FACTS[widgetValue(source, "model")] ?? null : null;
+        if (source) return source.comfyClass === "ReactorModel" ? source : null;
     }
     return null;
+}
+
+// The grid facts of the model a node is for, or null when they can't be read.
+function modelFacts(node) {
+    const model = chainModel(node);
+    return model ? MODEL_FACTS[widgetValue(model, "model")] ?? null : null;
+}
+
+// A Reactor Model's model and settings, to tell whether two chains are for the same one.
+function modelChoice(model) {
+    return JSON.stringify(model.widgets?.map((w) => [w.name, w.value]));
 }
 
 // Shows an optional socket only while the node reads it; a linked socket stays so its link isn't dropped.
@@ -771,6 +782,23 @@ app.registerExtension({
                 const drawn = !upstream(this, "chain");
                 if (showInput(this, "model", "REACTOR_MODEL", drawn) | showImages(this, drawn && modelFacts(this)?.images !== "none")) fitNode(this);
                 return onDrawForeground?.apply(this, args);
+            };
+        }
+        if (nodeData.name === "ReactorChainJoin") {
+            const onConnectInput = nodeType.prototype.onConnectInput;
+            nodeType.prototype.onConnectInput = function (slot, type, output, source, ...rest) {
+                // Refuse a chain for another model or settings here, rather than only when the workflow runs.
+                const model = chainModel(source);
+                const clash = model && this.inputs.some((input, i) => {
+                    const other = i !== slot && input.name.startsWith("chains.") && input.link != null && chainModel(this.getInputNode(i));
+                    return other && modelChoice(other) !== modelChoice(model);
+                });
+                if (clash) {
+                    app.extensionManager.toast.add({ severity: "warn", summary: "Reactor Chain Join", life: 5000,
+                        detail: "That chain is for a different Reactor Model or settings than the chains already joined; join chains made for the same model." });
+                    return false;
+                }
+                return onConnectInput?.call(this, slot, type, output, source, ...rest);
             };
         }
         if (nodeData.name === "ReactorChain") {

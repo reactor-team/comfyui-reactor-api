@@ -28,6 +28,9 @@ ReactorReferenceType = io.Custom("REACTOR_REFERENCE")
 # A browser camera, by its label; the widget lists the cameras the browser can see.
 ReactorCameraType = io.Custom("REACTOR_CAMERA")
 ReactorCameraDeviceType = io.Custom("REACTOR_CAMERA_DEVICE")
+# A browser microphone, by its label, the same way.
+ReactorMicrophoneType = io.Custom("REACTOR_MICROPHONE")
+ReactorMicrophoneDeviceType = io.Custom("REACTOR_MICROPHONE_DEVICE")
 
 
 @io.comfytype(io_type="REACTOR_MOVE_EDITOR")
@@ -286,7 +289,7 @@ async def live_socket(request):
 
 async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str, dict]],
                       clip: list[np.ndarray] | None, filename_prefix: str, camera: str | None = None,
-                      settings: dict[str, object] | None = None) -> io.NodeOutput:
+                      settings: dict[str, object] | None = None, microphone: str | None = None) -> io.NodeOutput:
     """A new take recorded in a live run, saved under the output directory like SaveVideo's files."""
     sid = PromptServer.instance.client_id
     if sid is None:
@@ -303,7 +306,7 @@ async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str,
     try:
         PromptServer.instance.send_sync("reactor.live.open",
                                         {"run_id": run.run_id, "mode": mode,
-                                         "title": "Reactor Realtime", "camera": camera}, sid)
+                                         "title": "Reactor Realtime", "camera": camera, "microphone": microphone}, sid)
         await run.run(comfy.model_management.throw_exception_if_processing_interrupted)
     finally:
         live.RUNS.pop(run.run_id, None)
@@ -327,6 +330,23 @@ class ReactorCameraCapture(io.ComfyNode):
         return io.NodeOutput(camera)
 
 
+class ReactorMicrophoneCapture(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ReactorMicrophoneCapture",
+            display_name="Reactor Microphone Capture",
+            category="Reactor",
+            description="Picks the microphone on this browser that you talk through on a Reactor Realtime call.",
+            inputs=[ReactorMicrophoneDeviceType.Input("microphone", tooltip="The microphone to talk through. Default is the browser's default microphone.")],
+            outputs=[ReactorMicrophoneType.Output()],
+        )
+
+    @classmethod
+    def execute(cls, microphone) -> io.NodeOutput:
+        return io.NodeOutput(microphone)
+
+
 def live_option(name: str) -> io.DynamicCombo.Option:
     """A model's entry in Reactor Realtime's model picker: the inputs that model takes to start a live run."""
     spec = MODELS[name]
@@ -340,6 +360,9 @@ def live_option(name: str) -> io.DynamicCombo.Option:
         *([io.Video.Input("video", optional=True, tooltip="Source clip to restyle, looped until you press Done."),
            ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera instead of a clip.")]
           if source else []),
+        *([ReactorMicrophoneType.Input("microphone", optional=True,
+                                       tooltip="A Reactor Microphone Capture, to talk through a chosen microphone. Default is the browser's default microphone.")]
+          if spec.pattern == "call" else []),
         *[setting_input(key, setting, "Read at start.") for key, setting in spec.settings.items()],
         *[setting_input(key, setting, "Read at start." if spec.prompted else "Change it in the window as it plays.")
           for key, setting in spec.beat_settings.items()],
@@ -382,7 +405,8 @@ class ReactorRealtime(io.ComfyNode):
         beat_settings = {key: model[key] for key in spec.beat_settings if model.get(key) is not None}
         png = None if image is None else spec.fit_png(image_to_png(image))
         if spec.pattern == "call":
-            return await live_output("call", name, prompt, call_setup(name, png, settings), None, filename_prefix)
+            return await live_output("call", name, prompt, call_setup(name, png, settings), None, filename_prefix,
+                                     microphone=model.get("microphone"))
         if spec.pattern != "source":
             beat = Beat(prompt, 1, image=png, settings=beat_settings)
             return await live_output("drive", name, prompt, live.drive_setup(name, beat, seed, settings), None, filename_prefix)
@@ -400,7 +424,7 @@ class ReactorRealtime(io.ComfyNode):
 class ReactorExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [*CHAIN_NODES, ReactorChainJoin, ReactorTimeline, ReactorViduS2AvatarReference, ReactorRender, ReactorCameraCapture, ReactorRealtime]
+        return [*CHAIN_NODES, ReactorChainJoin, ReactorTimeline, ReactorViduS2AvatarReference, ReactorRender, ReactorCameraCapture, ReactorMicrophoneCapture, ReactorRealtime]
 
 
 async def comfy_entrypoint() -> ReactorExtension:

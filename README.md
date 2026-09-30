@@ -141,6 +141,7 @@ priority over `config.ini`. The key is stored in plain text, and `config.ini` is
 - **Reactor Realtime** runs a model live. Its `model` picker shows only the inputs and settings the
   picked model takes. You steer it while it plays, and each take is saved as a video.
 - **Reactor Camera Capture** picks a camera on this browser to stream into Reactor Realtime.
+- **Reactor Microphone Capture** picks the microphone on this browser that you talk through on a Reactor Realtime call.
 
 ## Building a video from chain nodes
 
@@ -176,7 +177,8 @@ Cancel to drop it. With more than one camera, the window can switch cameras mid-
   and Q and E orbit on LingBot World 2. Models without camera lanes are steered by prompt alone.
 - **Vidu S2-Avatar** holds a conversation with you. Connect the person's image and set
   `persona`. Talk to the character out loud, or type a message and press Send; it answers either
-  way. The window asks for microphone access. Wear headphones so the character doesn't hear itself.
+  way. The window asks for microphone access and uses the browser's default microphone; connect a Reactor
+  Microphone Capture to pick another. Wear headphones so the character doesn't hear itself.
   The take records the character only, not your voice.
 
 Live prompts work best written to each model's prompt guide:

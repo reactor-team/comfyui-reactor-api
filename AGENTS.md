@@ -22,7 +22,7 @@ The plugin drives many Reactor models through a few shared nodes and each model'
 each capability in one of four places, depending on how many models share it and whether they
 share its shape.
 
-1. **Shared nodes**: Chain Join, Timeline, Render, Realtime and Camera Capture.
+1. **Shared nodes**: Chain Join, Timeline, Render, Realtime, Camera Capture and Microphone Capture.
    They hold only what most models have in the same shape: a prompt per beat, a beat's length, an
    image, a source video, camera moves, a seed. A shared node describes its inputs in
    general terms. It never branches on a model's name. Its tooltips name no model, though they

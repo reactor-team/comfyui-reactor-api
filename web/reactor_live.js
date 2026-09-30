@@ -38,7 +38,7 @@ function el(tag, attrs = {}, ...children) {
     return node;
 }
 
-function openLive({ run_id, mode, title, camera }) {
+function openLive({ run_id, mode, title, camera, microphone }) {
     const backdrop = el("div", { className: "reactor-live-backdrop" });
     const header = el("div", { className: "reactor-live-title", textContent: title });
     const output = el("video", { className: "reactor-live-output", autoplay: true, muted: true, playsInline: true });
@@ -194,7 +194,7 @@ function openLive({ run_id, mode, title, camera }) {
 
     async function startCamera() {
         // The node names its camera by label; an unknown label falls back to the default camera.
-        const wanted = camera && camera !== DEFAULT_CAMERA
+        const wanted = camera && camera !== DEFAULT_DEVICE
             && (await navigator.mediaDevices.enumerateDevices()).find((device) => device.kind === "videoinput" && device.label === camera);
         const media = await openCamera(wanted?.deviceId);
         if (closed) return media.getTracks().forEach((track) => track.stop());
@@ -223,8 +223,11 @@ function openLive({ run_id, mode, title, camera }) {
     }
 
     async function startMic() {
+        const wanted = microphone && microphone !== DEFAULT_DEVICE
+            && (await navigator.mediaDevices.enumerateDevices()).find((device) => device.kind === "audioinput" && device.label === microphone);
         const media = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false,
+            audio: { deviceId: wanted && { exact: wanted.deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            video: false,
         });
         if (closed) return media.getTracks().forEach((track) => track.stop());
         stream = media;
@@ -405,36 +408,36 @@ function openLive({ run_id, mode, title, camera }) {
     return { cancel: cancelRun };
 }
 
-const DEFAULT_CAMERA = "Default";
+const DEFAULT_DEVICE = "Default";
 let current = null;
 
-// The camera combo on Reactor Camera Capture. Labels are readable only once this page has camera
-// access, so opening the list asks for it the first time.
-function cameraWidget(node, inputName) {
-    let labels = [DEFAULT_CAMERA];
+// The device combo on Reactor Camera Capture and Microphone Capture. Labels are readable only once
+// this page has access to that kind of device, so opening the list asks for it the first time.
+const deviceWidget = (kind) => (node, inputName) => {
+    let labels = [DEFAULT_DEVICE];
     const refresh = async (ask) => {
-        let cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
-        if (ask && cameras.length && !cameras.some((device) => device.label)) {
-            const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        let devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === kind);
+        if (ask && devices.length && !devices.some((device) => device.label)) {
+            const media = await navigator.mediaDevices.getUserMedia({ video: kind === "videoinput", audio: kind === "audioinput" });
             for (const track of media.getTracks()) track.stop();
-            cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+            devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === kind);
         }
-        labels = [DEFAULT_CAMERA, ...new Set(cameras.map((device) => device.label).filter(Boolean))];
+        labels = [DEFAULT_DEVICE, ...new Set(devices.map((device) => device.label).filter(Boolean))];
     };
     refresh(false).catch(() => {});
-    const widget = node.addWidget("combo", inputName, DEFAULT_CAMERA, () => {}, {
+    const widget = node.addWidget("combo", inputName, DEFAULT_DEVICE, () => {}, {
         values: () => {
             refresh(true).catch(() => {});
             return labels.includes(widget.value) ? labels : [...labels, widget.value];
         },
     });
     return { widget };
-}
+};
 
 app.registerExtension({
     name: "reactor.live",
     getCustomWidgets() {
-        return { REACTOR_CAMERA_DEVICE: cameraWidget };
+        return { REACTOR_CAMERA_DEVICE: deviceWidget("videoinput"), REACTOR_MICROPHONE_DEVICE: deviceWidget("audioinput") };
     },
     setup() {
         document.head.append(el("style", { textContent: STYLE }));

@@ -17,6 +17,7 @@ DisplayName = "Reactor API: Realtime Video"
 [dependency-groups]
 dev = [
     "av",
+    "numpy>=2.2.6",
     "pillow>=12.3.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",

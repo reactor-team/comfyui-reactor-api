@@ -22,7 +22,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "A Helios scene in three segments from text alone, one node per segment. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes. Reactor Sequence Visualizer draws the sequence.\n\nSet your Reactor API key in this plugin's config.ini."
+        "A Helios scene in three segments from text alone, one node per segment. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes. Reactor Sequence Visualizer draws the sequence.\n\nHelios prompt guide: https://docs.reactor.inc/model-api-reference/helios/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
         "text": "A Helios scene in three segments from text alone, one node per segment. Each later prompt describes Leo, his outcrop and the camera again before the new action, which keeps the scene steady as the prompt changes. Reactor Sequence Visualizer draws the sequence.\n\nSet your Reactor API key in this plugin's config.ini."

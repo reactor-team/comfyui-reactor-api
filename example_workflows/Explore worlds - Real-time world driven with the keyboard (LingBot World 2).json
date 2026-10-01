@@ -1,5 +1,5 @@
 {
-  "id": "d2977b96-a176-4ec4-aba3-bafaab8908dc",
+  "id": "afef1061-d001-427e-81f0-804e28faa117",
   "revision": 0,
   "last_node_id": 5,
   "last_link_id": 5,
@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Restyle a video file in real time with X2. Load Video feeds Reactor Realtime, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving. To edit your camera instead, swap Load Video for a Reactor Camera Capture, as in the 'Realtime camera edited by a prompt' example.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_segments.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "Drive a LingBot World 2 world in real time from an image. Queue the prompt, then click the Reactor Realtime window and steer: W and S move forward and back, A and D strafe, Q and E orbit, and the arrow keys look around. Edit the prompt in that window and press Apply to change the weather, the light or what happens. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nLingBot World 2 prompt guide: https://docs.reactor.inc/model-api-reference/lingbot-world-2/prompt-guide\n\nThe prompt describes the image first, then a first-person camera moving through it, as the prompt guide sets out for a scene with no subject. When the prompt and the image disagree, the image wins. Copy example_inputs/reactor_city.png from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Restyle a video file in real time with X2. Load Video feeds Reactor Realtime, which loops the clip into the model until you press Done. Edit the prompt in that window and press Apply to change the edit. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving. To edit your camera instead, swap Load Video for a Reactor Camera Capture, as in the 'Realtime camera edited by a prompt' example.\n\nX2 prompts work best as one concrete change tied to something in view, then what stays fixed; see the X2 prompt guide. The clip is the jet ski render from this plugin's examples. Copy example_outputs/reactor_camera_segments.mp4 into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "text": "Drive a LingBot World 2 world in real time from an image. Queue the prompt, then click the Reactor Realtime window and steer: W and S move forward and back, A and D strafe, Q and E orbit, and the arrow keys look around. Edit the prompt in that window and press Apply to change the weather, the light or what happens. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nThe prompt is the resting form the LingBot World 2 prompt guide gives for one fixed prompt: the world, then the camera, then the subject at rest. Copy example_inputs/reactor_jet_ski_cruise.jpg from this plugin into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -66,23 +66,8 @@
         {
           "localized_name": "image",
           "name": "model.image",
-          "shape": 7,
           "type": "IMAGE",
-          "link": null
-        },
-        {
-          "localized_name": "video",
-          "name": "model.video",
-          "shape": 7,
-          "type": "VIDEO",
           "link": 5
-        },
-        {
-          "localized_name": "camera",
-          "name": "model.camera",
-          "shape": 7,
-          "type": "REACTOR_CAMERA",
-          "link": null
         },
         {
           "localized_name": "seed",
@@ -115,15 +100,15 @@
         "Node name for S&R": "ReactorRealtime"
       },
       "widgets_values": [
-        "X2",
-        "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
+        "LingBot World 2",
+        "A rain-soaked downtown street at night lined with glowing neon signs in red, green and blue, wet asphalt reflecting the lights, shopfronts and streetlamps on both sides. Moody cinematic neon-noir look. First-person view at street level moving straight down the centre of the road, the camera gliding forward at a steady pace as reflections slide across the wet asphalt.",
         42,
         "randomize",
         "reactor/realtime"
       ],
       "widgets_values_named": {
-        "model": "X2",
-        "model.prompt": "Restyle the scene as a Japanese ukiyo-e woodblock print with indigo and cream waves, flat colour blocks and bold black outlines. Preserve the rider, the jet ski, the motion and the camera.",
+        "model": "LingBot World 2",
+        "model.prompt": "A man in a red life vest on a white and red jet ski on turquoise water near a sandy beach lined with palm trees, a distant rocky outcrop on the horizon. Sunlit coastal atmosphere with light glinting off the calm sea. Strict third-person rear view, the man on the jet ski locked at the exact centre of the frame as the camera holds a fixed position behind him and tracks him forward.",
         "seed": 42,
         "control_after_generate": "randomize",
         "filename_prefix": "reactor/realtime"
@@ -131,7 +116,7 @@
     },
     {
       "id": 4,
-      "type": "LoadVideo",
+      "type": "LoadImage",
       "pos": [
         40,
         300
@@ -145,11 +130,11 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "file",
-          "name": "file",
+          "localized_name": "image",
+          "name": "image",
           "type": "COMBO",
           "widget": {
-            "name": "file"
+            "name": "image"
           },
           "link": null
         },
@@ -165,23 +150,29 @@
       ],
       "outputs": [
         {
-          "localized_name": "VIDEO",
-          "name": "VIDEO",
-          "type": "VIDEO",
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
           "links": [
             5
           ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
         }
       ],
       "properties": {
-        "Node name for S&R": "LoadVideo"
+        "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "reactor_camera_segments.mp4",
+        "reactor_city.png",
         "image"
       ],
       "widgets_values_named": {
-        "file": "reactor_camera_segments.mp4",
+        "image": "reactor_jet_ski_cruise.jpg",
         "upload": "image"
       }
     }
@@ -192,8 +183,8 @@
       4,
       0,
       3,
-      3,
-      "VIDEO"
+      2,
+      "IMAGE"
     ]
   ],
   "groups": [],

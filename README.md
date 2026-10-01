@@ -20,7 +20,7 @@ Copy `example_inputs/` into ComfyUI's `input` folder so the examples find their 
 ## Examples
 
 All of these are in ComfyUI's template browser under comfyui-reactor-api. Click a preview for the
-full render (15 shows its input image). You can also drop a preview on the canvas to load its workflow.
+full render. You can also drop a preview on the canvas to load its workflow.
 
 | Preview | Workflow | Model |
 | --- | --- | --- |
@@ -30,7 +30,6 @@ full render (15 shows its input image). You can also drop a preview on the canva
 | <a href="example_outputs/reactor_visko_orbis_stable.mp4"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="240"></a> | [09 A storm morphing around one shot](<example_workflows/09 Generate video - A storm morphing around one shot (Visko Orbis Stable).json>) | Visko Orbis Stable |
 | <a href="example_outputs/reactor_camera_moves.mp4"><img src="example_outputs/reactor_camera_moves.webp" width="240"></a> | [10 Camera moves across a sequence](<example_workflows/10 Explore worlds - Camera moves across a sequence (LingBot World 2).json>) | LingBot World 2 |
 | <a href="example_outputs/reactor_vidu_edit.mp4"><img src="example_outputs/reactor_vidu_edit.webp" width="240"></a> | [14 Restyle, re-dress and recast a video](<example_workflows/14 Edit video - Restyle, re-dress and recast a video (Vidu S2-Editing).json>) | Vidu S2-Editing |
-| <a href="example_inputs/reactor_fisherman_portrait.jpg"><img src="example_inputs/reactor_fisherman_portrait.jpg" width="240"></a> | [15 Two characters in conversation](<example_workflows/15 Avatars - Two characters in conversation (Vidu S2-Avatar).json>) | Vidu S2-Avatar |
 
 ## Nodes
 

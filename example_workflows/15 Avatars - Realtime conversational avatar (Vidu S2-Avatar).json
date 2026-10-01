@@ -1,0 +1,298 @@
+{
+  "id": "c8f86915-949d-4829-b0f5-c2913b905894",
+  "revision": 0,
+  "last_node_id": 4,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "ReactorRealtime",
+      "pos": [
+        420,
+        250
+      ],
+      "size": [
+        400,
+        404
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "model.prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "model.prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image",
+          "name": "model.image",
+          "type": "IMAGE",
+          "link": 1
+        },
+        {
+          "localized_name": "microphone",
+          "name": "model.microphone",
+          "shape": 7,
+          "type": "REACTOR_MICROPHONE",
+          "link": 2
+        },
+        {
+          "localized_name": "persona",
+          "name": "model.persona",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model.persona"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "voice",
+          "name": "model.voice",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "model.voice"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "greeting",
+          "name": "model.greeting",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model.greeting"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRealtime"
+      },
+      "widgets_values": [
+        "Vidu S2-Avatar",
+        "",
+        "Tom, a weathered lobster fisherman on his boat, gruff but warm. Keep your answers to two short sentences.",
+        "Harvey",
+        "Wave and say hello from the deck of your boat, then ask who's calling.",
+        42,
+        "randomize",
+        "reactor/realtime"
+      ],
+      "widgets_values_named": {
+        "model": "Vidu S2-Avatar",
+        "model.prompt": "",
+        "model.persona": "Tom, a weathered lobster fisherman on his boat, gruff but warm. Keep your answers to two short sentences.",
+        "model.voice": "Harvey",
+        "model.greeting": "Wave and say hello from the deck of your boat, then ask who's calling.",
+        "seed": 42,
+        "control_after_generate": "randomize",
+        "filename_prefix": "reactor/realtime"
+      }
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        282.798828125,
+        102
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_fisherman_portrait.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_fisherman_portrait.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorMicrophoneCapture",
+      "pos": [
+        40,
+        640
+      ],
+      "size": [
+        290.7115234375,
+        58
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "microphone",
+          "name": "microphone",
+          "type": "REACTOR_MICROPHONE_DEVICE",
+          "widget": {
+            "name": "microphone"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_MICROPHONE",
+          "name": "REACTOR_MICROPHONE",
+          "type": "REACTOR_MICROPHONE",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorMicrophoneCapture"
+      },
+      "widgets_values": [
+        "Default"
+      ],
+      "widgets_values_named": {
+        "microphone": "Default"
+      }
+    },
+    {
+      "id": 4,
+      "type": "Note",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        720,
+        170
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Talk live with a Vidu S2-Avatar character made from one photo. Queue the prompt, allow microphone access, and Tom, a lobster fisherman, says hello in the Reactor Realtime window. Talk to him out loud, or type a message in the window. Wear headphones so he doesn't hear himself. Press Done to end the call; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nThe greeting is his opening line and the persona is who he is; see the Vidu S2-Avatar prompt guide. Pick a microphone in Reactor Microphone Capture, or remove it to use the browser's default. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Talk live with a Vidu S2-Avatar character made from one photo. Queue the prompt, allow microphone access, and Tom, a lobster fisherman, says hello in the Reactor Realtime window. Talk to him out loud, or type a message in the window. Wear headphones so he doesn't hear himself. Press Done to end the call; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nThe greeting is his opening line and the persona is who he is; see the Vidu S2-Avatar prompt guide. Pick a microphone in Reactor Microphone Capture, or remove it to use the browser's default. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      1,
+      2,
+      "IMAGE"
+    ],
+    [
+      2,
+      3,
+      0,
+      1,
+      3,
+      "REACTOR_MICROPHONE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8,
+      "offset": [
+        40,
+        20
+      ]
+    }
+  },
+  "version": 0.4
+}

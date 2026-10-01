@@ -2,3 +2,4 @@ __pycache__/
 .venv/
 .pytest_cache/
 config.ini
+example_outputs/*.mp4

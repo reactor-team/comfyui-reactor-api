@@ -25,7 +25,7 @@
         "Each Reactor LongLive-2.0 Segment node is one segment: it plays its prompt for its frames, starting where the segment before it ends. The first segment sets the model and its settings, later segments take them from the first, and the last one feeds Reactor Render.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nkind is how a segment enters from the one before: shot blends softly, cut starts a fresh scene. The first segment just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Each Reactor LongLive-2.0 Segment node is one segment: it plays its prompt for its frames, starting where the segment before it ends. The first segment sets the model and its settings, later segments take them from the first, and the last one feeds Reactor Render.\n\nkind is how a segment enters from the one before: shot blends softly, cut starts a fresh scene. The first segment just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Each Reactor LongLive-2.0 Segment node is one segment: it plays its prompt for its frames, starting where the segment before it ends. The first segment sets the model and its settings, later segments take them from the first, and the last one feeds Reactor Render.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nkind is how a segment enters from the one before: shot blends softly, cut starts a fresh scene. The first segment just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"

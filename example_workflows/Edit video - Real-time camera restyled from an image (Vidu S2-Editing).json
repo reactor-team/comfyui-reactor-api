@@ -25,7 +25,7 @@
         "Edit your camera in real time with Vidu S2-Editing, steered by a reference image instead of a prompt. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Pick another edit type or a new image in that window and press Apply to switch the look. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nVidu S2-Editing prompt guide: https://docs.reactor.inc/model-api-reference/vidu-s2-editing/prompt-guide\n\nstyle_transfer gives the whole frame the look of the image, here an anime style. Use an image whose look is clear across the whole picture. Light yourself evenly from the front and keep the camera moving. Copy example_inputs/reactor_style_anime.jpg into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Edit your camera in real time with Vidu S2-Editing, steered by a reference image instead of a prompt. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Pick another edit type or a new image in that window and press Apply to switch the look. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nsubject_replacement puts the person in the image in your place. style_transfer takes its look, virtual_tryon an outfit, and background_replacement a new background. Copy example_inputs/reactor_fisherman.jpg into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
+        "text": "Edit your camera in real time with Vidu S2-Editing, steered by a reference image instead of a prompt. Pick a camera in Reactor Camera Capture, queue the prompt, allow camera access, and the edited video plays in the Reactor Realtime window. Pick another edit type or a new image in that window and press Apply to switch the look. Press Done to end the take; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nVidu S2-Editing prompt guide: https://docs.reactor.inc/model-api-reference/vidu-s2-editing/prompt-guide\n\nstyle_transfer gives the whole frame the look of the image, here an anime style. Use an image whose look is clear across the whole picture. Light yourself evenly from the front and keep the camera moving. Copy example_inputs/reactor_style_anime.jpg into ComfyUI's input folder first. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -88,7 +88,7 @@
         "image"
       ],
       "widgets_values_named": {
-        "image": "reactor_fisherman.jpg",
+        "image": "reactor_style_anime.jpg",
         "upload": "image"
       }
     },
@@ -230,7 +230,7 @@
       ],
       "widgets_values_named": {
         "model": "Vidu S2-Editing",
-        "model.editing_type": "subject_replacement",
+        "model.editing_type": "style_transfer",
         "seed": 42,
         "control_after_generate": "randomize",
         "filename_prefix": "reactor/realtime"

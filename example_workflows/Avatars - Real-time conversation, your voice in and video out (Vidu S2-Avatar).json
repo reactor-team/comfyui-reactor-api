@@ -113,9 +113,9 @@
       "widgets_values": [
         "Vidu S2-Avatar",
         "",
-        "Tom, a weathered lobster fisherman on his boat, gruff but warm. Keep your answers to two short sentences.",
-        "Harvey",
-        "Wave and say hello from the deck of your boat, then ask who's calling.",
+        "Maya, a cheerful travel planner working from her home office. Keep your answers to two short sentences.",
+        "Jennifer",
+        "Smile and say hello from your desk, then ask where the caller wants to go.",
         42,
         "randomize",
         "reactor/realtime"
@@ -123,9 +123,9 @@
       "widgets_values_named": {
         "model": "Vidu S2-Avatar",
         "model.prompt": "",
-        "model.persona": "Tom, a weathered lobster fisherman on his boat, gruff but warm. Keep your answers to two short sentences.",
-        "model.voice": "Harvey",
-        "model.greeting": "Wave and say hello from the deck of your boat, then ask who's calling.",
+        "model.persona": "Maya, a cheerful travel planner working from her home office. Keep your answers to two short sentences.",
+        "model.voice": "Jennifer",
+        "model.greeting": "Smile and say hello from your desk, then ask where the caller wants to go.",
         "seed": 42,
         "control_after_generate": "randomize",
         "filename_prefix": "reactor/realtime"
@@ -185,11 +185,11 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "reactor_fisherman_portrait.jpg",
+        "reactor_webcam_portrait.jpg",
         "image"
       ],
       "widgets_values_named": {
-        "image": "reactor_fisherman_portrait.jpg",
+        "image": "reactor_webcam_portrait.jpg",
         "upload": "image"
       }
     },
@@ -256,10 +256,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Talk live with a Vidu S2-Avatar character made from one photo. Queue the prompt, allow microphone access, and Tom, a lobster fisherman, says hello in the Reactor Realtime window. Talk to him out loud, or type a message in the window. Wear headphones so he doesn't hear himself. Press Done to end the call; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nVidu S2-Avatar prompt guide: https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/prompt-guide\n\nThe greeting is his opening line and the persona is who he is; see the guide below. Pick a microphone in Reactor Microphone Capture, or remove it to use the browser's default. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+        "Talk live with a Vidu S2-Avatar character made from one photo. Queue the prompt, allow microphone access, and Maya, a travel planner, says hello in the Reactor Realtime window. Talk to her out loud, or type a message in the window. Wear headphones so she doesn't hear herself. Press Done to end the call; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nVidu S2-Avatar prompt guide: https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/prompt-guide\n\nThe greeting is her opening line and the persona is who she is; see the guide above. Pick a microphone in Reactor Microphone Capture, or remove it to use the browser's default. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Talk live with a Vidu S2-Avatar character made from one photo. Queue the prompt, allow microphone access, and Tom, a lobster fisherman, says hello in the Reactor Realtime window. Talk to him out loud, or type a message in the window. Wear headphones so he doesn't hear himself. Press Done to end the call; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nVidu S2-Avatar prompt guide: https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/prompt-guide\n\nThe greeting is his opening line and the persona is who he is; see the guide below. Pick a microphone in Reactor Microphone Capture, or remove it to use the browser's default. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+        "text": "Talk live with a Vidu S2-Avatar character made from one photo. Queue the prompt, allow microphone access, and Maya, a travel planner, says hello in the Reactor Realtime window. Talk to her out loud, or type a message in the window. Wear headphones so she doesn't hear herself. Press Done to end the call; it is saved as a video under reactor/realtime. Cancel ends it without saving.\n\nVidu S2-Avatar prompt guide: https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/prompt-guide\n\nThe greeting is her opening line and the persona is who she is; see the guide above. Pick a microphone in Reactor Microphone Capture, or remove it to use the browser's default. Copy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"

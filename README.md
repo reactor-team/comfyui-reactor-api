@@ -19,34 +19,24 @@ Copy `example_inputs/` into ComfyUI's `input` folder so the examples find their 
 
 ## Examples
 
-All of these are in ComfyUI's template browser under comfyui-reactor-api.
+All of these are in ComfyUI's template browser under comfyui-reactor-api. Live examples play in the
+Reactor Realtime window; press Done to output the take as a video. Click a preview for the full render,
+or drop it on the canvas to load its workflow.
 
-### Realtime
-
-These run live in the Reactor Realtime window. Press Done to output the take as a video.
-
-| Workflow | Model | What you do |
-| --- | --- | --- |
-| [Realtime world driven with the keyboard](<example_workflows/Explore worlds - Realtime world driven with the keyboard (LingBot World 2).json>) | LingBot World 2 | Walk through a world from one image with W/A/S/D and the arrow keys. |
-| [Realtime conversation, your voice in and video out](<example_workflows/Avatars - Realtime conversation, your voice in and video out (Vidu S2-Avatar).json>) | Vidu S2-Avatar | Talk into your microphone; the character answers on video in real time. |
-| [Realtime camera restyled from an image](<example_workflows/Edit video - Realtime camera restyled from an image (Vidu S2-Editing).json>) | Vidu S2-Editing | Your camera, restyled from a reference image as it plays. |
-| [Realtime camera edited by a prompt](<example_workflows/Edit video - Realtime camera edited by a prompt (X2).json>) | X2 | Your camera, edited by a prompt you change as it plays. |
-| [Realtime video from a prompt](<example_workflows/Generate video - Realtime video from a prompt (LongLive-2.0).json>) | LongLive-2.0 | Video from a prompt; edit the prompt and the video follows. |
-| [Realtime video file edited by a prompt](<example_workflows/Edit video - Realtime video file edited by a prompt (X2).json>) | X2 | A video file, edited by a prompt you change as it plays. |
-
-### Rendered
-
-Click a preview for the full render. You can also drop a preview on the canvas to load its
-workflow.
-
-| Preview | Workflow | Model |
-| --- | --- | --- |
-| <a href="example_outputs/reactor_segment_cuts.mp4"><img src="example_outputs/reactor_segment_cuts.webp" width="240"></a> | [Segments joined by cuts](<example_workflows/Generate video - Segments joined by cuts (LongLive-2.0).json>) | LongLive-2.0 |
-| <a href="example_outputs/reactor_nine_segments.mp4"><img src="example_outputs/reactor_nine_segments.webp" width="240"></a> | [Nine segments of shots and cuts](<example_workflows/Generate video - Nine segments of shots and cuts (LongLive-2.0).json>) | LongLive-2.0 |
-| <a href="example_outputs/reactor_helios.mp4"><img src="example_outputs/reactor_helios.webp" width="240"></a> | [One scene steered by prompts](<example_workflows/Generate video - One scene steered by prompts (Helios).json>) | Helios |
-| <a href="example_outputs/reactor_visko_orbis_stable.mp4"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="240"></a> | [A storm morphing around one shot](<example_workflows/Generate video - A storm morphing around one shot (Visko Orbis Stable).json>) | Visko Orbis Stable |
-| <a href="example_outputs/reactor_camera_moves.mp4"><img src="example_outputs/reactor_camera_moves.webp" width="240"></a> | [Camera moves across a sequence](<example_workflows/Explore worlds - Camera moves across a sequence (LingBot World 2).json>) | LingBot World 2 |
-| <a href="example_outputs/reactor_vidu_edit.mp4"><img src="example_outputs/reactor_vidu_edit.webp" width="240"></a> | [Restyle, re-dress and recast a video](<example_workflows/Edit video - Restyle, re-dress and recast a video (Vidu S2-Editing).json>) | Vidu S2-Editing |
+| Preview | Workflow | Model | Runs |
+| --- | --- | --- | --- |
+| | [Realtime world driven with the keyboard](<example_workflows/Explore worlds - Realtime world driven with the keyboard (LingBot World 2).json>) | LingBot World 2 | Live |
+| <a href="example_outputs/reactor_avatar.mp4"><img src="example_outputs/reactor_avatar.webp" width="240"></a> | [Realtime conversation, your voice in and video out](<example_workflows/Avatars - Realtime conversation, your voice in and video out (Vidu S2-Avatar).json>) | Vidu S2-Avatar | Live |
+| | [Realtime camera restyled from an image](<example_workflows/Edit video - Realtime camera restyled from an image (Vidu S2-Editing).json>) | Vidu S2-Editing | Live |
+| | [Realtime camera edited by a prompt](<example_workflows/Edit video - Realtime camera edited by a prompt (X2).json>) | X2 | Live |
+| | [Realtime video from a prompt](<example_workflows/Generate video - Realtime video from a prompt (LongLive-2.0).json>) | LongLive-2.0 | Live |
+| | [Realtime video file edited by a prompt](<example_workflows/Edit video - Realtime video file edited by a prompt (X2).json>) | X2 | Live |
+| <a href="example_outputs/reactor_segment_cuts.mp4"><img src="example_outputs/reactor_segment_cuts.webp" width="240"></a> | [Segments joined by cuts](<example_workflows/Generate video - Segments joined by cuts (LongLive-2.0).json>) | LongLive-2.0 | Render |
+| <a href="example_outputs/reactor_nine_segments.mp4"><img src="example_outputs/reactor_nine_segments.webp" width="240"></a> | [Nine segments of shots and cuts](<example_workflows/Generate video - Nine segments of shots and cuts (LongLive-2.0).json>) | LongLive-2.0 | Render |
+| <a href="example_outputs/reactor_helios.mp4"><img src="example_outputs/reactor_helios.webp" width="240"></a> | [One scene steered by prompts](<example_workflows/Generate video - One scene steered by prompts (Helios).json>) | Helios | Render |
+| <a href="example_outputs/reactor_visko_orbis_stable.mp4"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="240"></a> | [A storm morphing around one shot](<example_workflows/Generate video - A storm morphing around one shot (Visko Orbis Stable).json>) | Visko Orbis Stable | Render |
+| <a href="example_outputs/reactor_camera_moves.mp4"><img src="example_outputs/reactor_camera_moves.webp" width="240"></a> | [Camera moves across a sequence](<example_workflows/Explore worlds - Camera moves across a sequence (LingBot World 2).json>) | LingBot World 2 | Render |
+| <a href="example_outputs/reactor_vidu_edit.mp4"><img src="example_outputs/reactor_vidu_edit.webp" width="240"></a> | [Restyle, re-dress and recast a video](<example_workflows/Edit video - Restyle, re-dress and recast a video (Vidu S2-Editing).json>) | Vidu S2-Editing | Render |
 
 ## Nodes
 

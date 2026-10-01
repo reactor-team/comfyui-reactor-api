@@ -26,4 +26,5 @@ dev = [
 [tool.uv]
 package = false
 exclude-newer = "7 days"
+exclude-newer-package = { reactor-sdk = false }
 

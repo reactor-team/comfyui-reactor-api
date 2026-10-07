@@ -23,6 +23,10 @@ def test_model_tracks_list_the_source_track_only_for_models_that_take_one():
         {"name": "camera", "kind": "video", "direction": "sendonly"},
         {"name": "main_video", "kind": "video", "direction": "recvonly"}]
     assert live.model_tracks(WORLD_2) == [{"name": "main_video", "kind": "video", "direction": "recvonly"}]
+    # A model with sound plays main_audio the browser must list and subscribe to.
+    assert live.model_tracks(MODELS["Visko Orbis Stable"]) == [
+        {"name": "main_video", "kind": "video", "direction": "recvonly"},
+        {"name": "main_audio", "kind": "audio", "direction": "recvonly"}]
     assert live.model_tracks(MODELS["Vidu S2-Avatar"]) == [
         {"name": "mic", "kind": "audio", "direction": "sendonly"},
         {"name": "webcam", "kind": "video", "direction": "sendonly"},

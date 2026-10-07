@@ -218,14 +218,15 @@ MODELS = {
     # and `frames_emitted` counts the whole session.
     "LongLive-2.0": ModelSpec("reactor/longlive-v2", "chunked", 24.0, "none", True, frames_per_chunk=32, max_scene_chunks=48,
                               session_frames=True, first_chunk_frames=29, size=(1280, 704), prompt_command="set_shot"),
-    # TODO: Helios publishes no frame rate, so the 24 the output file plays at is a placeholder.
+    # The docs give no frame rate. Its public examples export at 24 fps, which the output file plays at; measured on cloud
+    # sessions, frames arrive at about 21.
     "Helios": ModelSpec("reactor/helios", "chunked", 24.0, "any", False, frames_per_chunk=33, size=(640, 384),
                         native=(("set_sr_scale", {"sr_scale": "off"}),),
                         beat_settings={"image_strength": Setting("set_image_strength", (), 1.0, maximum=1.0)}),
     # Measured on cloud sessions, for both LingBots: a run's first chunk is 17 frames and every later one 24.
     # `max_scene_chunks` is a run, after which the model restarts from its image.
-    # TODO: LingBot's docs say 16 fps, but frames arrive at about 38, so the output file's rate is unsettled.
-    "LingBot": ModelSpec("reactor/lingbot", "chunked", 16.0, "first", False, frames_per_chunk=24, max_scene_chunks=300,
+    # The docs say 16 fps, but measured on cloud sessions frames arrive at about 33, so the output file plays at 32.
+    "LingBot": ModelSpec("reactor/lingbot", "chunked", 32.0, "first", False, frames_per_chunk=24, max_scene_chunks=300,
                          image_required=True, first_chunk_frames=17, size=(1664, 960), camera=LINGBOT_CAMERA),
     # The docs say about 12 frames a chunk; 17 then 24 is what cloud sessions emit.
     "LingBot World 2": ModelSpec("reactor/lingbot-world-2", "chunked", 48.0, "first", False, frames_per_chunk=24,

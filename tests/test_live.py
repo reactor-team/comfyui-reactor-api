@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+import logging
 from types import SimpleNamespace
 
 import av
@@ -277,6 +278,27 @@ async def test_a_cancel_while_waiting_for_the_camera_ends_the_run_at_once(tmp_pa
         await asyncio.wait_for(task, 2)
     assert [m for m in texts(sent) if m["type"] == "ended"] == [
         {"type": "ended", "error": "This browser lost its connection to the Reactor session."}]
+
+
+async def test_a_stats_error_is_logged_and_never_kills_the_take(tmp_path, monkeypatch, caplog):
+    class StatsShaky(FakeLiveReactor):
+        async def get_stats(self):
+            raise RuntimeError("stats boom")
+
+    monkeypatch.setattr(live, "STATS_INTERVAL_SECONDS", 0.01)
+    fake = StatsShaky()
+    path = tmp_path / "take.mp4"
+    run = make_run(fake, monkeypatch, "drive", "LongLive-2.0", path)
+    task = asyncio.create_task(run.run(lambda: None))
+    sent = []
+    run.connected(sent.append)
+    assert await until(lambda: run._writer is not None and run._writer.received > 0)
+    with caplog.at_level(logging.ERROR):
+        # The task dies on its first get_stats, with the take still running.
+        assert await until(lambda: "stats task died" in caplog.text)
+    run.receive('{"type":"done"}')
+    assert await asyncio.wait_for(task, 10) == str(path)
+    assert fake.disconnected
 
 
 async def test_a_dropped_session_ends_the_run_and_tells_the_browser(tmp_path, monkeypatch):

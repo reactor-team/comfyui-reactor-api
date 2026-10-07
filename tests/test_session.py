@@ -689,3 +689,29 @@ async def test_a_call_that_fails_while_starting_raises_its_error(tmp_path, monke
     _, coro = run(FakeCall(fail="warming_up"), CALL, tmp_path, monkeypatch, model="Vidu S2-Avatar")
     with pytest.raises(RuntimeError, match="failed: boom"):
         await asyncio.wait_for(coro, timeout=10)
+
+
+async def test_a_call_that_fails_while_creating_the_avatar_raises_its_error(tmp_path, monkeypatch, quick_replies):
+    # create_avatar passes in_call=False only to ignore a stale ended phase replayed from a call
+    # before; a failed phase is this session's own and must surface, not time out 180 s later.
+    _, coro = run(FakeCall(fail="preparing_avatar"), CALL, tmp_path, monkeypatch, model="Vidu S2-Avatar")
+    with pytest.raises(RuntimeError, match="failed: boom"):
+        await asyncio.wait_for(coro, timeout=10)
+
+
+async def test_a_call_whose_reply_starts_but_never_finishes_fails(tmp_path, monkeypatch, quick_replies):
+    # The character keeps talking forever: the wait-for-answer timeout does not apply once speech
+    # has started, so the reply itself needs its own bound.
+    _, coro = run(FakeCall(talk=600), CALL, tmp_path, monkeypatch, model="Vidu S2-Avatar")
+    with pytest.raises(RuntimeError, match="started but never finished"):
+        await asyncio.wait_for(coro, timeout=10)
+
+
+async def test_a_chunked_render_whose_model_goes_silent_mid_run_fails(tmp_path, monkeypatch):
+    # Fewer chunk_completes than planned and no failure event: without a stall bound this hangs.
+    monkeypatch.setattr(session, "CHUNK_STALL_SECONDS", 0.05)
+    fake = FakeReactor(chunks=2, stall=True)
+    _, coro = run(fake, Plan(setup=[START], chunks=5), tmp_path, monkeypatch)
+    with pytest.raises(RuntimeError, match="went silent"):
+        await asyncio.wait_for(coro, timeout=10)
+    assert fake.disconnected

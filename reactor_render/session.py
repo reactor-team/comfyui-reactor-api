@@ -39,6 +39,9 @@ SETUP_PHASES = {"create_avatar": "avatar_ready", "start_call": "live", "start_ed
 # a live edit streams a dark placeholder until its first edited frame (docs: vidu-s2-editing/schema).
 SETUP_READY = {"start_edit": "video_receiving"}
 SETUP_SECONDS = 180.0
+# How long a chunked render tolerates the model going silent — no message and no new frame — before
+# it calls the render dead; without a bound a stalled model would hang the node forever.
+CHUNK_STALL_SECONDS = 120.0
 # A reply is over once the character's sound has been quiet this long; replies measured on cloud
 # sessions paused at most 0.5 s, and began about 3 s after the line was said.
 REPLY_QUIET_SECONDS = 1.0
@@ -129,6 +132,8 @@ async def run_chunked(session: Session, spec: ModelSpec, plan: Plan) -> None:
     timed = sorted(plan.timed, key=lambda t: t[0])
     chunks = frames = 0
     model_done_at = None
+    last_sign_at = time.monotonic()
+    received = session.writer.received
     while not session.capture_ended(model_done_at):
         due = []
         while timed and chunks >= timed[0][0]:
@@ -137,8 +142,14 @@ async def run_chunked(session: Session, spec: ModelSpec, plan: Plan) -> None:
         # so commands sent in turn would land on successive chunks.
         await asyncio.gather(*(session.send(command, payload) for _, command, payload in due))
         msg = await session.next_message()
+        if session.writer.received != received:
+            received = session.writer.received
+            last_sign_at = time.monotonic()
         if msg is None:
+            if time.monotonic() - last_sign_at > CHUNK_STALL_SECONDS:
+                raise RuntimeError(f"The model went silent for {CHUNK_STALL_SECONDS:.0f}s mid-render; the session is dead.")
             continue
+        last_sign_at = time.monotonic()
         kind, data = msg.get("type"), msg.get("data") or {}
         if kind == "generation_complete":
             model_done_at = model_done_at or time.monotonic()
@@ -234,13 +245,15 @@ async def hold_until(session: Session, spec: ModelSpec, track, frame: np.ndarray
 
 def session_phase(msg: dict | None, in_call: bool = True) -> str | None:
     """The phase a `session_state` reports, if `msg` is one. Raises SessionEnded once the session has failed or ended,
-    unless not `in_call`: observed on cloud sessions, a new session can first report the end of the call before it."""
+    unless not `in_call`: observed on cloud sessions, a new session can first report the end of the call before it.
+    A `failed` phase is always this session's own, though: nothing stale reports one."""
     if msg is None or msg.get("type") != "session_state":
         return None
     data = msg.get("data") or {}
-    if in_call and data.get("phase") in ("failed", "ended"):
-        raise SessionEnded(data["phase"], data.get("last_error") or data.get("end_reason"))
-    return data.get("phase")
+    phase = data.get("phase")
+    if phase == "failed" or (in_call and phase == "ended"):
+        raise SessionEnded(phase, data.get("last_error") or data.get("end_reason"))
+    return phase
 
 
 async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
@@ -274,10 +287,17 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
         if replies == 0 and not greeting:
             session.capture_on_speech = True
         give_up = time.monotonic() + REPLY_TIMEOUT_SECONDS
+        finish_by = None
         while (session.sounded_at <= since or time.monotonic() - session.sounded_at < REPLY_QUIET_SECONDS
                or session.writer.received < held):
             if session.sounded_at <= since and time.monotonic() > give_up:
                 raise RuntimeError("The avatar never answered.")
+            if session.sounded_at > since:
+                # The reply itself is bounded too, by its timeout plus the frames it must still
+                # play: a reply whose sound never goes quiet, or whose frames never arrive, hangs here.
+                finish_by = finish_by or time.monotonic() + REPLY_TIMEOUT_SECONDS + plan.holds[replies] / spec.fps
+                if time.monotonic() > finish_by:
+                    raise RuntimeError("The avatar's reply started but never finished.")
             session_phase(await session.next_message())
 
 

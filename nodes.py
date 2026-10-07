@@ -317,7 +317,8 @@ async def one_session(on_status=None):
         try:
             await asyncio.wait_for(SESSIONS.acquire(), 0.5)
             break
-        except TimeoutError:
+        # Not the builtin TimeoutError, which asyncio's only aliases from Python 3.11; this plugin supports 3.10.
+        except asyncio.TimeoutError:
             comfy.model_management.throw_exception_if_processing_interrupted()
     try:
         yield
@@ -332,15 +333,17 @@ async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str,
     sid = PromptServer.instance.client_id
     if sid is None:
         raise RuntimeError(live.OPEN_TAB_ERROR)
-    folder, filename, counter, subfolder, _ = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_output_directory())
-    file = f"{filename}_{counter:05}_.mp4"
-    path = os.path.join(folder, file)
     spec = MODELS[model]
     # The browser asks its camera for this size, a 16:9 frame at the model's native size, and holds
     # it: a live session dies on a resolution change mid-chunk.
     input_size = spec.frame_size(1920, 1080) if mode == "style" and clip is None else None
-    run = live.LiveRun(mode, spec, path, prompt, setup, input_size, connect_args(), clip, settings)
     async with one_session():
+        # Claim the take's filename inside the session window: scanned from disk, it is only free
+        # while no other in-flight take can pick the same one.
+        folder, filename, counter, subfolder, _ = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_output_directory())
+        file = f"{filename}_{counter:05}_.mp4"
+        path = os.path.join(folder, file)
+        run = live.LiveRun(mode, spec, path, prompt, setup, input_size, connect_args(), clip, settings)
         live.RUNS[run.run_id] = run
         try:
             PromptServer.instance.send_sync("reactor.live.open",
@@ -455,6 +458,8 @@ class ReactorRealtime(io.ComfyNode):
             # Converted off the loop: a long clip would stall the server's other requests.
             clip = await asyncio.to_thread(lambda: [np.asarray(spec.fit(Image.fromarray(np.clip(255.0 * f.cpu().numpy(), 0, 255).astype(np.uint8))))
                                                     for f in video.get_components().images])
+            if not clip:
+                raise ValueError(f"{name}'s source video has no frames.")
         return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png, beat_settings), clip, filename_prefix,
                                  camera, beat_settings)
 

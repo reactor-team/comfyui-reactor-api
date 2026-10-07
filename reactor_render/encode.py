@@ -1,3 +1,4 @@
+import itertools
 import os
 import queue
 import threading
@@ -69,12 +70,29 @@ class FrameWriter:
             raise self.error
         if self.received == 0:
             raise RuntimeError("The session streamed no video frames.")
+        if self.limit is not None and self.received > self.limit:
+            # Completion messages can arrive after their video has already been encoded.
+            tmp = self.path + ".trim.mp4"
+            trimmed = FrameWriter(tmp, self.fps)
+            try:
+                try:
+                    with av.open(self.path) as source:
+                        for frame in itertools.islice(source.decode(video=0), self.limit):
+                            trimmed.push(frame.to_ndarray(format="rgb24"))
+                finally:
+                    trimmed.close()
+                os.replace(tmp, self.path)
+                self.received = trimmed.received
+            finally:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
         pcm = np.concatenate(self.audio)[:round(min(self.received, self.limit or self.received) / self.fps * self.sample_rate)] if self.audio else None
         # A model with its sound turned off still streams silence, which is left out.
         if pcm is not None and pcm.any():
             add_audio(self.path, pcm, self.sample_rate)
 
     def _encode(self) -> None:
+        drained = False
         try:
             with av.open(self.path, "w") as container:
                 stream = None
@@ -93,13 +111,15 @@ class FrameWriter:
                     out.pts = index
                     index += 1
                     container.mux(stream.encode(out))
+                drained = True
                 if stream is not None:
                     container.mux(stream.encode())
         except BaseException as e:
             self.error = e
             # Keep draining so `push` never backs up behind a dead encoder.
-            while self.frames.get() is not None:
-                pass
+            if not drained:
+                while self.frames.get() is not None:
+                    pass
 
 
 def add_audio(path: str, pcm: np.ndarray, sample_rate: int) -> None:

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="Reactor for ComfyUI" width="100%" />
+<img src="https://inc-reactor-static.b-cdn.net/assets/repo-banners/comfyui-reactor-api/comfyui-dune-5257e1df4183.png" alt="Reactor for ComfyUI — world models in your workflow" width="100%" />
 
 **Real-time video models in ComfyUI. Steer them live, or script every shot.**
 

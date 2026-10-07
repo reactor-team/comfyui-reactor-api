@@ -1,3 +1,5 @@
+import threading
+
 import av
 import numpy as np
 import pytest
@@ -45,20 +47,23 @@ def tone(seconds, rate=48000):
     return (np.sin(2 * np.pi * 440 * t) * 8000).astype(np.int16).reshape(-1, 1)
 
 
-def test_audio_is_muxed_in_and_cut_to_the_videos_length(tmp_path):
+@pytest.mark.parametrize("late_limit", [None, 18])
+def test_audio_is_muxed_in_and_cut_to_the_videos_length(tmp_path, late_limit):
     out = tmp_path / "out.mp4"
     writer = FrameWriter(str(out), 18.0)
     for _ in range(36):
         writer.push(np.full((32, 32, 3), 200, dtype=np.uint8))
     for block in np.split(tone(3.0), 300):
         writer.push_audio(block, 48000)
+    writer.limit = late_limit
     writer.close()
     with av.open(str(out)) as c:
         (audio,) = c.streams.audio
         samples = sum(f.samples for f in c.decode(audio=0))
     assert audio.sample_rate == 48000
-    assert samples == pytest.approx(2 * 48000, abs=2048)
-    assert len(read(out)) == 36
+    expected_frames = late_limit or 36
+    assert samples == pytest.approx(expected_frames / 18 * 48000, abs=2048)
+    assert len(read(out)) == expected_frames
 
 
 def test_audio_before_the_first_frame_is_left_out(tmp_path):
@@ -99,3 +104,45 @@ def test_fill_gaps_puts_sound_the_stream_never_sent_back_as_silence(tmp_path):
     assert len(pcm) == pytest.approx(2 * 48000, abs=2048)
     assert np.abs(pcm[round(1.0 * 48000):round(1.3 * 48000)]).max() < 0.01
     assert np.abs(pcm[round(1.7 * 48000):round(1.9 * 48000)]).max() > 0.05
+
+
+def test_a_limit_set_after_frames_arrive_trims_the_saved_video(tmp_path):
+    out = tmp_path / "out.mp4"
+    writer = FrameWriter(str(out), 24.0)
+    for level in range(10):
+        writer.push(np.full((32, 32, 3), level * 20, dtype=np.uint8))
+    writer.limit = 4
+    writer.close()
+    frames = read(out)
+    assert len(frames) == 4
+    assert [round(float(frame.mean()) / 20) for frame in frames] == list(range(4))
+
+
+def test_container_finalization_failure_does_not_hang_close(tmp_path, monkeypatch):
+    class BrokenContainer:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            raise OSError("finalization failed")
+
+    monkeypatch.setattr(av, "open", lambda *args: BrokenContainer())
+    writer = FrameWriter(str(tmp_path / "out.mp4"), 24.0)
+    errors = []
+
+    def close():
+        try:
+            writer.close()
+        except OSError as e:
+            errors.append(str(e))
+
+    thread = threading.Thread(target=close, daemon=True)
+    thread.start()
+    thread.join(timeout=2)
+    try:
+        assert not thread.is_alive()
+        assert errors == ["finalization failed"]
+    finally:
+        if thread.is_alive():
+            writer.frames.put(None)
+            thread.join(timeout=2)

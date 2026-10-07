@@ -188,17 +188,16 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
     # TODO: Stop on the output frame tagged with the clip's last index once models echo input frame tags.
     session.writer.limit = clip
     pad_until = None
-    next_frame_at = time.monotonic()
+    next_frame_at = time.monotonic() + 1 / spec.fps
     while not session.writer.full and not session.capture_ended(model_done_at):
-        if pushed == clip:
+        if pushed == clip and pad_until is None:
             pad_until = time.monotonic() + TAIL_PAD_SECONDS
         if pad_until is not None and time.monotonic() > pad_until:
             break
         while timed and timed[0][0] <= pushed:
             _, command, data = timed.pop(0)
             await session.send(command, data)
-        next_frame_at += 1 / spec.fps
-        # The wait between frames is the message wait, so a polled message never stalls the pacing.
+        # Messages may wake the wait early; only the frame deadline advances the source.
         msg = await session.next_message(max(next_frame_at - time.monotonic(), 0.0))
         try:
             session_phase(msg)
@@ -210,8 +209,11 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
             break
         if msg is not None and msg.get("type") in ("generation_complete", "generation_stopped"):
             model_done_at = model_done_at or time.monotonic()
+        if time.monotonic() < next_frame_at:
+            continue
         track.push_frame(frames[min(pushed, clip - 1)])
         pushed += 1
+        next_frame_at += 1 / spec.fps
     model_done_at = model_done_at or time.monotonic()
     # The capture ends as `capture_ended` always does: its frames in, or a grace beat without one.
     while not session.capture_ended(model_done_at):
@@ -232,15 +234,17 @@ async def hold_until(session: Session, spec: ModelSpec, track, frame: np.ndarray
     """Push `frame` at the model's frame rate until the session reaches `phase`, with its `ready` flag set if one is
     given, so a model that needs its source flowing to get there has it, and the clip itself starts once the model takes it."""
     give_up = time.monotonic() + SETUP_SECONDS
-    next_frame_at = time.monotonic()
+    next_frame_at = time.monotonic() + 1 / spec.fps
     while True:
         if time.monotonic() > give_up:
             raise RuntimeError(f"The session never reached {phase}{f' with {ready}' if ready else ''}.")
-        next_frame_at += 1 / spec.fps
         msg = await session.next_message(max(next_frame_at - time.monotonic(), 0.0))
         if session_phase(msg) == phase and (ready is None or msg["data"].get(ready)):
             return
+        if time.monotonic() < next_frame_at:
+            continue
         track.push_frame(frame)
+        next_frame_at += 1 / spec.fps
 
 
 def session_phase(msg: dict | None, in_call: bool = True) -> str | None:

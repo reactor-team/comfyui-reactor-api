@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import dataclasses
 
@@ -715,3 +716,50 @@ async def test_a_chunked_render_whose_model_goes_silent_mid_run_fails(tmp_path, 
     with pytest.raises(RuntimeError, match="went silent"):
         await asyncio.wait_for(coro, timeout=10)
     assert fake.disconnected
+
+
+async def test_queued_messages_do_not_accelerate_source_frames(tmp_path):
+    writer = session.FrameWriter(str(tmp_path / "out.mp4"), 24)
+    fake = FakeReactor(chunks=0, whole_chunks=1)
+    running = session.Session(fake, writer, 4, lambda: None, lambda *args: None)
+    fake.track.push = running.push_video
+    pushed_at = []
+    original = fake._return_whole_chunks
+
+    def push(count):
+        pushed_at.append(time.monotonic())
+        original(count)
+
+    fake._return_whole_chunks = push
+    for _ in range(20):
+        running.messages.put_nowait({"type": "status"})
+    spec = dataclasses.replace(MODELS["X2"], size=(16, 16))
+    try:
+        await asyncio.wait_for(session.run_source(running, spec, Plan([], 4, source=source_clip([100] * 4))), 5)
+    finally:
+        writer.close()
+    assert len(pushed_at) == 4
+    assert pushed_at[-1] - pushed_at[0] >= 3 / spec.fps - 0.01
+
+
+async def test_queued_messages_do_not_accelerate_source_warmup(tmp_path):
+    writer = session.FrameWriter(str(tmp_path / "out.mp4"), 24)
+    running = session.Session(None, writer, 4, lambda: None, lambda *args: None)
+    frame = np.zeros((16, 16, 3), dtype=np.uint8)
+    pushed_at = []
+
+    def push(count):
+        pushed_at.append(time.monotonic())
+        writer.push(frame)
+        if count == 4:
+            running.messages.put_nowait({"type": "session_state", "data": {"phase": "live"}})
+
+    track = SendOnlyTrack("source", push)
+    for _ in range(20):
+        running.messages.put_nowait({"type": "status"})
+    try:
+        await asyncio.wait_for(session.hold_until(running, MODELS["X2"], track, frame, "live"), 5)
+    finally:
+        writer.close()
+    assert len(pushed_at) == 4
+    assert pushed_at[-1] - pushed_at[0] >= 3 / 24 - 0.01

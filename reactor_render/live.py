@@ -36,15 +36,17 @@ RUNS: dict[str, "LiveRun"] = {}
 
 def model_tracks(spec: ModelSpec) -> list[dict]:
     """The session's media tracks for a model, as the JS SDK's `modelTracks` must list them: its
-    source track, if it takes one, and the video it plays. A call lists `webcam` though only a video
-    call reads it; this run publishes only `mic`."""
+    source track, if it takes one, the video it plays, and its `main_audio` for a model with sound.
+    The list must match the session's real tracks exactly, or the browser's join is refused. A call
+    lists `webcam` though only a video call reads it; this run publishes only `mic`."""
     if spec.pattern == "call":
         return [{"name": "mic", "kind": "audio", "direction": "sendonly"},
                 {"name": "webcam", "kind": "video", "direction": "sendonly"},
                 {"name": "main_video", "kind": "video", "direction": "recvonly"},
                 {"name": "main_audio", "kind": "audio", "direction": "recvonly"}]
     source = [{"name": spec.source_track, "kind": "video", "direction": "sendonly"}] if spec.source_track else []
-    return source + [{"name": "main_video", "kind": "video", "direction": "recvonly"}]
+    audio = [{"name": "main_audio", "kind": "audio", "direction": "recvonly"}] if spec.audio else []
+    return source + [{"name": "main_video", "kind": "video", "direction": "recvonly"}] + audio
 
 
 def session_token(api_key: str, model: str, session_id: str, api_url: str = DEFAULT_API_URL) -> str:

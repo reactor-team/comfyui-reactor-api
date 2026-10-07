@@ -116,7 +116,8 @@ class ModelSpec:
     model takes mid-run, so each beat sets its own and a value holds until a later beat changes it. `camera` maps each camera lane,
     named by its command's field, to the lane. `prompt_command` changes the prompt mid-run. `prompted` is whether the model
     takes a prompt at all. `switch_image` names the field of `prompt_command` that takes a new image mid-run, for a model whose
-    live change is an image and settings rather than a prompt.
+    live change is an image and settings rather than a prompt. `audio` is whether the model plays
+    sound, so its session carries a `main_audio` track.
     """
     slug: str
     pattern: str
@@ -142,6 +143,8 @@ class ModelSpec:
     camera: dict[str, Lane] = field(default_factory=dict)
     prompt_command: str = "set_prompt"
     prompted: bool = True
+    # A model with sound plays a `main_audio` track a live take must list and subscribe to.
+    audio: bool = False
     switch_image: str | None = None
 
     def frame_size(self, width: int, height: int) -> tuple[int, int]:
@@ -231,11 +234,11 @@ MODELS = {
     # `max_scene_chunks` is `generation_started.max_chunks` on cloud sessions at `2k`; the Dynamic docs say 229.
     "Visko Orbis Dynamic": ModelSpec("reactor/visko-orbis-dynamic", "chunked", 18.0, "first", False, frames_per_chunk=33,
                                      max_scene_chunks=2000, size=(832, 480), settings=VISKO_SETTINGS,
-                                     beat_settings=VISKO_BEAT_SETTINGS, native=(("set_resolution", {"resolution": "native"}),)),
+                                     beat_settings=VISKO_BEAT_SETTINGS, native=(("set_resolution", {"resolution": "native"}),), audio=True),
     # Stable offers no native tier, so it delivers its smallest, 1080p.
     "Visko Orbis Stable": ModelSpec("reactor/visko-orbis-stable", "chunked", 18.0, "first", False, frames_per_chunk=33,
                                     max_scene_chunks=2000, size=(832, 480), settings=VISKO_SETTINGS,
-                                    beat_settings=VISKO_BEAT_SETTINGS, native=(("set_resolution", {"resolution": "1080p"}),)),
+                                    beat_settings=VISKO_BEAT_SETTINGS, native=(("set_resolution", {"resolution": "1080p"}),), audio=True),
     # TODO: SANA-Streaming's docs publish no frame rate, so the 24 the output file plays at is
     # a placeholder.
     "Sana Streaming": ModelSpec("reactor/sana-streaming", "source", 24.0, "none", False, videos="first", video_required=True,

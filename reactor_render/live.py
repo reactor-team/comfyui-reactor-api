@@ -276,6 +276,7 @@ class LiveRun:
                     # From here the browser sends the model its prompt and drive commands itself.
                     self._send_json({"type": "started"})
                     stats = asyncio.create_task(self._report_stats(reactor))
+                    stats.add_done_callback(self._stats_failed)
                     await self._pump(check_interrupt)
                 finally:
                     self._watching = False
@@ -285,9 +286,11 @@ class LiveRun:
                 writer.close()
             raise
         finally:
-            for task in (push, stats):
-                if task is not None:
-                    task.cancel()
+            tasks = [task for task in (push, stats) if task is not None]
+            for task in tasks:
+                task.cancel()
+            # Awaited so a task's own error on the way down is retrieved, never lost.
+            await asyncio.gather(*tasks, return_exceptions=True)
         try:
             writer.close()
         except Exception:
@@ -386,6 +389,12 @@ class LiveRun:
         """A dead push task stops the model's whole input; never let it die quietly."""
         if not task.cancelled() and task.exception() is not None:
             logging.error("Reactor live: source push task died.", exc_info=task.exception())
+
+    @staticmethod
+    def _stats_failed(task) -> None:
+        """A dead stats task freezes the modal's telemetry mid-take; never let it die quietly either."""
+        if not task.cancelled() and task.exception() is not None:
+            logging.error("Reactor live: stats task died.", exc_info=task.exception())
 
     async def _send_command(self, command: str, data: dict) -> None:
         data = {key: await self._reactor.upload_file(value, name=f"{key}.png", mime_type="image/png")

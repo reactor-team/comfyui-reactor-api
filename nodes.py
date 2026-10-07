@@ -1,5 +1,4 @@
 import asyncio
-import configparser
 import contextlib
 import io as bytes_io
 import logging
@@ -19,10 +18,9 @@ from comfy_api.latest import ComfyExtension, InputImpl, Types, io, ui
 from server import PromptServer
 
 from .reactor_render import live
+from .reactor_render.config import connect_args, max_sessions
 from .reactor_render.session import render
 from .reactor_render.timeline import MODELS, Beat, Reference, Setting, Timeline, call_setup, compile_timeline, editor_moves, model_facts, join_chains
-
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
 
 ReactorSequenceType = io.Custom("REACTOR_SEQUENCE")
 ReactorReferenceType = io.Custom("REACTOR_REFERENCE")
@@ -207,26 +205,6 @@ class ReactorViduS2AvatarReference(io.ComfyNode):
         return io.NodeOutput(Reference("Vidu S2-Avatar", image_to_png(image), kind, text.strip()))
 
 
-def saved_api_key():
-    """REACTOR_API_KEY under [API] in this plugin's config.ini, laid out as in config.ini.example."""
-    config = configparser.ConfigParser()
-    config.read(CONFIG_PATH)
-    return config.get("API", "REACTOR_API_KEY", fallback="").strip() or None
-
-
-def connect_args() -> dict:
-    """The Reactor client's authentication, from REACTOR_API_KEY or this plugin's config.ini."""
-    # REACTOR_LOCAL=1 targets a model served by `reactor run` on this machine, which needs no key.
-    if os.environ.get("REACTOR_LOCAL") == "1":
-        connect = {"local": True}
-        if os.environ.get("REACTOR_API_URL"):
-            connect["api_url"] = os.environ["REACTOR_API_URL"]
-        return connect
-    if key := os.environ.get("REACTOR_API_KEY") or saved_api_key():
-        return {"api_key": key}
-    raise RuntimeError(f"Set REACTOR_API_KEY in {CONFIG_PATH} or in the environment ComfyUI starts from.")
-
-
 class ReactorRender(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -296,13 +274,6 @@ async def live_socket(request):
     return ws
 
 
-def max_sessions() -> int:
-    """MAX_CONCURRENT under [Sessions] in this plugin's config.ini: how many Reactor sessions this server runs at once."""
-    config = configparser.ConfigParser()
-    config.read(CONFIG_PATH)
-    return max(1, config.getint("Sessions", "MAX_CONCURRENT", fallback=1))
-
-
 # ComfyUI runs async nodes side by side, and each parallel session takes its own share of Reactor's
 # generation capacity, so sessions past the limit queue behind the running ones.
 SESSIONS = asyncio.Semaphore(max_sessions())
@@ -317,7 +288,8 @@ async def one_session(on_status=None):
         try:
             await asyncio.wait_for(SESSIONS.acquire(), 0.5)
             break
-        except TimeoutError:
+        # Not the builtin TimeoutError, which asyncio's only aliases from Python 3.11; this plugin supports 3.10.
+        except asyncio.TimeoutError:
             comfy.model_management.throw_exception_if_processing_interrupted()
     try:
         yield
@@ -332,15 +304,22 @@ async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str,
     sid = PromptServer.instance.client_id
     if sid is None:
         raise RuntimeError(live.OPEN_TAB_ERROR)
-    folder, filename, counter, subfolder, _ = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_output_directory())
-    file = f"{filename}_{counter:05}_.mp4"
-    path = os.path.join(folder, file)
     spec = MODELS[model]
     # The browser asks its camera for this size, a 16:9 frame at the model's native size, and holds
     # it: a live session dies on a resolution change mid-chunk.
     input_size = spec.frame_size(1920, 1080) if mode == "style" and clip is None else None
-    run = live.LiveRun(mode, spec, path, prompt, setup, input_size, connect_args(), clip, settings)
+    # A started prompt drives generation; an avatar's opening line may be empty, so "call" is exempt.
+    if spec.prompted and mode != "call" and not prompt.strip():
+        raise ValueError(f"{model} needs a text prompt: enter one in the Realtime node's prompt input.")
+    # A missing API key fails the node here, before it queues for a session slot.
+    connect = connect_args()
     async with one_session():
+        # Claim the take's filename inside the session window: scanned from disk, it is only free
+        # while no other in-flight take can pick the same one.
+        folder, filename, counter, subfolder, _ = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_output_directory())
+        file = f"{filename}_{counter:05}_.mp4"
+        path = os.path.join(folder, file)
+        run = live.LiveRun(mode, spec, path, prompt, setup, input_size, connect, clip, settings)
         live.RUNS[run.run_id] = run
         try:
             PromptServer.instance.send_sync("reactor.live.open",
@@ -391,8 +370,8 @@ def live_option(name: str) -> io.DynamicCombo.Option:
     spec = MODELS[name]
     source = spec.pattern == "source"
     return io.DynamicCombo.Option(name, [
-        *([io.String.Input("prompt", multiline=True, tooltip="What you say to the character first." if spec.pattern == "call"
-                           else "The prompt the video starts from. Change it in the window as it plays.")] if spec.prompted else []),
+        *([io.String.Input("prompt", multiline=True, tooltip="What you say to the character first; may be empty." if spec.pattern == "call"
+                           else "The prompt the video starts from. Required. Change it in the window as it plays.")] if spec.prompted else []),
         *([io.Image.Input("image", optional=not spec.image_required,
                           tooltip="The person the character is made from." if spec.pattern == "call" else "Reference image.")]
           if spec.images != "none" else []),
@@ -455,6 +434,8 @@ class ReactorRealtime(io.ComfyNode):
             # Converted off the loop: a long clip would stall the server's other requests.
             clip = await asyncio.to_thread(lambda: [np.asarray(spec.fit(Image.fromarray(np.clip(255.0 * f.cpu().numpy(), 0, 255).astype(np.uint8))))
                                                     for f in video.get_components().images])
+            if not clip:
+                raise ValueError(f"{name}'s source video has no frames.")
         return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png, beat_settings), clip, filename_prefix,
                                  camera, beat_settings)
 

@@ -111,7 +111,8 @@ function beatsUpTo(last) {
         const prompt = prompted ? inputValue(beat, "prompt") ?? "(linked prompt)" : "(no prompt)";
         const frames = inputValue(beat, "frames"), kind = widgetValue(beat, "kind");
         if (typeof prompt !== "string" || typeof frames !== "number") return "unknown";
-        beats.push({ prompt, frames, cut: kind === "cut", image: upstream(beat, "image") ? "image" : null, moves: widgetValue(beat, "moves")?.moves ?? [],
+        beats.push({ prompt, frames, cut: kind === "cut", image: upstream(beat, "image") ? "image" : null,
+                     video: upstream(beat, "video") ? "video" : null, moves: widgetValue(beat, "moves")?.moves ?? [],
                      references: connectedSlots(beat, "references") });
     }
     return beats.reverse();
@@ -222,6 +223,7 @@ function problems(beats, spans, facts) {
         if (b.image && facts.images === "none") add(i, "this model takes no reference images");
         if (b.image && facts.images === "first" && i > 0) add(i, "this model reads an image only on the first segment");
         if (!b.image && facts.image_required && i === 0) add(i, "this model needs an image on the first segment");
+        if (!b.video && facts.video_required && i === 0) add(i, "this model needs a video on the first segment");
     });
     if (facts?.max_scene_chunks) {
         let first = 0;

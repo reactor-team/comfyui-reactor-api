@@ -227,7 +227,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         const wanted = camera && camera !== DEFAULT_DEVICE
             && (await navigator.mediaDevices.enumerateDevices()).find((device) => device.kind === "videoinput" && device.label === camera);
         const media = await openCamera(wanted?.deviceId);
-        if (closed) return media.getTracks().forEach((track) => track.stop());
+        if (tornDown) return media.getTracks().forEach((track) => track.stop());
         stream = media;
         preview.append(el("video", { className: "reactor-live-self", autoplay: true, muted: true, playsInline: true, srcObject: stream }));
     }
@@ -243,7 +243,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         picker.addEventListener("change", async () => {
             const next = await openCamera(picker.value).catch(() => null);
             if (!next) return void (status.textContent = "That camera is unavailable.");
-            if (closed) return next.getTracks().forEach((track) => track.stop());
+            if (tornDown) return next.getTracks().forEach((track) => track.stop());
             await sender.replaceTrack(next.getVideoTracks()[0]);
             for (const track of stream.getTracks()) track.stop();
             stream = next;
@@ -259,7 +259,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             audio: { deviceId: wanted && { exact: wanted.deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             video: false,
         });
-        if (closed) return media.getTracks().forEach((track) => track.stop());
+        if (tornDown) return media.getTracks().forEach((track) => track.stop());
         stream = media;
     }
 
@@ -284,10 +284,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 throw new Error(mic ? "The microphone is unavailable; allow microphone access and run again."
                                     : "The camera is unavailable; allow camera access and run again.");
             }
-            if (closed) return;
+            if (tornDown) return;
         }
         const { Reactor } = await import("./vendor/reactor-sdk.mjs");
-        if (closed) return;
+        if (tornDown) return;
         reactor = new Reactor({ modelName: join.model, local: join.local, modelTracks: join.tracks });
         reactor.on("trackReceived", (name, track, media) => {
             if (name === join.publish) return;
@@ -327,7 +327,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             throw new Error(`This browser could not join the Reactor session: ${errorText(e)}`);
         }
         keepPreview(join.tracks.filter((track) => track.direction === "recvonly").map((track) => track.name)).catch(() => {});
-        if (!join.publish || closed) return;
+        if (!join.publish || tornDown) return;
         const track = mic ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
         // The SDK gives up on a publish after a fixed 10 s, which a slow link can miss; try again before failing.
         for (let attempt = 1; ; attempt++) {
@@ -335,12 +335,12 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 await reactor.publishTrack(join.publish, track);
                 break;
             } catch (e) {
-                if (attempt === 3 || closed || !/timed out/.test(e?.message ?? e)) throw e;
+                if (attempt === 3 || tornDown || !/timed out/.test(e?.message ?? e)) throw e;
                 console.warn(`Reactor: publishing ${join.publish} timed out, retrying.`, e);
                 await reactor.unpublishTrack(join.publish);
             }
         }
-        if (closed) return;
+        if (tornDown) return;
         const sender = reactor.getPeerConnection()?.getSenders().find((s) => s.track === track);
         if (sender && !mic) {
             // The model's input size is fixed for the session: drop frames on a slow link, never resolution.
@@ -395,7 +395,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             }
         } else if (message.type === "join") {
             joinSession(message).catch((e) => {
-                if (!closed) {
+                // A run already torn down (the socket closed first) keeps its own message.
+                if (!tornDown) {
                     teardown();
                     stay(e.message, true);
                 }

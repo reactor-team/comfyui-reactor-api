@@ -422,7 +422,7 @@ def live_option(name: str) -> io.DynamicCombo.Option:
                           tooltip="The person the character is made from." if spec.pattern == "call" else "Reference image.")]
           if spec.images != "none" else []),
         *(reference_inputs(name, spec, "kept by every clip.") if spec.pattern != "call" else []),
-        *([io.Video.Input("video", optional=True, tooltip="Source clip to restyle, looped until you press Done."),
+        *([io.Video.Input("video", optional=True, tooltip="Source clip to restyle, looped until you press Save."),
            ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera instead of a clip.")]
           if source else []),
         *([ReactorMicrophoneType.Input("microphone", optional=True,

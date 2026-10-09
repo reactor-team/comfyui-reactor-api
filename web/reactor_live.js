@@ -97,6 +97,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let lanes = [];          // the model's drive lanes, from the config
     let promptCommand = null;
     let promptField = null;
+    let promptThen = null;   // a command sent after each prompt, such as the start of a take
+    let heldFields = {};     // fields every prompt repeats from the opening one, such as a clip's references
+    let thenWaiting = false; // the model rejected promptThen, so it waits until a state_update lists it as valid
+    const THEN_WAITING = "Starts when the current take ends.";
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
     let markStarted;
@@ -163,9 +167,15 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // While the modal is open, keys outside its text fields stop here so ComfyUI's hotkeys never
     // fire; the drive keys drive only while the preview has focus, and a blur releases them all.
     function command(name, data) {
-        reactor?.sendCommand(name, data).then((reply) => {
+        return reactor?.sendCommand(name, data).then((reply) => {
             if (reply?.type === "command_error") status.textContent = `Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`;
         }, (e) => { status.textContent = `Sending ${name} failed: ${errorText(e)}`; });
+    }
+
+    function sendThen() {
+        thenWaiting = false;
+        if (status.textContent === THEN_WAITING) status.textContent = "";
+        command(promptThen, {});
     }
 
     // Each lane follows the first of its key pairs with exactly one key held, and rests at idle otherwise.
@@ -295,6 +305,14 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             else sound.srcObject = media;
         });
         reactor.on("statsUpdate", (stats) => { own = stats; });
+        // A take can't start while another plays: the model rejects promptThen with a command_error message,
+        // so it waits until a state_update lists it as valid again.
+        reactor.on("message", (message) => {
+            if (message?.type === "command_error" && message.data?.command === promptThen) {
+                thenWaiting = true;
+                status.textContent = THEN_WAITING;
+            } else if (thenWaiting && message?.type === "state_update" && message.data?.valid_commands?.includes(promptThen)) sendThen();
+        });
         let joined = false;
         // Why the session went away, when Reactor or the SDK said: the reason Reactor ended it, or the last error.
         let lost = null;
@@ -371,6 +389,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             lanes = message.lanes;
             promptCommand = message.prompt_command;
             promptField = message.prompt_field;
+            promptThen = message.prompt_then;
             if (mode === "call") {
                 apply.textContent = "Send";
                 // The placeholder goes once there is text, so the two ways to talk are also said above the box.
@@ -410,6 +429,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             status.textContent = message.text;
         } else if (message.type === "started") {
             started = true;
+            heldFields = message.held ?? {};
             markStarted();
             apply.disabled = false;
             look?.refresh();
@@ -443,7 +463,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
 
     apply.onclick = async () => {
         if (look) return void switchTo();
-        command(promptCommand, { [promptField]: prompt.value });
+        await command(promptCommand, { ...heldFields, [promptField]: prompt.value });
+        if (promptThen) sendThen();
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
     };
@@ -580,6 +601,8 @@ const deviceWidget = (kind) => (node, inputName) => {
     return { widget };
 };
 
+let pickerLinks = [];
+
 app.registerExtension({
     name: "reactor.live",
     getCustomWidgets() {
@@ -592,6 +615,26 @@ app.registerExtension({
             current?.cancel();
             current = openLive(detail);
         });
+    },
+    // The frontend keeps only the first link of a grown socket group inside a model picker when it loads a graph
+    // (comfyui-frontend 1.55), so Realtime's later pictures come unplugged; this reconnects them in socket order.
+    beforeConfigureGraph(graph) {
+        const links = new Map((graph?.links ?? []).map((l) => Array.isArray(l) ? [l[0], { node: l[1], slot: l[2] }] : [l.id, { node: l.origin_id, slot: l.origin_slot }]));
+        pickerLinks = (graph?.nodes ?? []).filter((n) => n.type === "ReactorRealtime").map((n) => ({
+            id: n.id,
+            inputs: (n.inputs ?? []).filter((i) => i.name.startsWith("model.") && links.has(i.link)).map((i) => ({ name: i.name, ...links.get(i.link) })),
+        }));
+    },
+    afterConfigureGraph() {
+        for (const { id, inputs } of pickerLinks) {
+            const node = app.graph.getNodeById(id);
+            for (const { name, node: from, slot } of inputs) {
+                const index = node?.inputs?.findIndex((i) => i.name === name) ?? -1;
+                const origin = app.graph.getNodeById(from);
+                if (index >= 0 && node.inputs[index].link == null && origin) origin.connect(slot, node, index);
+            }
+        }
+        pickerLinks = [];
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== "ReactorRealtime") return;

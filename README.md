@@ -54,10 +54,8 @@ scripting every move ahead of time.
 
 <table>
 <tr>
-<td width="25%" valign="top" align="center"><a href="example_workflows/Explore%20worlds%20-%20Real-time%20world%20driven%20with%20the%20keyboard%20%28LingBot%20World%202%29.json"><img src="example_outputs/reactor_realtime_world.webp" width="100%" alt="Real-time world driven with the keyboard"></a><br><sub><b>Real-time world driven with the keyboard</b><br>LingBot World 2 · ⚡ Real time</sub></td>
-<td width="25%" valign="top" align="center"><a href="example_workflows/Explore%20worlds%20-%20Camera%20moves%20across%20a%20sequence%20%28LingBot%20World%202%29.json"><img src="example_outputs/reactor_camera_moves.webp" width="100%" alt="Camera moves across a sequence"></a><br><sub><b>Camera moves across a sequence</b><br>LingBot World 2 · 🎬 Render</sub></td>
-<td width="25%" valign="top" align="center"><a href="example_workflows/Explore%20worlds%20-%20A%20camera%20move%20on%20each%20segment%20%28LingBot%20World%202%29.json"><img src="example_outputs/reactor_camera_segments.webp" width="100%" alt="A camera move on each segment"></a><br><sub><b>A camera move on each segment</b><br>LingBot World 2 · 🎬 Render</sub></td>
-<td width="25%" valign="top" align="center"><a href="example_workflows/Explore%20worlds%20-%20One%20camera%20path%2C%20an%20event%20you%20pick%20%28LingBot%20World%202%29.json"><img src="example_outputs/reactor_camera_events.webp" width="100%" alt="One camera path, an event you pick"></a><br><sub><b>One camera path, an event you pick</b><br>LingBot World 2 · 🎬 Render</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Explore%20worlds%20-%20Real-time%20world%20driven%20with%20the%20keyboard%20%28LingBot%20World%202%29.json"><img src="example_outputs/reactor_realtime_world.webp" width="100%" alt="Real-time world driven with the keyboard"></a><br><sub><b>Real-time world driven with the keyboard</b><br>LingBot World 2 · ⚡ Real time</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Explore%20worlds%20-%20Scripted%20camera%20moves%20%28LingBot%20World%202%29.json"><img src="example_outputs/reactor_camera_moves.webp" width="100%" alt="Scripted camera moves"></a><br><sub><b>Scripted camera moves</b><br>LingBot World 2 · 🎬 Render</sub></td>
 </tr>
 </table>
 
@@ -83,31 +81,46 @@ prompt. Source on the left, result on the right.
 
 ### Generate video
 
-Stories across shots and cuts, one continuous scene steered by prompts, or a single shot that
-morphs, all from text.
+Short clips with sound from a prompt with FastH3, or from pictures of a person and a place with
+H3 Reference Turbo Realtime. Stories across shots and cuts, one continuous scene steered by prompts,
+or a single shot that morphs, all from text.
 
 <table>
 <tr>
-<td width="33%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Real-time%20video%20from%20a%20prompt%20%28LongLive-2.0%29.json"><img src="example_outputs/reactor_realtime_prompt.webp" width="100%" alt="Real-time video from a prompt"></a><br><sub><b>Real-time video from a prompt</b><br>LongLive-2.0 · ⚡ Real time</sub></td>
-<td width="33%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Segments%20joined%20by%20cuts%20%28LongLive-2.0%29.json"><img src="example_outputs/reactor_segment_cuts.webp" width="100%" alt="Segments joined by cuts"></a><br><sub><b>Segments joined by cuts</b><br>LongLive-2.0 · 🎬 Render</sub></td>
-<td width="33%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Nine%20segments%20of%20shots%20and%20cuts%20%28LongLive-2.0%29.json"><img src="example_outputs/reactor_nine_segments.webp" width="100%" alt="Nine segments of shots and cuts"></a><br><sub><b>Nine segments of shots and cuts</b><br>LongLive-2.0 · 🎬 Render</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Real-time%20clips%20with%20sound%20from%20a%20prompt%20%28FastH3%29.json"><img src="example_outputs/reactor_fasth3_realtime.webp" width="100%" alt="Real-time clips with sound from a prompt"></a><br><sub><b>Real-time clips with sound from a prompt</b><br>FastH3 · ⚡ Real time</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Clips%20with%20sound%2C%20a%20shot%20then%20a%20cut%20%28FastH3%29.json"><img src="example_outputs/reactor_fasth3_clips.webp" width="100%" alt="Clips with sound, a shot then a cut"></a><br><sub><b>Clips with sound, a shot then a cut</b><br>FastH3 · 🎬 Render</sub></td>
 </tr>
 <tr>
-<td width="33%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20One%20scene%20steered%20by%20prompts%20%28Helios%29.json"><img src="example_outputs/reactor_helios.webp" width="100%" alt="One scene steered by prompts"></a><br><sub><b>One scene steered by prompts</b><br>Helios · 🎬 Render</sub></td>
-<td width="33%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20A%20storm%20morphing%20around%20one%20shot%20%28Visko%20Orbis%20Stable%29.json"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="100%" alt="A storm morphing around one shot"></a><br><sub><b>A storm morphing around one shot</b><br>Visko Orbis Stable · 🎬 Render</sub></td>
-<td width="33%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20One%20opening%2C%20three%20endings%20%28LongLive-2.0%29.json"><img src="example_outputs/reactor_ad_variants.webp" width="34%" alt="One opening, three endings"></a><br><sub><b>One opening, three endings</b><br>LongLive-2.0 · 🎬 Render</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Real-time%20clips%20of%20a%20person%20and%20a%20place%20from%20two%20pictures%20%28H3%20Reference%20Turbo%20Realtime%29.json"><img src="example_outputs/reactor_h3_reference_realtime.webp" width="100%" alt="Real-time clips of a person and a place from two pictures"></a><br><sub><b>Real-time clips of a person and a place from two pictures</b><br>H3 Reference Turbo Realtime · ⚡ Real time</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20A%20person%20and%20a%20place%20from%20two%20pictures%20%28H3%20Reference%20Turbo%20Realtime%29.json"><img src="example_outputs/reactor_h3_reference.webp" width="100%" alt="A person and a place from two pictures"></a><br><sub><b>A person and a place from two pictures</b><br>H3 Reference Turbo Realtime · 🎬 Render</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Real-time%20video%20from%20a%20prompt%20%28LongLive-2.0%29.json"><img src="example_outputs/reactor_realtime_prompt.webp" width="100%" alt="Real-time video from a prompt"></a><br><sub><b>Real-time video from a prompt</b><br>LongLive-2.0 · ⚡ Real time</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Nine%20segments%20of%20shots%20and%20cuts%20%28LongLive-2.0%29.json"><img src="example_outputs/reactor_nine_segments.webp" width="100%" alt="Nine segments of shots and cuts"></a><br><sub><b>Nine segments of shots and cuts</b><br>LongLive-2.0 · 🎬 Render</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20One%20scene%20steered%20by%20prompts%20%28Helios%29.json"><img src="example_outputs/reactor_helios.webp" width="100%" alt="One scene steered by prompts"></a><br><sub><b>One scene steered by prompts</b><br>Helios · 🎬 Render</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20A%20storm%20morphing%20around%20one%20shot%20%28Visko%20Orbis%20Stable%29.json"><img src="example_outputs/reactor_visko_orbis_stable.webp" width="100%" alt="A storm morphing around one shot"></a><br><sub><b>A storm morphing around one shot</b><br>Visko Orbis Stable · 🎬 Render</sub></td>
 </tr>
 </table>
 
 ### Avatars
 
-Talk with a character made from a photo: your voice goes in, video comes out.
+Talk with a character made from a photo: your voice goes in, video comes out. Or have a photo
+speak your script, one take at a time.
 
 <div align="center">
 
 <table>
 <tr>
-<td width="100%" valign="top" align="center"><a href="example_workflows/Avatars%20-%20Real-time%20conversation%2C%20your%20voice%20in%20and%20video%20out%20%28Vidu%20S2-Avatar%29.json"><img src="example_outputs/reactor_avatar.webp" height="320" alt="Real-time conversation, your voice in and video out"></a><br><sub><b>Real-time conversation, your voice in and video out</b><br>Vidu S2-Avatar · ⚡ Real time</sub></td>
+<td colspan="2" width="100%" valign="top" align="center"><a href="example_workflows/Avatars%20-%20Real-time%20conversation%2C%20your%20voice%20in%20and%20video%20out%20%28Vidu%20S2-Avatar%29.json"><img src="example_outputs/reactor_avatar.webp" height="320" alt="Real-time conversation, your voice in and video out"></a><br><sub><b>Real-time conversation, your voice in and video out</b><br>Vidu S2-Avatar · ⚡ Real time</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Avatars%20-%20Real-time%20takes%20of%20a%20photo%20speaking%20your%20script%20%28LTX%29.json"><img src="example_outputs/reactor_ltx_realtime.webp" width="100%" alt="Real-time takes of a photo speaking your script"></a><br><sub><b>Real-time takes of a photo speaking your script</b><br>LTX · ⚡ Real time</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Avatars%20-%20A%20photo%20speaks%20a%20script%20in%20two%20takes%20%28LTX%29.json"><img src="example_outputs/reactor_ltx_takes.webp" width="100%" alt="A photo speaks a script in two takes"></a><br><sub><b>A photo speaks a script in two takes</b><br>LTX · 🎬 Render</sub></td>
 </tr>
 </table>
 
@@ -118,17 +131,39 @@ Talk with a character made from a photo: your voice goes in, video comes out.
 Read the model's prompt guide before writing prompts: it applies to the prompts you write here,
 and each example's note links it.
 
+### Explore worlds
+
 | Model | What it does | Takes | Prompt guide |
 | --- | --- | --- | --- |
-| [LingBot](https://docs.reactor.inc/model-api-reference/lingbot/overview) | A world you walk through | first image, camera moves | [Prompt guide](https://docs.reactor.inc/model-api-reference/lingbot/prompt-guide) |
 | [LingBot World 2](https://docs.reactor.inc/model-api-reference/lingbot-world-2/overview) | LingBot with more camera control | first image, camera moves | [Prompt guide](https://docs.reactor.inc/model-api-reference/lingbot-world-2/prompt-guide) |
+| [LingBot](https://docs.reactor.inc/model-api-reference/lingbot/overview) | A world you walk through | first image, camera moves | [Prompt guide](https://docs.reactor.inc/model-api-reference/lingbot/prompt-guide) |
+
+### Edit video
+
+| Model | What it does | Takes | Prompt guide |
+| --- | --- | --- | --- |
 | [Vidu S2-Editing](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/overview) | Restyle, re-dress or recast from an image | video, image | [Prompt guide](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/prompt-guide) |
 | [X2](https://docs.reactor.inc/model-api-reference/x2/overview) | Edit a video or camera from a prompt | video, optional image | [Prompt guide](https://docs.reactor.inc/model-api-reference/x2/prompt-guide) |
 | [Sana Streaming](https://docs.reactor.inc/model-api-reference/sana-streaming/overview) | Edit a video file from a prompt | video (Render only) | [Prompt guide](https://docs.reactor.inc/model-api-reference/sana-streaming/prompt-guide) |
-| [LongLive-2.0](https://docs.reactor.inc/model-api-reference/longlive-v2/overview) | A story across shots and cuts, from text | prompt | [Prompt guide](https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide) |
+
+### Generate video
+
+| Model | What it does | Takes | Prompt guide |
+| --- | --- | --- | --- |
+| [FastH3](https://docs.reactor.inc/model-api-reference/fast-h3/overview) | Short clips with sound, one per prompt | prompt, image on any segment | [Prompt guide](https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide) |
+| [H3 Reference Turbo Realtime](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/overview) | Clips with sound, guided by up to nine pictures, which prompts call Picture 1, Picture 2, … in socket order | prompt, pictures | [Prompt guide](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide) |
 | [Helios](https://docs.reactor.inc/model-api-reference/helios/overview) | One continuous scene steered by prompts | prompt, image on any segment | [Prompt guide](https://docs.reactor.inc/model-api-reference/helios/prompt-guide) |
 | [Visko Orbis Stable / Dynamic](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/overview) | One unbroken shot that morphs, with sound | prompt, optional first image | [Stable](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/prompt-guide), [Dynamic](https://docs.reactor.inc/model-api-reference/visko-orbis-dynamic/prompt-guide) |
+| [LongLive-2.0](https://docs.reactor.inc/model-api-reference/longlive-v2/overview) | A story across shots and cuts, from text | prompt | [Prompt guide](https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide) |
+
+### Avatars
+
+| Model | What it does | Takes | Prompt guide |
+| --- | --- | --- | --- |
 | [Vidu S2-Avatar](https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/overview) | Talk with a character made from a photo | first image, persona | [Prompt guide](https://docs.reactor.inc/model-api-reference/vidu-s2-avatar/prompt-guide) |
+| [LTX](https://docs.reactor.inc/model-api-reference/ltx/overview) | A person from a photo speaks your script | first image, script | [Prompt guide](https://docs.reactor.inc/model-api-reference/ltx/prompt-guide) |
+
+**Not yet supported: HappyOyster.**
 
 ## Nodes
 

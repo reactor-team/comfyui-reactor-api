@@ -16,8 +16,8 @@ class Beat:
     `cut` asks for a hard scene break from the beat before instead of a soft transition. `image`
     is PNG bytes for models that condition on a reference image. `video` is the source clip as
     an encoded video file, for video-to-video models, and only the first beat's is read. `moves` are camera
-    moves counted from the beat's own start and cut at its end. `references` are what a call's
-    character has on during the beat. `settings` holds the beat's values of the model's `beat_settings`.
+    moves counted from the beat's own start and cut at its end. `references` are the model's own
+    reference images in effect during the beat, in order. `settings` holds the beat's values of the model's `beat_settings`.
     """
     prompt: str
     frames: int
@@ -70,13 +70,14 @@ class Setting:
     """A model option sent as `command` with one field: before `start` as the first link sets it, when a later beat changes it, or as a field of a call's `start_call`.
 
     `field` is that field's name, when it differs from the setting's. A setting with no `options`
-    takes a value of its `default`'s type: a toggle, a number from 0 to `maximum`, or text.
+    takes a value of its `default`'s type: a toggle, a number from `minimum` to `maximum`, or text.
     """
     command: str
     options: tuple[str, ...]
     default: str | float | bool
     field: str | None = None
     maximum: float | None = None
+    minimum: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -100,7 +101,7 @@ class ModelSpec:
 
     `pattern` is how the model is driven: "chunked" models generate from prompts and report each
     chunk, "source" models transform a video the client sends, "clips" models build and play
-    queued clips, and "call" models hold a conversation, answering each beat's prompt aloud. `images` is which beats may carry an image: "none", "first" (read only at
+    queued clips, "takes" models speak a script per take, and "call" models hold a conversation, answering each beat's prompt aloud. `images` is which beats may carry an image: "none", "first" (read only at
     start), or "any". `frames_per_chunk` is set only for models whose timeline is scheduled by chunk.
     `session_frames` is whether `chunk_complete.frames_emitted` counts the whole session rather
     than the one chunk. `image_required` is whether the opening beat must carry an image.
@@ -109,7 +110,8 @@ class ModelSpec:
     "source" model's live source is pushed to. `first_chunk_frames` is the length of a scene's
     first chunk when it differs from the rest. `size` is the native frame size images and source
     frames are fitted to; with `keeps_aspect`, only its short side is fixed and the source's aspect holds.
-    `references` is whether beats may carry its references. `starts` is whether the model waits for a `start` command before generating. `live` is whether
+    `references` is whether beats may carry its references, and `pictures` whether those are plain images, which prompts
+    call Picture 1, Picture 2, … in order. `starts` is whether the model waits for a `start` command before generating. `live` is whether
     Reactor Realtime offers the model.
     `native` is the commands, sent before `start`, that keep the video at the model's native size, or its nearest.
     `settings` are the settings the model reads only at start, set on a chain's first link. `beat_settings` are settings the
@@ -117,7 +119,12 @@ class ModelSpec:
     named by its command's field, to the lane. `prompt_command` changes the prompt mid-run. `prompted` is whether the model
     takes a prompt at all. `switch_image` names the field of `prompt_command` that takes a new image mid-run, for a model whose
     live change is an image and settings rather than a prompt. `audio` is whether the model plays
-    sound, so its session carries a `main_audio` track.
+    sound, so its session carries a `main_audio` track. `max_references` is how many references a beat may
+    carry. `live_held` are fields of the live prompt command that every later prompt repeats from the opening one.
+    `prompt_field` is the field of `prompt_command` the prompt goes in, and `live_then` a command the live
+    window sends after each prompt. `crop_focus` is where a fitted image's crop sits, from 0 (its top) to 1 (its bottom).
+    `seconds` is set for a model timed in seconds: the range of a segment's length, which its segments take in
+    seconds, with 0 lasting as long as the script needs.
     """
     slug: str
     pattern: str
@@ -131,6 +138,7 @@ class ModelSpec:
     videos: str = "none"
     video_required: bool = False
     references: bool = False
+    pictures: bool = False
     source_track: str | None = None
     first_chunk_frames: int | None = None
     size: tuple[int, int] = (1280, 704)
@@ -146,6 +154,12 @@ class ModelSpec:
     # A model with sound plays a `main_audio` track a live take must list and subscribe to.
     audio: bool = False
     switch_image: str | None = None
+    max_references: int = 3
+    prompt_field: str = "prompt"
+    live_then: str | None = None
+    live_held: tuple[str, ...] = ()
+    crop_focus: float = 0.5
+    seconds: tuple[float, float] | None = None
 
     def frame_size(self, width: int, height: int) -> tuple[int, int]:
         """The size a width x height input is sent at."""
@@ -155,8 +169,8 @@ class ModelSpec:
         return round(width * scale / 2) * 2, round(height * scale / 2) * 2
 
     def fit(self, image: Image.Image) -> Image.Image:
-        """The image scaled to cover `frame_size` and center-cropped to it."""
-        return ImageOps.fit(image.convert("RGB"), self.frame_size(*image.size), Image.LANCZOS)
+        """The image scaled to cover `frame_size` and cropped to it, centered across and at `crop_focus` down."""
+        return ImageOps.fit(image.convert("RGB"), self.frame_size(*image.size), Image.LANCZOS, centering=(0.5, self.crop_focus))
 
     def fit_png(self, png: bytes) -> bytes:
         buf = io.BytesIO()
@@ -213,7 +227,19 @@ AVATAR_SETTINGS = {"persona": Setting("start_call", (), ""),
 EDIT_TYPES = ("style_transfer", "virtual_tryon", "subject_replacement", "background_replacement")
 
 
+# LTX's default pace, in words a minute.
+LTX_DEFAULT_WPM = 140
+LTX_SETTINGS = {"scene": Setting("set_prompt", (), "", field="prompt"),
+                "pace": Setting("set_wpm", (), LTX_DEFAULT_WPM, field="wpm", minimum=80, maximum=220)}
+FAST_H3_SETTINGS = {"aspect": Setting("set_canvas", ("16:9", "1:1", "9:16", "4:3"), "16:9")}
+
+
 MODELS = {
+    # Each segment is one clip; the model fits an image to its own canvas, so only its short side is fitted here.
+    # Live, each prompt enqueues the next clip and autoplay plays it.
+    # Measured on cloud sessions: a 6 s clip plays 158 frames, not 144, and the render keeps them all.
+    "FastH3": ModelSpec("reactor/fast-h3", "clips", 24.0, "any", True, size=(1344, 768), keeps_aspect=True, starts=False,
+                        settings=FAST_H3_SETTINGS, prompt_command="enqueue", audio=True),
     # Measured on cloud sessions: a scene's first chunk is 29 frames and every later one 32, where the docs say 29,
     # and `frames_emitted` counts the whole session.
     "LongLive-2.0": ModelSpec("reactor/longlive-v2", "chunked", 24.0, "none", True, frames_per_chunk=32, max_scene_chunks=48,
@@ -255,6 +281,16 @@ MODELS = {
                                  video_required=True, source_track="camera", size=(952, 544), keeps_aspect=True, prompted=False,
                                  prompt_command="switch_reference", switch_image="reference_image",
                                  beat_settings={"editing_type": Setting("switch_reference", EDIT_TYPES, "style_transfer")}),
+    # Every clip needs its own references, which guide its look rather than fix a frame; prompts call them Picture 1, 2, ...
+    "H3 Reference Turbo Realtime": ModelSpec("reactor/h3-reference-to-video-turbo-realtime", "clips", 24.0, "none", True,
+                                             references=True, pictures=True, max_references=9, size=(1344, 768), keeps_aspect=True, starts=False,
+                                             settings=FAST_H3_SETTINGS, prompt_command="enqueue", audio=True,
+                                             live_held=("reference_images",)),
+    # Each segment is one take: its prompt is the script the avatar speaks, its length the take's.
+    # Live, each prompt is the next take's script, started once the take before ends.
+    # A portrait fitted to its wide frame keeps the face, which sits near its top.
+    "LTX": ModelSpec("reactor/ltx2", "takes", 24.0, "first", False, image_required=True, size=(640, 352), crop_focus=0.1, settings=LTX_SETTINGS,
+                     prompt_command="set_script", prompt_field="script", live_then="start", audio=True, seconds=(4, 300)),
 }
 
 
@@ -273,6 +309,9 @@ def model_facts(spec: ModelSpec) -> dict:
         "references": spec.references,
         "videos": spec.videos,
         "video_required": spec.video_required,
+        # A "takes" beat of 0 frames lasts its script's words at the first segment's pace, clamped to a take's range.
+        "script_length": {"wpm": LTX_DEFAULT_WPM, "min_seconds": spec.seconds[0], "max_seconds": spec.seconds[1]}
+                         if spec.seconds else None,
         "camera": {name: {"options": list(lane.options), "idle": lane.idle, "maximum": lane.maximum,
                           "speed": lane.speed and {"idle": spec.camera[lane.speed].idle, "maximum": spec.camera[lane.speed].maximum}}
                    for name, lane in spec.camera.items() if name not in speed_lanes(spec)},
@@ -292,7 +331,9 @@ class Plan:
     once `chunk` chunks have completed, for beats the model cannot schedule itself. `chunks` is how
     many chunks of video to capture. `source` is the clip a "source" runner streams, as an encoded video file;
     for a "source" model `chunks` and the first element of each `timed` entry count source frames
-    pushed, as a source model reports no chunks. For a "call" model, `holds` is the least number of
+    pushed, as a source model reports no chunks. For a "clips" model, `chunks` is the frames asked
+    for, `timed` holds one `enqueue` per clip in play order, and an int `continue_from_clip_id` is
+    the index of an earlier clip, which the runner swaps for its id. For a "call" model, `holds` is the least number of
     frames each of its `chunks` plays before the next goes out. A command value holding `bytes` is a file to
     upload first.
     """
@@ -547,6 +588,53 @@ def compile_edit(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> P
     return plan
 
 
+def compile_clips(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
+    """One clip per beat. A shot continues from the clip before it; a cut opens fresh, and so does a beat with
+    a starting image. A model that takes references gets each beat's, in order.
+
+    Boundaries hold the last frame instead of cutting to black. The runner turns on autoplay once the clips are built.
+    """
+    plan = Plan(setup=[("set_seed", {"seed": seed}), ("set_flush_on_clip_end", {"enabled": False})],
+                chunks=sum(beat.frames for beat in beats))
+    for i, beat in enumerate(beats):
+        data = {"prompt": beat.prompt, "seconds": beat.frames / spec.fps}
+        if spec.references:
+            if not beat.references:
+                raise ValueError(f"Segment {i + 1} has no references; every {model} segment needs at least one.")
+            if len(beat.references) > spec.max_references:
+                raise ValueError(f"Segment {i + 1} has {len(beat.references)} references; {model} takes at most {spec.max_references}.")
+            data["reference_images"] = [r.png for r in beat.references]
+            if i and not beat.cut:
+                data["continue_from_clip_id"] = i - 1
+        # A clip opens from one picture: an image, or the clip before's last frame.
+        elif beat.image is not None:
+            data["starting_frame"] = beat.image
+        elif i and not beat.cut:
+            data["continue_from_clip_id"] = i - 1
+        plan.timed.append((i, "enqueue", data))
+    return plan
+
+
+def compile_takes(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
+    """One take per beat, in turn: the first beat's image is the avatar, each beat's prompt is its script, and its frames its length.
+
+    `timed` keys each command by its take, and `holds` is each take's frames. A beat of 0 frames lasts as long
+    as its script needs at the session's pace, and its hold is 0: the take is recorded until the model ends it.
+    A take that runs past its script holds an idle presence to the end.
+    """
+    low, high = spec.seconds
+    plan = Plan(setup=[("set_seed", {"seed": seed}), ("set_avatar_image", {"avatar_image": beats[0].image})], chunks=len(beats),
+                holds=[beat.frames for beat in beats])
+    for i, beat in enumerate(beats):
+        if not beat.prompt.strip():
+            raise ValueError(f"Segment {i + 1} says nothing; give it a script as its prompt.")
+        if beat.frames and not low <= beat.frames / spec.fps <= high:
+            raise ValueError(f"Segment {i + 1} lasts {beat.frames / spec.fps:.1f}s; a {model} take lasts {low}–{high}s, or 0 to fit its script.")
+        plan.timed += [(i, "set_script", {"script": beat.prompt}), (i, "set_duration_seconds", {"duration_seconds": beat.frames / spec.fps}),
+                       (i, "start", {})]
+    return plan
+
+
 def data_url(png: bytes) -> str:
     """The image as an inline JPEG `data:` URL.
 
@@ -603,4 +691,5 @@ def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> 
 
 COMPILERS = {"LongLive-2.0": compile_longlive, "Helios": compile_helios, "LingBot": compile_live,
              "LingBot World 2": compile_live, "Visko Orbis Dynamic": compile_live, "Visko Orbis Stable": compile_live,
-             "Sana Streaming": compile_sana, "X2": compile_x2, "Vidu S2-Editing": compile_edit}
+             "Sana Streaming": compile_sana, "X2": compile_x2, "Vidu S2-Editing": compile_edit, "FastH3": compile_clips,
+             "H3 Reference Turbo Realtime": compile_clips, "LTX": compile_takes}

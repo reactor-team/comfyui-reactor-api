@@ -13,6 +13,7 @@ from reactor_sdk.errors import RateLimitedError, ReactorError, UnauthorizedError
 
 from .clip import ClipStream
 from .encode import FrameWriter
+from .recording import Recording
 from .timeline import ModelSpec, Plan
 
 # Once the model is done, how long to wait without a frame before closing a short capture.
@@ -59,12 +60,19 @@ class Session:
                  on_progress: Progress):
         # `planned` estimates the frames to capture, for progress until the model reports the real count.
         self.reactor, self.writer, self.planned = reactor, writer, planned
+        self.uploads: dict[bytes, object] = {}
         self.check_interrupt, self.on_progress = check_interrupt, on_progress
         self.messages: asyncio.Queue[dict] = asyncio.Queue()
         # Observed on cloud sessions: the stream opens with a placeholder frame at connect, before the model produces anything.
-        self.capturing = False
+        self._capturing = False
+        # The session's own recording, which keeps the spans captured here; None saves only the frames received.
+        self.recording: Recording | None = None
         # Set to start capturing at the character's next speech rather than at once.
         self.capture_on_speech = False
+        # Set to start capturing at the next frame rather than at `start`, so sound sent before it stays out.
+        self.capture_on_frame = False
+        # A frame count at which capturing stops by itself, so frames past a take's end stay out.
+        self.capture_until: int | None = None
         self.frame_shape: tuple[int, ...] | None = None
         self.reported = -1
         self.reported_at = -PROGRESS_INTERVAL_SECONDS
@@ -73,10 +81,24 @@ class Session:
         # Why Reactor ended the session or the SDK gave up on it, raised at the next message wait.
         self.failure: str | None = None
 
+    @property
+    def capturing(self) -> bool:
+        return self._capturing
+
+    @capturing.setter
+    def capturing(self, on: bool) -> None:
+        if on != self._capturing and self.recording is not None:
+            self.recording.mark()
+        self._capturing = on
+
     def push_video(self, frame: np.ndarray) -> None:
         self.frame_shape = frame.shape
+        if self.capture_on_frame:
+            self.capture_on_frame, self.capturing = False, True
         if self.capturing:
             self.writer.push(frame)
+            if self.capture_until is not None and self.writer.received >= self.capture_until:
+                self.capturing = False
 
     def push_audio(self, pcm: np.ndarray, sample_rate: int) -> None:
         if np.sqrt(np.mean(np.square(pcm, dtype=np.float32))) > SPEECH_LEVEL:
@@ -86,18 +108,26 @@ class Session:
         if self.capturing:
             self.writer.push_audio(pcm, sample_rate)
 
-    async def send(self, command: str, data: dict) -> None:
-        async def upload(key: str, value: bytes):
-            # An upload under `video` is the source clip; every other file is a PNG image.
-            name, mime_type = ("video.mp4", "video/mp4") if key == "video" else (f"{key}.png", "image/png")
-            return await self.reactor.upload_file(value, name=name, mime_type=mime_type)
+    async def send(self, command: str, data: dict) -> dict | None:
+        async def upload(key: str, value):
+            if isinstance(value, list) and value and all(isinstance(v, bytes) for v in value):
+                return [await upload(key, v) for v in value]
+            if not isinstance(value, bytes):
+                return value
+            # A file is uploaded once a session, however many clips reuse it.
+            if value not in self.uploads:
+                # An upload under `video` is the source clip; every other file is a PNG image.
+                name, mime_type = ("video.mp4", "video/mp4") if key == "video" else (f"{key}.png", "image/png")
+                self.uploads[value] = await self.reactor.upload_file(value, name=name, mime_type=mime_type)
+            return self.uploads[value]
 
-        data = {k: await upload(k, v) if isinstance(v, bytes) else v for k, v in data.items()}
-        if command == "start":
+        data = {k: await upload(k, v) for k, v in data.items()}
+        if command == "start" and not self.capture_on_frame:
             self.capturing = True
         reply = await self.reactor.send_command(command, data)
         if reply is not None and reply.get("type") == "command_error":
             raise RuntimeError(f"Reactor rejected {command}: {reply.get('data', {}).get('reason')}")
+        return reply
 
     async def next_message(self, timeout: float = PROGRESS_INTERVAL_SECONDS) -> dict | None:
         """The next model message, or None after `timeout` without one. Raises on a rejected command."""
@@ -323,7 +353,96 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
             session_phase(await session.next_message())
 
 
-RUNNERS = {"chunked": run_chunked, "source": run_source, "call": run_call}
+async def run_clips(session: Session, spec: ModelSpec, plan: Plan) -> None:
+    """Drive a model that builds queued clips and plays them; its clock is the clips played.
+
+    A clip that continues another is queued once that one is built, since a continuation of an
+    unbuilt clip opens fresh. Playing starts once every clip is built, or the playout queue is full,
+    so autoplay does not run dry between clips. The take is the frames the model reports for its
+    clips, which it snaps to lengths it can make.
+    """
+    for command, data in plan.setup:
+        await session.send(command, data)
+    pending = sorted(plan.timed, key=lambda t: t[0])
+    ids: list[str] = []
+    frames = 0
+    building: set[str] = set()
+    full = playing = False
+    model_done_at = None
+    last_sign_at = time.monotonic()
+    while not session.capture_ended(model_done_at):
+        while pending and not (isinstance(anchor := pending[0][2].get("continue_from_clip_id"), int) and ids[anchor] in building):
+            i, command, data = pending.pop(0)
+            if isinstance(anchor, int):
+                data = {**data, "continue_from_clip_id": ids[anchor]}
+            reply = await session.send(command, data)
+            clip = ((reply or {}).get("data") or {}).get("clip")
+            if not clip:
+                raise RuntimeError(f"The model did not queue segment {i + 1}.")
+            ids.append(clip["clip_id"])
+            building.add(clip["clip_id"])
+            frames += int(clip["frames"])
+            if not pending:
+                session.planned = session.writer.limit = frames
+        if not playing and ((not pending and not building) or full):
+            await session.send("set_autoplay", {"enabled": True})
+            playing = True
+        msg = await session.next_message()
+        if msg is None:
+            if model_done_at is None and time.monotonic() - last_sign_at > CHUNK_STALL_SECONDS:
+                raise RuntimeError(f"The model went silent for {CHUNK_STALL_SECONDS:.0f}s mid-render; the session is dead.")
+            continue
+        last_sign_at = time.monotonic()
+        kind, data = msg.get("type"), msg.get("data") or {}
+        clip_id = (data.get("clip") or {}).get("clip_id")
+        if kind == "state_update" and "playout_queued" in data:
+            full = data["playout_queued"] >= data.get("playout_capacity", math.inf)
+        elif kind == "clip_generated":
+            building.discard(clip_id)
+        elif kind == "clip_failed" and clip_id in ids:
+            raise RuntimeError(f"Segment {ids.index(clip_id) + 1} failed to build: {data.get('reason') or data.get('error') or 'no reason given'}")
+        elif kind == "clip_started" and ids and clip_id == ids[0]:
+            session.capturing = True
+        elif kind in ("clip_finished", "clip_stopped") and not pending and clip_id == ids[-1]:
+            model_done_at = model_done_at or time.monotonic()
+
+
+async def run_takes(session: Session, spec: ModelSpec, plan: Plan) -> None:
+    """Drive a model that generates one take at a time; each take is recorded from its start to its end.
+
+    A take's commands go out once the take before has ended, as a model refuses `start` mid-take. Each take
+    records its planned frames and no more, or with none planned every frame until it ends, so the idle frames
+    between takes stay out of the video.
+    """
+    for command, data in plan.setup:
+        await session.send(command, data)
+    for take, frames in enumerate(plan.holds):
+        session.capture_until = session.writer.received + frames if frames else None
+        # Measured on LTX: sound keeps streaming while a take is generated, before its first frame arrives.
+        session.capture_on_frame = True
+        for _, command, data in (t for t in plan.timed if t[0] == take):
+            await session.send(command, data)
+        done = False
+        last_sign_at = time.monotonic()
+        # The take ends at `generation_complete`; its frames may trail the message, so they are waited for.
+        while not done or (session.capturing and time.monotonic() - max(last_sign_at, session.writer.last_frame_at or 0) <= FRAME_GRACE_SECONDS):
+            msg = await session.next_message()
+            if msg is None:
+                if not done and time.monotonic() - last_sign_at > CHUNK_STALL_SECONDS:
+                    raise RuntimeError(f"The model went silent for {CHUNK_STALL_SECONDS:.0f}s mid-render; the session is dead.")
+                continue
+            kind, data = msg.get("type"), msg.get("data") or {}
+            if kind in ("generation_started", "window_progress"):
+                last_sign_at = time.monotonic()
+            elif kind == "generation_complete":
+                done, last_sign_at = True, time.monotonic()
+            elif kind in ("generation_failed", "generation_stopped", "generation_reset"):
+                raise RuntimeError(f"Segment {take + 1} did not finish: {data.get('reason') or kind}")
+        session.capturing = session.capture_on_frame = False
+    session.planned = session.writer.received
+
+
+RUNNERS = {"chunked": run_chunked, "source": run_source, "clips": run_clips, "takes": run_takes, "call": run_call}
 
 
 def api_message(text: str) -> str:
@@ -440,12 +559,32 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
             on_status("Connecting to Reactor…")
             await connect_with_retry(reactor, check_interrupt, on_status)
             await asyncio.sleep(CONNECT_SETTLE_SECONDS)
+            session.recording = Recording(reactor)
             on_status("Rendering")
             await RUNNERS[spec.pattern](session, spec, plan)
+            clip, jwt = await session.recording.finish(), None
+            if clip is not None:
+                try:
+                    jwt = await recording_token(reactor, spec, connect)
+                except Exception as e:
+                    logging.warning("Reactor: no token to download the session's recording (%s); keeping the frames this client received.", e)
+                    clip = None
     except BaseException:
         # The session's error is the one worth reporting, not the encoder's.
         with contextlib.suppress(Exception):
             writer.close()
         raise
     writer.close()
+    if clip is not None:
+        on_status("Saving the session's recording…")
+        await session.recording.save(clip, jwt, out_path, spec.fps, writer.limit)
     on_progress(writer.received, writer.received, writer.previous)
+
+
+async def recording_token(reactor: Reactor, spec: ModelSpec, connect: dict) -> str | None:
+    """A token bound to this session that can download its recording; a local runtime needs none."""
+    if "api_key" not in connect:
+        return None
+    # Imported here: live imports this module.
+    from .live import session_token
+    return await asyncio.to_thread(session_token, connect["api_key"], spec.slug, reactor.session_id)

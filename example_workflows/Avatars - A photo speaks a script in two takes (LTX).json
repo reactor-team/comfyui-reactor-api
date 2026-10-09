@@ -1,0 +1,505 @@
+{
+  "id": "3e879e8a-5dd1-4481-8179-7feebec8b650",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        560,
+        180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "A person from a photo speaks a script in two takes with LTX, one segment node per take. The first segment holds the photo, and the scene that casts the voice and the delivery for every take. Each segment's prompt is the words spoken. With seconds at 0, a take lasts as long as its script needs at the pace; set seconds to pin its length, and a take longer than its script holds the person in a quiet, idle presence to the end.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "A person from a photo speaks a script in two takes with LTX, one segment node per take. The first segment holds the photo, and the scene that casts the voice and the delivery for every take. Each segment's prompt is the words spoken. With seconds at 0, a take lasts as long as its script needs at the pace; set seconds to pin its length, and a take longer than its script holds the person in a quiet, idle presence to the end.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        300
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_gardener_portrait.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_gardener_portrait.jpg"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorLTXSegment",
+      "pos": [
+        400,
+        300
+      ],
+      "size": [
+        400,
+        400
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 1
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "shape": 7,
+          "type": "REACTOR_SEQUENCE",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seconds",
+          "name": "seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "seconds"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "scene",
+          "name": "scene",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "scene"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "pace",
+          "name": "pace",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "pace"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorLTXSegment"
+      },
+      "widgets_values": [
+        "Welcome to my garden. These tomatoes took all summer, but look at them now. They're finally ripe.",
+        0,
+        "A single person speaks directly to the camera in a sunny greenhouse. Her voice is a warm, bright mezzo with an easy smile in it, unhurried and conversational, with a soft breath between sentences.",
+        140
+      ],
+      "widgets_values_named": {
+        "prompt": "Welcome to my garden. These tomatoes took all summer, but look at them now. They're finally ripe.",
+        "seconds": 0,
+        "scene": "A single person speaks directly to the camera in a sunny greenhouse. Her voice is a warm, bright mezzo with an easy smile in it, unhurried and conversational, with a soft breath between sentences.",
+        "pace": 140
+      }
+    },
+    {
+      "id": 4,
+      "type": "ReactorLTXSegment",
+      "pos": [
+        860,
+        300
+      ],
+      "size": [
+        400,
+        400
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "shape": 7,
+          "type": "REACTOR_SEQUENCE",
+          "link": 2
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seconds",
+          "name": "seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "seconds"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "scene",
+          "name": "scene",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "scene"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "pace",
+          "name": "pace",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "pace"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            3,
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorLTXSegment"
+      },
+      "widgets_values": [
+        "And over here are the sunflowers. They grew taller than me this year, and the bees love them.",
+        0,
+        "",
+        140
+      ],
+      "widgets_values_named": {
+        "prompt": "And over here are the sunflowers. They grew taller than me this year, and the bees love them.",
+        "seconds": 0,
+        "scene": "",
+        "pace": 140
+      }
+    },
+    {
+      "id": 5,
+      "type": "ReactorSequenceVisualizer",
+      "pos": [
+        400,
+        760
+      ],
+      "size": [
+        860,
+        160
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 3
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "ReactorSequenceVisualizer"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "timeline": ""
+      }
+    },
+    {
+      "id": 6,
+      "type": "ReactorRender",
+      "pos": [
+        1320,
+        300
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 4
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        42,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 7,
+      "type": "SaveVideo",
+      "pos": [
+        1780,
+        300
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 5
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/ltx",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/ltx",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      3,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      1,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      3,
+      4,
+      0,
+      5,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      4,
+      4,
+      0,
+      6,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      5,
+      6,
+      0,
+      7,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.45,
+      "offset": [
+        100,
+        100
+      ]
+    }
+  },
+  "version": 0.4
+}

@@ -48,13 +48,24 @@ share its shape.
    value without reading it, and only that model's compiler reads its fields. The value records
    the model it was made for, and a render for any other model rejects it.
 
+   Reference nodes are factory nodes too. A model whose `ModelSpec` has `references=True` takes a
+   list of them on a `references` input (an Autogrow of `REACTOR_REFERENCE` sockets, up to
+   `max_references`), on its segment node and inside Reactor Realtime's `model` picker alike. The
+   node that makes one is listed in `REFERENCE_NODES` in `nodes.py`, such as Reactor Vidu S2-Avatar
+   Reference (tags an image as an object, outfit or background). A reference that is only an image
+   needs no factory node: with `pictures=True` the model takes plain images on a `pictures` input
+   instead (`picture_1`, `picture_2`, …), which prompts call Picture 1, Picture 2, … in socket order,
+   as H3 Reference Turbo Realtime does. A live model that needs its references resent with every
+   prompt names them in `live_held`.
+
 To choose:
 
 - A per-segment input → a field in the model's data, so its segment node shows it. A single value the
   model takes mid-run is a `beat_settings` entry.
 - A single value that applies to the whole run → a `settings` entry, read on the first segment.
 - A value with several fields of its own → that model's factory node, into a segment input.
-- Every segment node has frames, and a prompt unless its model takes none (`prompted`). Other inputs
+- Every segment node has a length, and a prompt unless its model takes none (`prompted`). The length is
+  `frames`, or `seconds` for a model timed in seconds (`ModelSpec.seconds`), where 0 lasts as long as the script. Other inputs
   appear only on the nodes whose models take them.
 - A shared node takes something only when most models take it in the same shape. Until then it
   stays with the model.
@@ -87,6 +98,19 @@ Nodes change shape with the model, and every change is driven by model data:
 - **Runners** differ by `pattern` (chunked, source, clips, call), which says how a model is driven.
   Code for a pattern may assume that pattern's commands. It must not assume any one model's
   settings beyond what the model's data declares.
+
+## Examples
+
+Each example is a workflow in `example_workflows/`, named `<Capability> - <what it shows> (<Model>).json`,
+with a `.jpg` preview of the same name, so ComfyUI's template browser groups them by capability. Its
+inputs come from `example_inputs/` (`reactor_*`), its output is a `.mp4` plus a `.webp` preview in
+`example_outputs/`, and the README's Examples table links the workflow and shows the preview, marked
+⚡ Real time or 🎬 Render. Give a model one example of each path it supports, and a note in the workflow
+that links its prompt guide. Make every example from a real run, never by hand.
+
+## Models the plugin can't run yet
+
+HappyOyster is listed in the README as not yet supported. Don't add it to `MODELS`.
 
 ## Only public information
 

@@ -109,9 +109,11 @@ function beatsUpTo(last) {
         // A model without a prompt has no prompt input, and its beats are drawn as "(no prompt)".
         const prompted = beat.inputs?.some((i) => i.name === "prompt") || beat.widgets?.some((w) => w.name === "prompt");
         const prompt = prompted ? inputValue(beat, "prompt") ?? "(linked prompt)" : "(no prompt)";
-        const frames = inputValue(beat, "frames"), kind = widgetValue(beat, "kind");
-        if (typeof prompt !== "string" || typeof frames !== "number") return "unknown";
-        beats.push({ prompt, frames, cut: kind === "cut", image: upstream(beat, "image") ? "image" : null,
+        // A model timed in seconds takes `seconds`, which beatFrames turns into frames.
+        const seconds = inputValue(beat, "seconds"), frames = seconds === undefined ? inputValue(beat, "frames") : null;
+        const kind = widgetValue(beat, "kind");
+        if (typeof prompt !== "string" || (typeof frames !== "number" && typeof seconds !== "number")) return "unknown";
+        beats.push({ prompt, frames, seconds, pace: widgetValue(beat, "pace"), cut: kind === "cut", image: upstream(beat, "image") ? "image" : null,
                      video: upstream(beat, "video") ? "video" : null, moves: widgetValue(beat, "moves")?.moves ?? [],
                      references: connectedSlots(beat, "references") });
     }
@@ -157,8 +159,18 @@ function connectedSlots(node, group) {
 const chunksFor = (frames, facts) => frames < facts.first_chunk_frames / 2 ? 0 : 1 + Math.round((frames - facts.first_chunk_frames) / facts.frames_per_chunk);
 const framesIn = (n, facts) => n === 0 ? 0 : facts.first_chunk_frames + (n - 1) * facts.frames_per_chunk;
 
+// A beat's frames; a beat of 0 seconds on a model whose takes fit their script lasts its words at the first beat's pace.
+function beatFrames(b, beats, facts) {
+    if (b.seconds === undefined) return b.frames;
+    const s = facts?.script_length;
+    if (b.seconds || !s) return Math.round(b.seconds * (facts?.fps ?? 24));
+    const words = b.prompt.split(/\s+/).filter(Boolean).length, wpm = beats[0].pace ?? s.wpm;
+    return Math.round(Math.min(Math.max(words / wpm * 60, s.min_seconds), s.max_seconds) * facts.fps);
+}
+
 // Each beat's [start, end] frame, placed as timeline.scheduled_chunks places them.
 function layout(beats, facts) {
+    beats = beats.map((b) => ({ ...b, frames: beatFrames(b, beats, facts) }));
     let total = 0;
     if (!facts) return beats.map((b) => [total, (total += b.frames)]);
     let sceneChunk = 0, sceneFrames = 0, chunk = 0;
@@ -198,7 +210,8 @@ function adaptBeat(node) {
     const has = (name) => node.reactorDeclared?.has(name);
     const reads = (taken) => !facts || taken === "any" || (taken === "first" && opens);
     let changed = fitInputs(node, [["image", "IMAGE", reads(facts?.images)], ["video", "VIDEO", reads(facts?.videos)]].filter(([name]) => has(name)))
-        | (has("references") && showGrown(node, "references", "reference_0", "REACTOR_REFERENCE", true));
+        | (has("references") && showGrown(node, "references", "reference_0", "REACTOR_REFERENCE", true))
+        | (has("pictures") && showGrown(node, "pictures", "picture_1", "IMAGE", true));
     for (const widget of node.widgets ?? [])
         if (node.reactorStart.has(widget.name) && widget.hidden !== !opens) {
             widget.hidden = !opens;

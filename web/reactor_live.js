@@ -16,6 +16,13 @@ const STYLE = `
 .reactor-live-preview:focus .reactor-live-hint { display: none; }
 .reactor-live-output { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .reactor-live-self { position: absolute; right: 6px; bottom: 6px; width: 22%; min-width: 120px; border: 1px solid var(--border-color); border-radius: 3px; }
+.reactor-live-loading { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; padding: 16px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 13px; text-align: center; pointer-events: none; }
+.reactor-live-loading[hidden] { display: none; }
+.reactor-live-loading.error { background: rgb(0 0 0 / 0.8); color: #ff8a8a; pointer-events: auto; user-select: text; }
+.reactor-live-spinner { width: 28px; height: 28px; border: 3px solid rgb(255 255 255 / 0.25); border-top-color: #fff; border-radius: 50%; animation: reactor-live-spin 0.9s linear infinite; }
+.reactor-live-loading.error .reactor-live-spinner { display: none; }
+@keyframes reactor-live-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .reactor-live-spinner { animation-duration: 3s; } }
 .reactor-live-status { min-height: 15px; opacity: 0.8; }
 .reactor-live-status:empty { display: none; }
 .reactor-live-status.error { color: #e05252; opacity: 1; }
@@ -60,8 +67,12 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     const header = el("div", { className: "reactor-live-title", textContent: title });
     const output = el("video", { className: "reactor-live-output", autoplay: true, muted: true, playsInline: true });
     const sound = el("audio", { autoplay: true });
-    const preview = el("div", { className: "reactor-live-preview" }, output, sound);
-    const status = el("div", { className: "reactor-live-status", textContent: "Connecting…" });
+    // The spacer holds the aspect ratio, 16:9 until the model's own arrives; the video stretches over it.
+    const spacer = el("div", { style: "width:100%;aspect-ratio:16/9" });
+    const loadingText = el("div");
+    const loading = el("div", { className: "reactor-live-loading" }, el("div", { className: "reactor-live-spinner" }), loadingText);
+    const preview = el("div", { className: "reactor-live-preview" }, spacer, output, sound, loading);
+    const status = el("div", { className: "reactor-live-status" });
     // Keycaps for the drive keys, lit while held.
     const caps = new Map();
     // Each pad is a top row at columns 1-3, where null leaves a gap, over a full bottom row.
@@ -101,6 +112,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let heldFields = {};     // fields every prompt repeats from the opening one, such as a clip's references
     let thenWaiting = false; // the model rejected promptThen, so it waits until a state_update lists it as valid
     const THEN_WAITING = "Starts when the current take ends.";
+    const CLIP_ENDED = "The clip has ended. Apply a prompt to play the next one.";
+    const STALL_MS = 2000;
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
     let markStarted;
@@ -113,6 +126,15 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let staying = false;     // the modal stays open on an error or a take that needs pasting
     let closed = false;
     let tornDown = false;
+    let stage = "Connecting…";  // the server's latest step toward the first frame
+    let joining = null;         // this browser's own step while it joins the session
+    let playing = false;        // a frame of the model's output has played since setup
+    let saving = false;         // Done was pressed and the take is being saved
+    let lastFrameAt = 0;        // when the latest frame of the model's output played
+    let stalled = false;        // frames stopped while the model should be sending them
+    let clipEnded = false;      // a clip model played its clips and holds its last frame until the next Apply
+    let nextClip = false;       // Apply asked an ended clip model for another clip, which hasn't started yet
+    showLoading();
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
 
@@ -151,11 +173,47 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         backdrop.remove();
     }
 
+    // The overlay covers the video until the model's output plays, and again while a take saves.
+    function showLoading() {
+        loading.hidden = playing && !saving && !stalled;
+        loadingText.textContent = saving ? stage : stalled ? "Waiting for frames…"
+                                : joining ?? (started ? "Waiting for the first frame…" : stage);
+    }
+
+    // The overlay leaves on a frame played after setup, so a placeholder the session shows before it doesn't count.
+    function onFrame() {
+        if (tornDown) return;
+        nextFrame();
+        if (!started) return;
+        lastFrameAt = performance.now();
+        if ((playing && !stalled) || nextClip) return;
+        playing = true;
+        stalled = false;
+        showLoading();
+    }
+    const nextFrame = () => (output.requestVideoFrameCallback ? output.requestVideoFrameCallback(onFrame)
+                                                               : output.addEventListener("timeupdate", onFrame, { once: true }));
+
+    // Frames that stop for longer than a network hiccup bring the overlay back, unless a clip model is holding its last frame.
+    const stallCheck = setInterval(() => {
+        if (tornDown) return void clearInterval(stallCheck);
+        if (!playing || stalled || saving || staying || clipEnded || performance.now() - lastFrameAt < STALL_MS) return;
+        stalled = true;
+        showLoading();
+    }, 500);
+
     // The run is over but the user has something to read: an error, or a take to paste by hand.
     function stay(text, error = false) {
         staying = true;
-        status.textContent = text;
-        status.classList.toggle("error", error);
+        if (error) {
+            loading.hidden = false;
+            loading.classList.add("error");
+            loadingText.textContent = text;
+            status.textContent = "";
+        } else {
+            loading.hidden = true;
+            status.textContent = text;
+        }
         buttons.replaceChildren(el("button", { textContent: "Close", onclick: close }));
     }
 
@@ -288,6 +346,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     async function joinSession(join) {
         const mic = join.tracks.find((track) => track.name === join.publish)?.kind === "audio";
         if (join.publish) {
+            joining = mic ? "Waiting for microphone access…" : "Waiting for camera access…";
+            showLoading();
             try {
                 await (mic ? startMic() : startCamera());
             } catch {
@@ -301,8 +361,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         reactor = new Reactor({ modelName: join.model, local: join.local, modelTracks: join.tracks });
         reactor.on("trackReceived", (name, track, media) => {
             if (name === join.publish) return;
-            if (track.kind === "video") output.srcObject = media;
-            else sound.srcObject = media;
+            if (track.kind === "video") {
+                output.srcObject = media;
+                nextFrame();
+            } else sound.srcObject = media;
         });
         reactor.on("statsUpdate", (stats) => { own = stats; });
         // A take can't start while another plays: the model rejects promptThen with a command_error message,
@@ -312,6 +374,14 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 thenWaiting = true;
                 status.textContent = THEN_WAITING;
             } else if (thenWaiting && message?.type === "state_update" && message.data?.valid_commands?.includes(promptThen)) sendThen();
+            // A clip model holds its last frame once its queued clips have played, which reads as a stall without this.
+            else if (message?.type === "clip_finished" || message?.type === "clip_stopped") {
+                clipEnded = true;
+                status.textContent = CLIP_ENDED;
+            } else if (message?.type === "clip_started") {
+                clipEnded = nextClip = false;
+                if (status.textContent === CLIP_ENDED) status.textContent = "";
+            }
         });
         let joined = false;
         // Why the session went away, when Reactor or the SDK said: the reason Reactor ended it, or the last error.
@@ -321,25 +391,31 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         });
         reactor.on("error", (e) => {
             console.error("Reactor:", e);
-            if (e?.recoverable || tornDown) return;
+            if (e?.recoverable || tornDown || saving) return;
             lost ??= errorText(e);
             status.textContent = lost;
             status.classList.add("error");
         });
         const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
             if (s === "ready") resolve();
-            // This browser's side dropped: end the run on the server too, so neither side outlives the other.
-            if (s === "disconnected" && joined && !tornDown) {
+            // This browser's side dropped: end the run on the server too, so neither side outlives the other. After Done
+            // the server leaves the session to save the take, so a drop then is expected and the window waits for "ended".
+            if (s === "disconnected" && joined && !tornDown && !saving) {
                 const error = lost ?? "This browser lost its connection to the Reactor session.";
                 send({ type: "cancel", error });
                 teardown();
                 stay(error, true);
             }
         }));
+        joining = "Joining the session…";
+        showLoading();
         try {
             await reactor.connect(join.jwt ?? undefined, { sessionId: join.session_id });
             await ready;
             joined = true;
+            joining = null;
+            stage = "Waiting for the first frame…";  // the server had connected before this browser joined
+            showLoading();
         } catch (e) {
             console.error("Reactor: this browser could not join the session.", e);
             throw new Error(`This browser could not join the Reactor session: ${errorText(e)}`);
@@ -382,8 +458,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         if (message.type === "config") {
             input = message.input;
             const { width, height } = message.preview;
-            // The spacer holds the aspect ratio; the video stretches over it.
-            preview.append(el("div", { style: `width:100%;aspect-ratio:${width}/${height}` }));
+            spacer.style.aspectRatio = `${width}/${height}`;
             preview.style.maxWidth = `${width}px`;
             // Only the keys this model's camera lanes answer to are shown, and a pad left empty goes too.
             lanes = message.lanes;
@@ -426,9 +501,17 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 }
             });
         } else if (message.type === "status") {
-            status.textContent = message.text;
+            // Steps toward the first frame show on the video; anything said while it plays shows below. Once Done
+            // is pressed the overlay keeps its own "Saving the take…".
+            if (saving) return;
+            if (playing) status.textContent = message.text;
+            else if (message.text) {
+                stage = message.text;
+                showLoading();
+            }
         } else if (message.type === "started") {
             started = true;
+            showLoading();
             heldFields = message.held ?? {};
             markStarted();
             apply.disabled = false;
@@ -465,6 +548,14 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         if (look) return void switchTo();
         await command(promptCommand, { ...heldFields, [promptField]: prompt.value });
         if (promptThen) sendThen();
+        // The next clip takes a while to build, and the video holds the last one's final frame meanwhile.
+        // The old clip's last frames can still arrive after it ends, so only the new clip's start ends the wait.
+        if (clipEnded) {
+            clipEnded = false;
+            stalled = nextClip = true;
+            if (status.textContent === CLIP_ENDED) status.textContent = "";
+            showLoading();
+        }
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
     };
@@ -566,7 +657,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     done.onclick = () => {
         done.disabled = true;
         send({ type: "done" });
-        status.textContent = "Saving the take…";
+        saving = true;
+        status.textContent = "";
+        stage = "Saving the take…";
+        showLoading();
     };
     cancel.onclick = cancelRun;
 

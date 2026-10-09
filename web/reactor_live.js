@@ -92,7 +92,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // The Look panel, for a model steered by an image and settings instead of a prompt, filled from the config.
     const switcher = el("div", { className: "reactor-live-look", hidden: true });
     const apply = el("button", { textContent: "Apply", disabled: true });
-    const applyRow = el("div", { className: "reactor-live-row end" }, apply);
+    const proceed = el("button", { textContent: "Continue", title: "Carry the clip before on from its last frame", disabled: true, hidden: true });
+    const applyRow = el("div", { className: "reactor-live-row end" }, apply, proceed);
     const done = el("button", { textContent: "Done" });
     const cancel = el("button", { textContent: "Cancel" });
     const buttons = el("div", { className: "reactor-live-row" }, done, cancel);
@@ -112,7 +113,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let heldFields = {};     // fields every prompt repeats from the opening one, such as a clip's references
     let thenWaiting = false; // the model rejected promptThen, so it waits until a state_update lists it as valid
     const THEN_WAITING = "Starts when the current take ends.";
-    const CLIP_ENDED = "The clip has ended. Apply a prompt to play the next one.";
+    const CLIP_ENDED = "What happens next?";
     const STALL_MS = 2000;
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
@@ -134,6 +135,11 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let stalled = false;        // frames stopped while the model should be sending them
     let clipEnded = false;      // a clip model played its clips and holds its last frame until the next Apply
     let nextClip = false;       // Apply asked an ended clip model for another clip, which hasn't started yet
+    let continueField = null;   // the prompt field that carries a clip model's previous clip on, so Continue is offered
+    let lastClip = null;        // the clip that plays last so far, which Continue carries on
+    const built = new Set();    // clips the model has finished building or failed, which some models need before continuing one
+    const builtWaiters = new Map();  // a clip to the Continue waiting for it to build, told whether it did
+    let waitingToContinue = false;
     showLoading();
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
@@ -227,6 +233,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     function command(name, data) {
         return reactor?.sendCommand(name, data).then((reply) => {
             if (reply?.type === "command_error") status.textContent = `Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`;
+            return reply;
         }, (e) => { status.textContent = `Sending ${name} failed: ${errorText(e)}`; });
     }
 
@@ -370,6 +377,19 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         // A take can't start while another plays: the model rejects promptThen with a command_error message,
         // so it waits until a state_update lists it as valid again.
         reactor.on("message", (message) => {
+            const clip = message?.data?.clip?.clip_id;
+            if (clip) {
+                // The run queues the opening clip itself, so this browser learns its id from the clips it sees.
+                if (!lastClip && (message.type === "clip_generated" || message.type === "clip_started")) {
+                    lastClip = clip;
+                    proceed.disabled = !started || waitingToContinue;
+                }
+                if (message.type === "clip_generated" || message.type === "clip_failed") {
+                    built.add(clip);
+                    builtWaiters.get(clip)?.(message.type === "clip_generated");
+                    builtWaiters.delete(clip);
+                }
+            }
             if (message?.type === "command_error" && message.data?.command === promptThen) {
                 thenWaiting = true;
                 status.textContent = THEN_WAITING;
@@ -465,6 +485,12 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             promptCommand = message.prompt_command;
             promptField = message.prompt_field;
             promptThen = message.prompt_then;
+            if (message.continue_field) {
+                continueField = message.continue_field;
+                apply.textContent = "New shot";
+                apply.title = "Cut to a new shot";
+                proceed.hidden = false;
+            }
             if (mode === "call") {
                 apply.textContent = "Send";
                 // The placeholder goes once there is text, so the two ways to talk are also said above the box.
@@ -515,6 +541,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             heldFields = message.held ?? {};
             markStarted();
             apply.disabled = false;
+            proceed.disabled = !lastClip;
             look?.refresh();
             if (held) drive();
         } else if (message.type === "stats") {
@@ -544,9 +571,29 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         else stay("Connection lost.", true);
     });
 
-    apply.onclick = async () => {
+    apply.onclick = () => sendPrompt(false);
+    proceed.onclick = () => sendPrompt(true);
+
+    // Continue chains the new clip onto the clip that plays last so far; a new shot opens fresh.
+    async function sendPrompt(continuing) {
         if (look) return void switchTo();
-        await command(promptCommand, { ...heldFields, [promptField]: prompt.value });
+        const data = { ...heldFields, [promptField]: prompt.value };
+        if (continuing) {
+            const anchor = lastClip;
+            // A model may drop a continuation of a clip it hasn't built, opening fresh instead, so Continue waits for it.
+            if (!built.has(anchor)) {
+                waitingToContinue = apply.disabled = proceed.disabled = true;
+                status.textContent = "Continues once the clip before is built…";
+                const ok = await new Promise((resolve) => builtWaiters.set(anchor, resolve));
+                waitingToContinue = apply.disabled = proceed.disabled = false;
+                if (status.textContent === "Continues once the clip before is built…") status.textContent = "";
+                if (!ok) return void (status.textContent = "The clip before failed to build, so there is nothing to continue.");
+            }
+            data[continueField] = anchor;
+        }
+        const reply = await command(promptCommand, data);
+        lastClip = reply?.data?.clip?.clip_id ?? lastClip;
+        if (continueField) proceed.disabled = !lastClip;
         if (promptThen) sendThen();
         // The next clip takes a while to build, and the video holds the last one's final frame meanwhile.
         // The old clip's last frames can still arrive after it ends, so only the new clip's start ends the wait.
@@ -558,7 +605,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         }
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
-    };
+    }
     // Each option value reads as its label: `style_transfer` is "Style transfer".
     const optionLabel = (option) => option.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
 

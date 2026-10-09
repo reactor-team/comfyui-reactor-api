@@ -220,6 +220,8 @@ class LiveRun:
             self._send_json({"type": "config", "mode": self.mode, "prompt": self.prompt,
                              "lanes": drive_lanes(self.spec), "prompt_command": command, "prompt_field": field,
                              **({"prompt_then": self.spec.live_then} if self.spec.live_then else {}),
+                             # A clip model can carry the clip before on instead of opening a new shot.
+                             **({"continue_field": "continue_from_clip_id"} if self.spec.pattern == "clips" else {}),
                              "switch": switch_controls(self.spec, self.settings, self.setup),
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else

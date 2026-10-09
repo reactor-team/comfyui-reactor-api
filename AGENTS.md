@@ -51,10 +51,12 @@ share its shape.
    Reference nodes are factory nodes too. A model whose `ModelSpec` has `references=True` takes a
    list of them on a `references` input (an Autogrow of `REACTOR_REFERENCE` sockets, up to
    `max_references`), on its segment node and inside Reactor Realtime's `model` picker alike. The
-   node that makes one is listed in `REFERENCE_NODES` in `nodes.py`: Reactor Vidu S2-Avatar Reference
-   (tags an image as an object, outfit or background) and Reactor H3 Reference Turbo Realtime
-   Picture (one picture; prompts call them Picture 1, 2, … in socket order). A live model that
-   needs its references resent with every prompt names them in `live_held`.
+   node that makes one is listed in `REFERENCE_NODES` in `nodes.py`, such as Reactor Vidu S2-Avatar
+   Reference (tags an image as an object, outfit or background). A reference that is only an image
+   needs no factory node: with `pictures=True` the model takes plain images on a `pictures` input
+   instead (`picture_1`, `picture_2`, …), which prompts call Picture 1, Picture 2, … in socket order,
+   as H3 Reference Turbo Realtime does. A live model that needs its references resent with every
+   prompt names them in `live_held`.
 
 To choose:
 

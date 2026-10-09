@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Two H3 Reference Turbo Realtime clips with sound, from a person and a place. Each Reactor H3 Reference Turbo Realtime Picture node turns an image into a picture; prompts call them Picture 1 and Picture 2, in the order they're connected. Every clip needs its own pictures, so both segments take both. Pictures guide how the clip looks; they aren't its first frame.\n\nH3 Reference Turbo Realtime prompt guide: https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+        "Two H3 Reference Turbo Realtime clips with sound, from a person and a place. Connect each image to a picture socket; prompts call them Picture 1 and Picture 2, in socket order. Every clip needs its own pictures, so both segments take both. Pictures guide how the clip looks; they aren't its first frame.\n\nH3 Reference Turbo Realtime prompt guide: https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Two H3 Reference Turbo Realtime clips with sound, from a person and a place. Each Reactor H3 Reference Turbo Realtime Picture node turns an image into a picture; prompts call them Picture 1 and Picture 2, in the order they're connected. Every clip needs its own pictures, so both segments take both. Pictures guide how the clip looks; they aren't its first frame.\n\nH3 Reference Turbo Realtime prompt guide: https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Two H3 Reference Turbo Realtime clips with sound, from a person and a place. Connect each image to a picture socket; prompts call them Picture 1 and Picture 2, in socket order. Every clip needs its own pictures, so both segments take both. Pictures guide how the clip looks; they aren't its first frame.\n\nH3 Reference Turbo Realtime prompt guide: https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -70,7 +70,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            1
+            3,
+            5
           ]
         },
         {
@@ -131,7 +132,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            2
+            4,
+            6
           ]
         },
         {
@@ -153,80 +155,6 @@
       }
     },
     {
-      "id": 4,
-      "type": "ReactorH3ReferenceTurboRealtimePicture",
-      "pos": [
-        380,
-        300
-      ],
-      "size": [
-        300,
-        60
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "image",
-          "name": "image",
-          "type": "IMAGE",
-          "link": 1
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_REFERENCE",
-          "name": "REACTOR_REFERENCE",
-          "type": "REACTOR_REFERENCE",
-          "links": [
-            3,
-            5
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorH3ReferenceTurboRealtimePicture"
-      }
-    },
-    {
-      "id": 5,
-      "type": "ReactorH3ReferenceTurboRealtimePicture",
-      "pos": [
-        380,
-        660
-      ],
-      "size": [
-        300,
-        60
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "image",
-          "name": "image",
-          "type": "IMAGE",
-          "link": 2
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "REACTOR_REFERENCE",
-          "name": "REACTOR_REFERENCE",
-          "type": "REACTOR_REFERENCE",
-          "links": [
-            4,
-            6
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ReactorH3ReferenceTurboRealtimePicture"
-      }
-    },
-    {
       "id": 6,
       "type": "ReactorH3ReferenceTurboRealtimeSegment",
       "pos": [
@@ -243,24 +171,17 @@
       "inputs": [
         {
           "localized_name": "reference_0",
-          "name": "references.reference_0",
+          "name": "pictures.picture_1",
           "shape": 7,
-          "type": "REACTOR_REFERENCE",
+          "type": "IMAGE",
           "link": 3
         },
         {
           "localized_name": "reference_1",
-          "name": "references.reference_1",
+          "name": "pictures.picture_2",
           "shape": 7,
-          "type": "REACTOR_REFERENCE",
+          "type": "IMAGE",
           "link": 4
-        },
-        {
-          "localized_name": "reference_2",
-          "name": "references.reference_2",
-          "shape": 7,
-          "type": "REACTOR_REFERENCE",
-          "link": null
         },
         {
           "localized_name": "sequence",
@@ -350,24 +271,17 @@
       "inputs": [
         {
           "localized_name": "reference_0",
-          "name": "references.reference_0",
+          "name": "pictures.picture_1",
           "shape": 7,
-          "type": "REACTOR_REFERENCE",
+          "type": "IMAGE",
           "link": 5
         },
         {
           "localized_name": "reference_1",
-          "name": "references.reference_1",
+          "name": "pictures.picture_2",
           "shape": 7,
-          "type": "REACTOR_REFERENCE",
+          "type": "IMAGE",
           "link": 6
-        },
-        {
-          "localized_name": "reference_2",
-          "name": "references.reference_2",
-          "shape": 7,
-          "type": "REACTOR_REFERENCE",
-          "link": null
         },
         {
           "localized_name": "sequence",
@@ -611,59 +525,43 @@
   ],
   "links": [
     [
-      1,
+      3,
       2,
       0,
-      4,
+      6,
       0,
       "IMAGE"
     ],
     [
-      2,
+      4,
       3,
       0,
+      6,
+      1,
+      "IMAGE"
+    ],
+    [
       5,
+      2,
+      0,
+      7,
       0,
       "IMAGE"
     ],
     [
+      6,
       3,
-      4,
-      0,
-      6,
-      0,
-      "REACTOR_REFERENCE"
-    ],
-    [
-      4,
-      5,
-      0,
-      6,
-      1,
-      "REACTOR_REFERENCE"
-    ],
-    [
-      5,
-      4,
-      0,
-      7,
-      0,
-      "REACTOR_REFERENCE"
-    ],
-    [
-      6,
-      5,
       0,
       7,
       1,
-      "REACTOR_REFERENCE"
+      "IMAGE"
     ],
     [
       7,
       6,
       0,
       7,
-      3,
+      2,
       "REACTOR_SEQUENCE"
     ],
     [

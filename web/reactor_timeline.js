@@ -210,7 +210,8 @@ function adaptBeat(node) {
     const has = (name) => node.reactorDeclared?.has(name);
     const reads = (taken) => !facts || taken === "any" || (taken === "first" && opens);
     let changed = fitInputs(node, [["image", "IMAGE", reads(facts?.images)], ["video", "VIDEO", reads(facts?.videos)]].filter(([name]) => has(name)))
-        | (has("references") && showGrown(node, "references", "reference_0", "REACTOR_REFERENCE", true));
+        | (has("references") && showGrown(node, "references", "reference_0", "REACTOR_REFERENCE", true))
+        | (has("pictures") && showGrown(node, "pictures", "picture_1", "IMAGE", true));
     for (const widget of node.widgets ?? [])
         if (node.reactorStart.has(widget.name) && widget.hidden !== !opens) {
             widget.hidden = !opens;

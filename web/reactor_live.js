@@ -112,6 +112,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let heldFields = {};     // fields every prompt repeats from the opening one, such as a clip's references
     let thenWaiting = false; // the model rejected promptThen, so it waits until a state_update lists it as valid
     const THEN_WAITING = "Starts when the current take ends.";
+    const CLIP_ENDED = "The clip has ended. Apply a prompt to play the next one.";
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
     let markStarted;
@@ -355,6 +356,9 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 thenWaiting = true;
                 status.textContent = THEN_WAITING;
             } else if (thenWaiting && message?.type === "state_update" && message.data?.valid_commands?.includes(promptThen)) sendThen();
+            // A clip model holds its last frame once its queued clips have played, which reads as a stall without this.
+            else if (message?.type === "clip_finished" || message?.type === "clip_stopped") status.textContent = CLIP_ENDED;
+            else if (message?.type === "clip_started" && status.textContent === CLIP_ENDED) status.textContent = "";
         });
         let joined = false;
         // Why the session went away, when Reactor or the SDK said: the reason Reactor ended it, or the last error.
@@ -364,15 +368,16 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         });
         reactor.on("error", (e) => {
             console.error("Reactor:", e);
-            if (e?.recoverable || tornDown) return;
+            if (e?.recoverable || tornDown || saving) return;
             lost ??= errorText(e);
             status.textContent = lost;
             status.classList.add("error");
         });
         const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
             if (s === "ready") resolve();
-            // This browser's side dropped: end the run on the server too, so neither side outlives the other.
-            if (s === "disconnected" && joined && !tornDown) {
+            // This browser's side dropped: end the run on the server too, so neither side outlives the other. After Done
+            // the server leaves the session to save the take, so a drop then is expected and the window waits for "ended".
+            if (s === "disconnected" && joined && !tornDown && !saving) {
                 const error = lost ?? "This browser lost its connection to the Reactor session.";
                 send({ type: "cancel", error });
                 teardown();
@@ -622,6 +627,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         done.disabled = true;
         send({ type: "done" });
         saving = true;
+        status.textContent = "";
         stage = "Saving the take…";
         showLoading();
     };

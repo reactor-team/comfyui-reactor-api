@@ -115,3 +115,38 @@ def test_fitting_a_frame_costs_no_more_than_decoding_it_again():
     decode = timed(lambda f: f.to_ndarray(format="rgb24"))
     fit = timed(lambda f: clip.fit_frame(spec, f))
     assert fit < 2 * decode, f"fit {fit * 1000 / 24:.1f} ms/frame vs decode {decode * 1000 / 24:.1f} ms/frame"
+
+
+async def test_a_faster_clip_drops_frames_to_play_at_its_own_speed():
+    # One second at 48 fps reaches a 24 fps model as one second: every other frame.
+    stream = await ClipStream.open(MODELS["X2"], encode(gray(range(0, 240, 5)), rate=48))
+    frames = await read(stream, 25)
+    await stream.close()
+    assert frames[24] is None
+    assert [round(int(f.mean()) / 10) for f in frames[:24]] == list(range(24))
+
+
+async def test_a_slower_clip_repeats_frames_to_play_at_its_own_speed():
+    stream = await ClipStream.open(MODELS["X2"], encode(gray([0, 80, 160]), rate=12))
+    frames = await read(stream, 7)
+    await stream.close()
+    assert frames[6] is None
+    assert [round(int(f.mean()) / 80) for f in frames[:6]] == [0, 0, 1, 1, 2, 2]
+
+
+async def test_a_looping_clip_keeps_its_speed_on_every_pass():
+    stream = await ClipStream.open(MODELS["X2"], encode(gray([0, 80]), rate=12), loop=True)
+    frames = await read(stream, 8)
+    await stream.close()
+    assert [round(int(f.mean()) / 80) for f in frames] == [0, 0, 1, 1, 0, 0, 1, 1]
+
+
+async def test_a_dropped_frame_is_never_fitted(monkeypatch):
+    fitted = []
+    fit = clip.fit_frame
+    monkeypatch.setattr(clip, "fit_frame", lambda spec, frame: fitted.append(1) or fit(spec, frame))
+    stream = await ClipStream.open(MODELS["X2"], encode(gray([40] * 48), rate=48))
+    while await stream.next() is not None:
+        pass
+    await stream.close()
+    assert len(fitted) == 24

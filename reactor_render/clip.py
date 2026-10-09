@@ -27,14 +27,32 @@ def fit_frame(spec: ModelSpec, frame: av.VideoFrame) -> np.ndarray:
 
 
 def fitted_frames(spec: ModelSpec, source: bytes, loop: bool) -> Iterator[np.ndarray]:
+    """The clip resampled to the model's frame rate: each tick shows the source frame on screen at that time, so a
+    clip plays at its own speed whatever its rate, and a frame no tick shows is never fitted."""
+    step = 1 / spec.fps
     while True:
         decoded = False
         with av.open(io.BytesIO(source)) as container:
             stream = container.streams.video[0]
             stream.thread_type = "AUTO"
-            for frame in container.decode(stream):
+            interval = 1 / (stream.average_rate or stream.guessed_rate or spec.fps)
+            tick, start, held, fitted, at = 0, None, None, None, 0.0
+            for index, frame in enumerate(container.decode(stream)):
+                t = frame.time if frame.time is not None else index * interval
+                start = t if start is None else start
+                # Ticks before this frame's time show the frame before it; the epsilon keeps equal rates one to one.
+                while held is not None and tick * step < t - start - 1e-6:
+                    fitted = fit_frame(spec, held) if fitted is None else fitted
+                    decoded = True
+                    yield fitted
+                    tick += 1
+                held, fitted, at = frame, None, t - start
+            # The last frame holds for one source frame.
+            while held is not None and (tick * step < at + interval - 1e-6 or not decoded):
+                fitted = fit_frame(spec, held) if fitted is None else fitted
                 decoded = True
-                yield fit_frame(spec, frame)
+                yield fitted
+                tick += 1
         # A clip with no frames would otherwise loop forever.
         if not loop or not decoded:
             return

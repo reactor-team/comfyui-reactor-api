@@ -22,7 +22,6 @@ from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_
 LIVE_SESSION_LIMIT_SECONDS = 1800
 # How long a run waits for the browser modal to open its socket before giving up.
 BROWSER_TIMEOUT_SECONDS = 60.0
-INPUT_FPS = 24
 # How often the browser gets the model connection's stats.
 STATS_INTERVAL_SECONDS = 1.0
 # How long the browser gets to join the session and publish its camera, retries included.
@@ -201,7 +200,7 @@ class LiveRun:
                              "switch": switch_controls(self.spec, self.settings, self.setup),
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else
-                                      {"width": self.input_size[0], "height": self.input_size[1], "fps": INPUT_FPS}})
+                                      {"width": self.input_size[0], "height": self.input_size[1], "fps": self.spec.fps}})
             await self._session(check_interrupt)
             self._finish(error=None)
             return self.path

@@ -14,11 +14,12 @@ from typing_extensions import override
 import comfy.model_management
 import comfy.utils
 import folder_paths
-from comfy_api.latest import ComfyExtension, InputImpl, Types, io, ui
+from comfy_api.latest import ComfyExtension, InputImpl, io, ui
 from server import PromptServer
 
 from .reactor_render import live
 from .reactor_render.config import connect_args, max_sessions
+from .reactor_render.clip import ClipStream
 from .reactor_render.session import render
 from .reactor_render.timeline import MODELS, Beat, Reference, Setting, Timeline, call_setup, compile_timeline, editor_moves, model_facts, join_chains
 
@@ -49,9 +50,10 @@ def image_to_png(image) -> bytes:
     return buf.getvalue()
 
 
-def video_to_mp4(video) -> bytes:
+def video_bytes(video) -> bytes:
+    """The video as a file in its own container and codec; save_to re-encodes only a trimmed or cropped video."""
     buf = bytes_io.BytesIO()
-    video.save_to(buf, format=Types.VideoContainer.MP4, codec=Types.VideoCodec.H264)
+    video.save_to(buf)
     return buf.getvalue()
 
 
@@ -128,7 +130,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
             if name not in models:
                 raise ValueError(f"{display_name} can't take {name}; use Reactor {FAMILY_OF[name]} Segment.")
             beat = Beat(prompt, frames, cut=kind == "cut", image=None if image is None else image_to_png(image),
-                        video=None if video is None else video_to_mp4(video), moves=tuple(editor_moves(moves)) if moves else (),
+                        video=None if video is None else video_bytes(video), moves=tuple(editor_moves(moves)) if moves else (),
                         references=tuple(r for r in (references or {}).values() if r is not None),
                         settings={key: value for key, value in settings.items() if key in spec.beat_settings and value is not None})
             if sequence is None:
@@ -298,7 +300,7 @@ async def one_session(on_status=None):
 
 
 async def live_output(mode: str, model: str, prompt: str, setup: list[tuple[str, dict]],
-                      clip: list[np.ndarray] | None, filename_prefix: str, camera: str | None = None,
+                      clip: ClipStream | None, filename_prefix: str, camera: str | None = None,
                       settings: dict[str, object] | None = None, microphone: str | None = None) -> io.NodeOutput:
     """A new take recorded in a live run, saved under the output directory like SaveVideo's files."""
     sid = PromptServer.instance.client_id
@@ -431,13 +433,16 @@ class ReactorRealtime(io.ComfyNode):
             raise ValueError(f"{name} edits one source: connect a video or a Reactor Camera Capture.")
         clip = None
         if video is not None:
-            # Converted off the loop: a long clip would stall the server's other requests.
-            clip = await asyncio.to_thread(lambda: [np.asarray(spec.fit(Image.fromarray(np.clip(255.0 * f.cpu().numpy(), 0, 255).astype(np.uint8))))
-                                                    for f in video.get_components().images])
-            if not clip:
+            # Streamed from the compressed video, never get_components(), which holds every frame at full size as float32.
+            clip = await ClipStream.open(spec, await asyncio.to_thread(video_bytes, video), loop=True)
+            if clip is None:
                 raise ValueError(f"{name}'s source video has no frames.")
-        return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png, beat_settings), clip, filename_prefix,
-                                 camera, beat_settings)
+        try:
+            return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png, beat_settings), clip,
+                                     filename_prefix, camera, beat_settings)
+        finally:
+            if clip is not None:
+                await clip.close()
 
 
 class ReactorExtension(ComfyExtension):

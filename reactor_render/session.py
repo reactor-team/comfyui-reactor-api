@@ -1,18 +1,17 @@
 import asyncio
 import contextlib
-import io
 import json
 import logging
 import math
 import time
 from collections.abc import Callable
 
-import av
 import numpy as np
 
 from reactor_sdk import Reactor
 from reactor_sdk.errors import RateLimitedError, ReactorError, UnauthorizedError
 
+from .clip import ClipStream
 from .encode import FrameWriter
 from .timeline import ModelSpec, Plan
 
@@ -109,9 +108,14 @@ class Session:
             self.reported, self.reported_at = self.writer.received, time.monotonic()
             self.on_progress(self.writer.received, self.writer.limit or self.planned, self.writer.previous)
         try:
-            msg = await asyncio.wait_for(self.messages.get(), timeout=timeout)
-        except asyncio.TimeoutError:
-            return None
+            # A queued message comes first: wait_for with no time left cancels its get() before it runs, so a
+            # loop running behind its frame clock would otherwise never read one.
+            msg = self.messages.get_nowait()
+        except asyncio.QueueEmpty:
+            try:
+                msg = await asyncio.wait_for(self.messages.get(), timeout=timeout)
+            except asyncio.TimeoutError:
+                return None
         if msg.get("type") == "command_error":
             data = msg.get("data") or {}
             raise RuntimeError(f"Reactor rejected {data.get('command')}: {data.get('reason')}")
@@ -169,20 +173,29 @@ async def run_chunked(session: Session, spec: ModelSpec, plan: Plan) -> None:
 
 async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
     """Drive a model that transforms a live source track; its clock is the source frames pushed."""
-    # The clip decodes on a thread: a blocking PyAV decode between pushes would starve the message loop.
-    frames = await asyncio.to_thread(
-        lambda: [np.asarray(spec.fit(f.to_image())) for f in av.open(io.BytesIO(plan.source)).decode(video=0)])
+    frames = await ClipStream.open(spec, plan.source)
+    if frames is None:
+        raise ValueError("The source video has no frames.")
+    try:
+        await push_source(session, spec, plan, frames)
+    finally:
+        await frames.close()
+
+
+async def push_source(session: Session, spec: ModelSpec, plan: Plan, frames: ClipStream) -> None:
     # The source track is up before setup, so a model's `start` finds it.
     track = await session.reactor.publish_track(spec.source_track)
     for command, data in plan.setup:
         await session.send(command, data)
         if command in SETUP_PHASES:
-            await hold_until(session, spec, track, frames[0], SETUP_PHASES[command], SETUP_READY.get(command))
+            await hold_until(session, spec, track, frames.first, SETUP_PHASES[command], SETUP_READY.get(command))
     timed = sorted(plan.timed, key=lambda t: t[0])
     session.capturing = True
     pushed = 0
     model_done_at = None
-    clip = min(len(frames), plan.chunks)
+    # The clip's length is the plan's until the clip runs out first; only frames up to it are ever decoded.
+    clip = plan.chunks
+    frame = frames.first
     # A model can hold back the clip's tail (it generates whole chunks, and frames sit in flight), so the last
     # frame repeats until the clip's length is back; the writer's limit drops what the repeats produce.
     # TODO: Stop on the output frame tagged with the clip's last index once models echo input frame tags.
@@ -190,7 +203,7 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
     pad_until = None
     next_frame_at = time.monotonic() + 1 / spec.fps
     while not session.writer.full and not session.capture_ended(model_done_at):
-        if pushed == clip and pad_until is None:
+        if pushed >= clip and pad_until is None:
             pad_until = time.monotonic() + TAIL_PAD_SECONDS
         if pad_until is not None and time.monotonic() > pad_until:
             break
@@ -211,7 +224,12 @@ async def run_source(session: Session, spec: ModelSpec, plan: Plan) -> None:
             model_done_at = model_done_at or time.monotonic()
         if time.monotonic() < next_frame_at:
             continue
-        track.push_frame(frames[min(pushed, clip - 1)])
+        if pushed < clip:
+            if (decoded := await frames.next()) is None:
+                clip = session.writer.limit = pushed
+            else:
+                frame = decoded
+        track.push_frame(frame)
         pushed += 1
         next_frame_at += 1 / spec.fps
     model_done_at = model_done_at or time.monotonic()

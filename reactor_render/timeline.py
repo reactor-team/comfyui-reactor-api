@@ -15,7 +15,7 @@ class Beat:
 
     `cut` asks for a hard scene break from the beat before instead of a soft transition. `image`
     is PNG bytes for models that condition on a reference image. `video` is the source clip as
-    MP4 bytes, for video-to-video models, and only the first beat's is read. `moves` are camera
+    an encoded video file, for video-to-video models, and only the first beat's is read. `moves` are camera
     moves counted from the beat's own start and cut at its end. `references` are what a call's
     character has on during the beat. `settings` holds the beat's values of the model's `beat_settings`.
     """
@@ -290,7 +290,7 @@ class Plan:
 
     `setup` is sent in order before the model runs. `timed` holds `(chunk, command, data)` to send
     once `chunk` chunks have completed, for beats the model cannot schedule itself. `chunks` is how
-    many chunks of video to capture. `source` is the clip a "source" runner streams, as MP4 bytes;
+    many chunks of video to capture. `source` is the clip a "source" runner streams, as an encoded video file;
     for a "source" model `chunks` and the first element of each `timed` entry count source frames
     pushed, as a source model reports no chunks. For a "call" model, `holds` is the least number of
     frames each of its `chunks` plays before the next goes out. A command value holding `bytes` is a file to

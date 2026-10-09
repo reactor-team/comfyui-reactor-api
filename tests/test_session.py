@@ -10,7 +10,7 @@ import pytest
 
 from reactor_sdk.errors import BadRequestError, RateLimitedError
 
-from reactor_render import session
+from reactor_render import clip, session
 from reactor_render.timeline import MODELS, Plan
 
 BLACK, WHITE = 0, 255
@@ -469,10 +469,15 @@ async def test_an_edit_the_model_ends_keeps_the_video_so_far(tmp_path, monkeypat
 
 async def test_source_frames_past_the_planned_count_are_never_pushed(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=2, frames=1)
-    plan = Plan(setup=[], chunks=2, source=source_clip([i * 40 for i in range(6)]))
+    plan = Plan(setup=[], chunks=2, source=source_clip([0, 40] + [80] * 28))
+    decoded = []
+    fit = clip.fit_frame
+    monkeypatch.setattr(clip, "fit_frame", lambda spec, frame: decoded.append(1) or fit(spec, frame))
     _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
     await asyncio.wait_for(coro, timeout=10)
     assert {round(int(f.mean()) / 40) for f in fake.published.pushed} == {0, 1}
+    # Decoding stops at the plan, give or take the one frame read ahead.
+    assert len(decoded) <= plan.chunks + 1
 
 
 async def test_a_source_tail_the_model_holds_back_is_padded_until_it_returns(tmp_path, monkeypatch, fast_grace):

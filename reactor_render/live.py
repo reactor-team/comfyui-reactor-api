@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import itertools
 import json
 import logging
 import threading
@@ -13,6 +12,7 @@ import numpy as np
 
 from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
 
+from .clip import ClipStream
 from .encode import FrameWriter
 from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       api_message, closing_session, connect_with_retry, watch_for_failure)
@@ -137,7 +137,7 @@ class LiveRun:
     """
 
     def __init__(self, mode: str, spec: ModelSpec, path: str, prompt: str, setup: list[tuple[str, dict]],
-                 input_size: tuple[int, int] | None, connect: dict, clip: list[np.ndarray] | None = None,
+                 input_size: tuple[int, int] | None, connect: dict, clip: ClipStream | None = None,
                  settings: dict[str, object] | None = None):
         self.run_id = uuid.uuid4().hex
         self.mode, self.spec, self.path = mode, spec, path
@@ -147,7 +147,7 @@ class LiveRun:
         self.input_size, self.clip = input_size, clip
         self.connect = connect
         # The output's expected size, which the modal lays the preview out at until video arrives.
-        self.source_size = (clip[0].shape[1], clip[0].shape[0]) if clip else input_size if mode == "style" else spec.size
+        self.source_size = (clip.first.shape[1], clip.first.shape[0]) if clip else input_size if mode == "style" else spec.size
         # Set just before "ended" goes out; the websocket handler closes the socket on it.
         self.ended = False
         # Gates recording, as Session.capturing does: the stream opens with a
@@ -372,8 +372,8 @@ class LiveRun:
     async def _push_clip(self, track) -> None:
         """Push the source clip at the model's frame rate, looping until the run ends."""
         next_at = time.monotonic()
-        for frame in itertools.cycle(self.clip):
-            track.push_frame(frame)
+        while True:
+            track.push_frame(await self.clip.next())
             next_at += 1 / self.spec.fps
             await asyncio.sleep(max(next_at - time.monotonic(), 0))
 

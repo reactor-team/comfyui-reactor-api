@@ -601,6 +601,8 @@ const deviceWidget = (kind) => (node, inputName) => {
     return { widget };
 };
 
+let pickerLinks = [];
+
 app.registerExtension({
     name: "reactor.live",
     getCustomWidgets() {
@@ -613,6 +615,26 @@ app.registerExtension({
             current?.cancel();
             current = openLive(detail);
         });
+    },
+    // The frontend keeps only the first link of a grown socket group inside a model picker when it loads a graph
+    // (comfyui-frontend 1.55), so Realtime's later pictures come unplugged; this reconnects them in socket order.
+    beforeConfigureGraph(graph) {
+        const links = new Map((graph?.links ?? []).map((l) => Array.isArray(l) ? [l[0], { node: l[1], slot: l[2] }] : [l.id, { node: l.origin_id, slot: l.origin_slot }]));
+        pickerLinks = (graph?.nodes ?? []).filter((n) => n.type === "ReactorRealtime").map((n) => ({
+            id: n.id,
+            inputs: (n.inputs ?? []).filter((i) => i.name.startsWith("model.") && links.has(i.link)).map((i) => ({ name: i.name, ...links.get(i.link) })),
+        }));
+    },
+    afterConfigureGraph() {
+        for (const { id, inputs } of pickerLinks) {
+            const node = app.graph.getNodeById(id);
+            for (const { name, node: from, slot } of inputs) {
+                const index = node?.inputs?.findIndex((i) => i.name === name) ?? -1;
+                const origin = app.graph.getNodeById(from);
+                if (index >= 0 && node.inputs[index].link == null && origin) origin.connect(slot, node, index);
+            }
+        }
+        pickerLinks = [];
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== "ReactorRealtime") return;

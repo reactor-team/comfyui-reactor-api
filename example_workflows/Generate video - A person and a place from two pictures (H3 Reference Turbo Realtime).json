@@ -170,14 +170,14 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "reference_0",
+          "localized_name": "picture_1",
           "name": "pictures.picture_1",
           "shape": 7,
           "type": "IMAGE",
           "link": 3
         },
         {
-          "localized_name": "reference_1",
+          "localized_name": "picture_2",
           "name": "pictures.picture_2",
           "shape": 7,
           "type": "IMAGE",
@@ -270,14 +270,14 @@
       "mode": 0,
       "inputs": [
         {
-          "localized_name": "reference_0",
+          "localized_name": "picture_1",
           "name": "pictures.picture_1",
           "shape": 7,
           "type": "IMAGE",
           "link": 5
         },
         {
-          "localized_name": "reference_1",
+          "localized_name": "picture_2",
           "name": "pictures.picture_2",
           "shape": 7,
           "type": "IMAGE",

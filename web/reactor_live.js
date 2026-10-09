@@ -53,6 +53,9 @@ const STYLE = `
 .reactor-live button:disabled { cursor: default; opacity: 0.5; }
 .reactor-live-row { display: flex; gap: 8px; align-items: center; }
 .reactor-live-row.end { justify-content: flex-end; }
+.reactor-live-composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.reactor-live-composer[hidden] { display: none; }
+.reactor-live-actions { display: flex; flex-direction: column; gap: 6px; }
 .reactor-live-camera { margin-right: auto; max-width: 50%; }
 `;
 
@@ -93,11 +96,13 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     const switcher = el("div", { className: "reactor-live-look", hidden: true });
     const apply = el("button", { textContent: "Apply", disabled: true });
     const proceed = el("button", { textContent: "Continue shot", title: "Apply the prompt as more of the same shot, picking up from its last frame", disabled: true, hidden: true });
-    const applyRow = el("div", { className: "reactor-live-row end" }, apply, proceed);
+    const applyRow = el("div", { className: "reactor-live-actions" }, apply, proceed);
+    // The prompt and the buttons that apply it sit side by side, the buttons stacked to its right.
+    const composer = el("div", { className: "reactor-live-composer" }, prompt, applyRow);
     const done = el("button", { textContent: "Done" });
     const cancel = el("button", { textContent: "Cancel" });
     const buttons = el("div", { className: "reactor-live-row" }, done, cancel);
-    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, prompt, switcher, applyRow, buttons, stats));
+    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, composer, switcher, buttons, stats));
     document.body.append(backdrop);
 
     const url = new URL(api.apiURL(`/reactor/live/${run_id}`), location.href);
@@ -494,7 +499,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             if (mode === "call") {
                 apply.textContent = "Send";
                 // The placeholder goes once there is text, so the two ways to talk are also said above the box.
-                prompt.before(el("div", { textContent: "Talk to the character out loud, or type a message and press Send." }));
+                composer.before(el("div", { textContent: "Talk to the character out loud, or type a message and press Send." }));
                 prompt.placeholder = "Type a message for the character…";
             }
             const keys = new Set(lanes.flatMap((lane) => lane.axes.flatMap(([low, high]) => [low, high])));
@@ -505,8 +510,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             for (const pad of [...legend.children]) if (!pad.children.length) pad.remove();
             prompt.value = message.prompt;
             if (message.switch) {
-                prompt.hidden = true;
-                applyRow.hidden = true;
+                composer.hidden = true;
                 look = buildLook(message.switch);
             }
             if (caps.size) {

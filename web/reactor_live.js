@@ -92,7 +92,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // The Look panel, for a model steered by an image and settings instead of a prompt, filled from the config.
     const switcher = el("div", { className: "reactor-live-look", hidden: true });
     const apply = el("button", { textContent: "Apply", disabled: true });
-    const proceed = el("button", { textContent: "Continue", title: "Carry the clip before on from its last frame", disabled: true, hidden: true });
+    const proceed = el("button", { textContent: "Continue shot", title: "Apply the prompt as more of the same shot, picking up from its last frame", disabled: true, hidden: true });
     const applyRow = el("div", { className: "reactor-live-row end" }, apply, proceed);
     const done = el("button", { textContent: "Done" });
     const cancel = el("button", { textContent: "Cancel" });
@@ -487,8 +487,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             promptThen = message.prompt_then;
             if (message.continue_field) {
                 continueField = message.continue_field;
-                apply.textContent = "New shot";
-                apply.title = "Cut to a new shot";
+                apply.textContent = "Cut to new shot";
+                apply.title = "Apply the prompt as a new shot, starting fresh";
                 proceed.hidden = false;
             }
             if (mode === "call") {

@@ -113,6 +113,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let thenWaiting = false; // the model rejected promptThen, so it waits until a state_update lists it as valid
     const THEN_WAITING = "Starts when the current take ends.";
     const CLIP_ENDED = "The clip has ended. Apply a prompt to play the next one.";
+    const STALL_MS = 2000;
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let started = false;     // setup is done, and this browser sends the model its commands
     let markStarted;
@@ -129,6 +130,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let joining = null;         // this browser's own step while it joins the session
     let playing = false;        // a frame of the model's output has played since setup
     let saving = false;         // Done was pressed and the take is being saved
+    let lastFrameAt = 0;        // when the latest frame of the model's output played
+    let stalled = false;        // frames stopped while the model should be sending them
+    let clipEnded = false;      // a clip model played its clips and holds its last frame until the next Apply
+    let nextClip = false;       // Apply asked an ended clip model for another clip, which hasn't started yet
     showLoading();
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
@@ -170,19 +175,32 @@ function openLive({ run_id, mode, title, camera, microphone }) {
 
     // The overlay covers the video until the model's output plays, and again while a take saves.
     function showLoading() {
-        loading.hidden = playing && !saving;
-        loadingText.textContent = saving ? stage : joining ?? (started ? "Waiting for the first frame…" : stage);
+        loading.hidden = playing && !saving && !stalled;
+        loadingText.textContent = saving ? stage : stalled ? "Waiting for frames…"
+                                : joining ?? (started ? "Waiting for the first frame…" : stage);
     }
 
     // The overlay leaves on a frame played after setup, so a placeholder the session shows before it doesn't count.
     function onFrame() {
         if (tornDown) return;
-        if (!started) return void nextFrame();
+        nextFrame();
+        if (!started) return;
+        lastFrameAt = performance.now();
+        if ((playing && !stalled) || nextClip) return;
         playing = true;
+        stalled = false;
         showLoading();
     }
     const nextFrame = () => (output.requestVideoFrameCallback ? output.requestVideoFrameCallback(onFrame)
                                                                : output.addEventListener("timeupdate", onFrame, { once: true }));
+
+    // Frames that stop for longer than a network hiccup bring the overlay back, unless a clip model is holding its last frame.
+    const stallCheck = setInterval(() => {
+        if (tornDown) return void clearInterval(stallCheck);
+        if (!playing || stalled || saving || staying || clipEnded || performance.now() - lastFrameAt < STALL_MS) return;
+        stalled = true;
+        showLoading();
+    }, 500);
 
     // The run is over but the user has something to read: an error, or a take to paste by hand.
     function stay(text, error = false) {
@@ -357,8 +375,13 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 status.textContent = THEN_WAITING;
             } else if (thenWaiting && message?.type === "state_update" && message.data?.valid_commands?.includes(promptThen)) sendThen();
             // A clip model holds its last frame once its queued clips have played, which reads as a stall without this.
-            else if (message?.type === "clip_finished" || message?.type === "clip_stopped") status.textContent = CLIP_ENDED;
-            else if (message?.type === "clip_started" && status.textContent === CLIP_ENDED) status.textContent = "";
+            else if (message?.type === "clip_finished" || message?.type === "clip_stopped") {
+                clipEnded = true;
+                status.textContent = CLIP_ENDED;
+            } else if (message?.type === "clip_started") {
+                clipEnded = nextClip = false;
+                if (status.textContent === CLIP_ENDED) status.textContent = "";
+            }
         });
         let joined = false;
         // Why the session went away, when Reactor or the SDK said: the reason Reactor ended it, or the last error.
@@ -525,6 +548,14 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         if (look) return void switchTo();
         await command(promptCommand, { ...heldFields, [promptField]: prompt.value });
         if (promptThen) sendThen();
+        // The next clip takes a while to build, and the video holds the last one's final frame meanwhile.
+        // The old clip's last frames can still arrive after it ends, so only the new clip's start ends the wait.
+        if (clipEnded) {
+            clipEnded = false;
+            stalled = nextClip = true;
+            if (status.textContent === CLIP_ENDED) status.textContent = "";
+            showLoading();
+        }
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
     };

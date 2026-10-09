@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import itertools
 import json
 import logging
 import threading
@@ -13,6 +12,7 @@ import numpy as np
 
 from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
 
+from .clip import ClipStream
 from .encode import FrameWriter
 from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       api_message, closing_session, connect_with_retry, watch_for_failure)
@@ -22,7 +22,6 @@ from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_
 LIVE_SESSION_LIMIT_SECONDS = 1800
 # How long a run waits for the browser modal to open its socket before giving up.
 BROWSER_TIMEOUT_SECONDS = 60.0
-INPUT_FPS = 24
 # How often the browser gets the model connection's stats.
 STATS_INTERVAL_SECONDS = 1.0
 # How long the browser gets to join the session and publish its camera, retries included.
@@ -137,7 +136,7 @@ class LiveRun:
     """
 
     def __init__(self, mode: str, spec: ModelSpec, path: str, prompt: str, setup: list[tuple[str, dict]],
-                 input_size: tuple[int, int] | None, connect: dict, clip: list[np.ndarray] | None = None,
+                 input_size: tuple[int, int] | None, connect: dict, clip: ClipStream | None = None,
                  settings: dict[str, object] | None = None):
         self.run_id = uuid.uuid4().hex
         self.mode, self.spec, self.path = mode, spec, path
@@ -147,7 +146,7 @@ class LiveRun:
         self.input_size, self.clip = input_size, clip
         self.connect = connect
         # The output's expected size, which the modal lays the preview out at until video arrives.
-        self.source_size = (clip[0].shape[1], clip[0].shape[0]) if clip else input_size if mode == "style" else spec.size
+        self.source_size = (clip.first.shape[1], clip.first.shape[0]) if clip else input_size if mode == "style" else spec.size
         # Set just before "ended" goes out; the websocket handler closes the socket on it.
         self.ended = False
         # Gates recording, as Session.capturing does: the stream opens with a
@@ -201,7 +200,7 @@ class LiveRun:
                              "switch": switch_controls(self.spec, self.settings, self.setup),
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else
-                                      {"width": self.input_size[0], "height": self.input_size[1], "fps": INPUT_FPS}})
+                                      {"width": self.input_size[0], "height": self.input_size[1], "fps": self.spec.fps}})
             await self._session(check_interrupt)
             self._finish(error=None)
             return self.path
@@ -372,8 +371,8 @@ class LiveRun:
     async def _push_clip(self, track) -> None:
         """Push the source clip at the model's frame rate, looping until the run ends."""
         next_at = time.monotonic()
-        for frame in itertools.cycle(self.clip):
-            track.push_frame(frame)
+        while True:
+            track.push_frame(await self.clip.next())
             next_at += 1 / self.spec.fps
             await asyncio.sleep(max(next_at - time.monotonic(), 0))
 

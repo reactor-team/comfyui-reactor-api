@@ -347,6 +347,11 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             const params = sender.getParameters();
             params.degradationPreference = "maintain-resolution";
             await sender.setParameters(params).catch(() => {});
+            // The capture rate is only a request, which a camera without that rate ignores; capping the send drops a
+            // faster camera's extra frames, and a slower camera sends what it has. Set apart so a refusal keeps the above.
+            const capped = sender.getParameters();
+            if (input?.fps) for (const encoding of capped.encodings ?? []) encoding.maxFramerate = input.fps;
+            await sender.setParameters(capped).catch(() => {});
             addPicker(sender).catch(() => {});
         }
         send({ type: "published" });

@@ -1,5 +1,6 @@
 import asyncio
 import io
+import itertools
 import json
 import logging
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ import pytest
 from PIL import Image
 
 from reactor_render import live, timeline
+from reactor_render.clip import ClipStream
 from reactor_render.timeline import MODELS, POSES
 
 X2_INPUT = MODELS["X2"].frame_size(1920, 1080)
@@ -467,8 +469,9 @@ async def test_a_source_clip_loops_in_place_of_the_camera(tmp_path, monkeypatch)
     monkeypatch.setattr(live, "Reactor", fake)
     monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
     monkeypatch.setattr(live, "session_token", lambda *args: "jwt-test")
+    stream = ClipStream(itertools.islice(itertools.cycle(clip), 1, None), clip[0])
     run = live.LiveRun("style", MODELS["X2"], str(tmp_path / "take.mp4"), "a",
-                       live.style_setup(MODELS["X2"], "a", 42, None, {}), None, {"api_key": "rk_test"}, clip)
+                       live.style_setup(MODELS["X2"], "a", 42, None, {}), None, {"api_key": "rk_test"}, stream)
     task = asyncio.create_task(run.run(lambda: None))
     sent = []
     run.connected(sent.append)

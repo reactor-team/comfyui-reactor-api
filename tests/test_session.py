@@ -10,7 +10,7 @@ import pytest
 
 from reactor_sdk.errors import BadRequestError, RateLimitedError
 
-from reactor_render import session
+from reactor_render import clip, session
 from reactor_render.timeline import MODELS, Plan
 
 BLACK, WHITE = 0, 255
@@ -156,11 +156,11 @@ def frames_in(path):
         return [f.to_ndarray(format="rgb24") for f in c.decode(video=0)]
 
 
-def source_clip(levels):
+def source_clip(levels, rate=24):
     """An H.264 MP4 whose frames hold these gray levels, in order."""
     buf = io.BytesIO()
     container = av.open(buf, "w", format="mp4")
-    stream = container.add_stream("libx264", rate=24)
+    stream = container.add_stream("libx264", rate=rate)
     stream.width, stream.height, stream.pix_fmt = 16, 16, "yuv420p"
     for level in levels:
         frame = av.VideoFrame.from_ndarray(np.full((16, 16, 3), level, dtype=np.uint8), format="rgb24")
@@ -393,7 +393,9 @@ async def test_an_interrupt_during_the_rate_limit_wait_stops_the_render(tmp_path
     assert fake.connects == 1
 
 
-# Source tests run at a pacing of 1000 fps so the pushes finish at once; the grace waits stay real.
+# Source tests run at a pacing of 1000 fps so the pushes finish at once; the grace waits stay real. Their clips are
+# 1000 fps too, so each source frame is pushed once.
+FAST = 1000
 
 
 async def test_send_uploads_a_video_as_mp4_and_images_as_png(tmp_path, monkeypatch):
@@ -407,8 +409,8 @@ async def test_send_uploads_a_video_as_mp4_and_images_as_png(tmp_path, monkeypat
 async def test_source_frames_are_pushed_in_order(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=2, frames=1)
     # Source frames carry levels 0, 40, 80, 120, so H.264's quantization cannot reorder them.
-    plan = Plan(setup=[], chunks=4, source=source_clip([i * 40 for i in range(4)]))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    plan = Plan(setup=[], chunks=4, source=source_clip([i * 40 for i in range(4)], rate=FAST))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     pushed = fake.published.pushed
     levels = [round(int(f.mean()) / 40) for f in pushed]
@@ -435,8 +437,8 @@ async def test_an_edit_holds_the_first_frame_until_edited_video_arrives_then_pla
         return reply
 
     fake.send_command = send_command
-    plan = Plan(setup=[("start_edit", {"reference_image": b"clay"})], chunks=3, source=source_clip([40, 80, 120]))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="Vidu S2-Editing", fps=1000)
+    plan = Plan(setup=[("start_edit", {"reference_image": b"clay"})], chunks=3, source=source_clip([40, 80, 120], rate=FAST))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="Vidu S2-Editing", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     levels = [round(int(f.mean()) / 40) for f in fake.published.pushed]
     held = levels.index(2)
@@ -461,24 +463,29 @@ async def test_an_edit_the_model_ends_keeps_the_video_so_far(tmp_path, monkeypat
 
     fake.send_command = send_command
     fake._return_whole_chunks = on_push
-    plan = Plan(setup=[("start_edit", {"reference_image": b"clay"})], chunks=10, source=source_clip([40] * 10))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="Vidu S2-Editing", fps=1000)
+    plan = Plan(setup=[("start_edit", {"reference_image": b"clay"})], chunks=10, source=source_clip([40] * 10, rate=FAST))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="Vidu S2-Editing", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     assert 0 < len(frames_in(tmp_path / "out.mp4")) < 10
 
 
 async def test_source_frames_past_the_planned_count_are_never_pushed(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=2, frames=1)
-    plan = Plan(setup=[], chunks=2, source=source_clip([i * 40 for i in range(6)]))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    plan = Plan(setup=[], chunks=2, source=source_clip([0, 40] + [80] * 28, rate=FAST))
+    decoded = []
+    fit = clip.fit_frame
+    monkeypatch.setattr(clip, "fit_frame", lambda spec, frame: decoded.append(1) or fit(spec, frame))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     assert {round(int(f.mean()) / 40) for f in fake.published.pushed} == {0, 1}
+    # Decoding stops at the plan, give or take the one frame read ahead.
+    assert len(decoded) <= plan.chunks + 1
 
 
 async def test_a_source_tail_the_model_holds_back_is_padded_until_it_returns(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=0, whole_chunks=4)
-    plan = Plan(setup=[], chunks=5, source=source_clip([i * 40 for i in range(5)]))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    plan = Plan(setup=[], chunks=5, source=source_clip([i * 40 for i in range(5)], rate=FAST))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     assert len(fake.published.pushed) == 8
     assert len(frames_in(tmp_path / "out.mp4")) == 5
@@ -486,8 +493,8 @@ async def test_a_source_tail_the_model_holds_back_is_padded_until_it_returns(tmp
 
 async def test_source_padding_gives_up_on_a_tail_that_never_returns(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=2, frames=1)
-    plan = Plan(setup=[], chunks=4, source=source_clip([i * 40 for i in range(4)]))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    plan = Plan(setup=[], chunks=4, source=source_clip([i * 40 for i in range(4)], rate=FAST))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     assert len(frames_in(tmp_path / "out.mp4")) == 2
 
@@ -495,8 +502,8 @@ async def test_source_padding_gives_up_on_a_tail_that_never_returns(tmp_path, mo
 async def test_a_timed_command_goes_out_when_the_source_reaches_its_frame(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=2, frames=1)
     plan = Plan(setup=[("set_keep_backlog", {"keep_backlog": True})], timed=[(2, "set_prompt", {"prompt": "b"})],
-                chunks=4, source=source_clip([i * 40 for i in range(4)]))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+                chunks=4, source=source_clip([i * 40 for i in range(4)], rate=FAST))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     assert [c for c, _ in fake.sent] == ["set_keep_backlog", "set_prompt"]
     assert fake.sent_at == [0, 2]
@@ -504,8 +511,8 @@ async def test_a_timed_command_goes_out_when_the_source_reaches_its_frame(tmp_pa
 
 async def test_source_capture_records_the_stream_from_the_first_push(tmp_path, monkeypatch, fast_grace):
     fake = FakeReactor(chunks=3, frames=1)
-    plan = Plan(setup=[], chunks=2, source=source_clip([0, 40]))
-    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=1000)
+    plan = Plan(setup=[], chunks=2, source=source_clip([0, 40], rate=FAST))
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="X2", fps=FAST)
     await asyncio.wait_for(coro, timeout=10)
     frames = frames_in(tmp_path / "out.mp4")
     # The output is the clip's length: frames past it answer the padding.

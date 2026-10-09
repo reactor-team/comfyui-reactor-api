@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { canMove, statusLine } from "./reactor_live_state.mjs";
 
 const HINT = "Press Run to start a real-time session: the model plays in a window and you steer it as it runs. "
     + "Each run records a take. Set the seed's control after generate to fixed to keep the last take instead of starting a new session.";
@@ -130,8 +131,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let promptThen = null;   // a command sent after each prompt, such as the start of a take
     let heldFields = {};     // fields every prompt repeats from the opening one, such as a clip's references
     let thenWaiting = false; // the model rejected promptThen, so it waits until a state_update lists it as valid
-    const THEN_WAITING = "Starts when the current take ends.";
-    const CLIP_ENDED = "What happens next?";
+    let note = "";           // the latest message for the status line, which covers what the take is waiting on
     const STALL_MS = 2000;
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
     let markStarted;
@@ -191,24 +191,29 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     function started() { return phase !== "connecting"; }
     function played() { return ["playing", "stalled", "awaitingClip", "clipEnded"].includes(phase); }
 
-    // Moves the take to `next` when PHASES allows it from here, and shows the new phase. False when it didn't move.
+    // Moves the take to `next` when the phase table allows it from here, and shows the new phase. False when it didn't move.
     function setPhase(next) {
         if (next === phase) return false;
-        if (!PHASES[phase].includes(next)) {
+        if (!canMove(phase, next)) {
             console.warn(`Reactor: ignored a move from ${phase} to ${next}.`);
             return false;
         }
         const was = phase;
         phase = next;
-        if (was === "clipEnded" && status.textContent === CLIP_ENDED) status.textContent = "";
-        if (next === "clipEnded") status.textContent = CLIP_ENDED;
+        if (next === "clipEnded") note = "";
         if (over() && was !== "held") teardown();
         render();
         return true;
     }
 
+    function say(text) {
+        note = text;
+        status.textContent = statusLine({ phase, note, thenWaiting });
+    }
+
     // The overlay covers the video until the model's output plays, while frames stop, and while a take saves.
     function render() {
+        status.textContent = statusLine({ phase, note, thenWaiting });
         if (over()) return;
         loading.hidden = phase === "playing" || phase === "clipEnded";
         loadingText.textContent = phase === "saving" ? stage
@@ -241,10 +246,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             loading.hidden = false;
             loading.classList.add("error");
             loadingText.textContent = text;
-            status.textContent = "";
+            say("");
         } else {
             loading.hidden = true;
-            status.textContent = text;
+            say(text);
         }
         buttons.replaceChildren(el("button", { textContent: "Close", onclick: close }));
     }
@@ -258,14 +263,14 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // fire; the drive keys drive only while the preview has focus, and a blur releases them all.
     function command(name, data) {
         return reactor?.sendCommand(name, data).then((reply) => {
-            if (reply?.type === "command_error") status.textContent = `Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`;
+            if (reply?.type === "command_error") say(`Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`);
             return reply;
-        }, (e) => { status.textContent = `Sending ${name} failed: ${errorText(e)}`; });
+        }, (e) => say(`Sending ${name} failed: ${errorText(e)}`));
     }
 
     function sendThen() {
         thenWaiting = false;
-        if (status.textContent === THEN_WAITING) status.textContent = "";
+        render();
         command(promptThen, {});
     }
 
@@ -343,7 +348,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                                                                          selected: camera.deviceId === current })));
         picker.addEventListener("change", async () => {
             const next = await openCamera(picker.value).catch(() => null);
-            if (!next) return void (status.textContent = "That camera is unavailable.");
+            if (!next) return void say("That camera is unavailable.");
             if (over()) return next.getTracks().forEach((track) => track.stop());
             await sender.replaceTrack(next.getVideoTracks()[0]);
             for (const track of stream.getTracks()) track.stop();
@@ -424,7 +429,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             } else if (clip && continueField) showQueue();
             if (message?.type === "command_error" && message.data?.command === promptThen) {
                 thenWaiting = true;
-                status.textContent = THEN_WAITING;
+                say("");
             } else if (thenWaiting && message?.type === "state_update" && message.data?.valid_commands?.includes(promptThen)) sendThen();
             // A clip model holds its last frame once its queued clips have played, which reads as a stall without this.
             else if (message?.type === "clip_finished" || message?.type === "clip_stopped") {
@@ -447,7 +452,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             console.error("Reactor:", e);
             if (e?.recoverable || over() || phase === "saving") return;
             lost ??= errorText(e);
-            status.textContent = lost;
+            say(lost);
             status.classList.add("error");
         });
         const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
@@ -557,7 +562,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             // Steps toward the first frame show on the video; anything said while it plays shows below. Once Save
             // is pressed the overlay keeps its own "Saving the take…".
             if (phase === "saving") return;
-            if (played()) status.textContent = message.text;
+            if (played()) say(message.text);
             else if (message.text) {
                 stage = message.text;
                 render();
@@ -616,7 +621,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                     ok = await new Promise((resolve) => builtWaiters.set(anchor, resolve));
                 }
                 if (ok) data[continueField] = anchor;
-                else status.textContent = "The clip before failed to build, so the next one starts fresh.";
+                else say("The clip before failed to build, so the next one starts fresh.");
             }
             const reply = await command(promptCommand, data);
             unsent.splice(unsent.indexOf(entry), 1);
@@ -740,9 +745,9 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             const reply = await reactor.sendCommand(promptCommand, data);
             if (reply?.type === "command_error") throw new Error(reply.data?.reason ?? "no reason given");
             look.commit();
-            status.textContent = "Switched; the new look shows in a moment.";
+            say("Switched; the new look shows in a moment.");
         } catch (e) {
-            status.textContent = `The switch failed: ${errorText(e)}`;
+            say(`The switch failed: ${errorText(e)}`);
         } finally {
             look.busy = false;
             apply.textContent = "Apply";
@@ -752,7 +757,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     done.onclick = () => {
         done.disabled = true;
         send({ type: "done" });
-        status.textContent = "";
+        say("");
         stage = "Saving the take…";
         setPhase("saving");
     };
@@ -760,21 +765,6 @@ function openLive({ run_id, mode, title, camera, microphone }) {
 
     return { cancel: cancelRun };
 }
-
-// The phases of a take in the Realtime window, each with the phases it can move to. A take connects, waits for its
-// first frame and plays; frames can stall, and a clip model can end its clips and wait for the next one. Save, an
-// error or a close can end it from anywhere: "held" keeps the window open on a message, and "closed" removes it.
-const PHASES = {
-    connecting: ["firstFrame", "saving", "held", "closed"],
-    firstFrame: ["playing", "saving", "held", "closed"],
-    playing: ["stalled", "awaitingClip", "clipEnded", "saving", "held", "closed"],
-    stalled: ["playing", "awaitingClip", "clipEnded", "saving", "held", "closed"],
-    awaitingClip: ["stalled", "saving", "held", "closed"],
-    clipEnded: ["playing", "awaitingClip", "saving", "held", "closed"],
-    saving: ["held", "closed"],
-    held: ["closed"],
-    closed: [],
-};
 
 const DEFAULT_DEVICE = "Default";
 const PREVIEW_WAIT_MS = 4000;

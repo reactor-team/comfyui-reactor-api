@@ -1,0 +1,31 @@
+# Publishes this pack to the Comfy Registry. A push to main that changes
+# pyproject.toml (including the merge of this workflow) runs it, so the
+# REGISTRY_ACCESS_TOKEN secret — a publishing key for publisher "reactor" —
+# has to exist on the repo before that merge. Forks never publish.
+
+name: Publish to Comfy registry
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
+
+permissions:
+  contents: read
+
+jobs:
+  publish-node:
+    name: Publish Custom Node to registry
+    runs-on: ubuntu-latest
+    # Only publish from the canonical repo, never from forks.
+    if: ${{ github.repository == 'reactor-team/comfyui-reactor-api' }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+      - name: Publish Custom Node
+        uses: Comfy-Org/publish-node-action@main
+        with:
+          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}

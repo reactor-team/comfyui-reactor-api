@@ -13,6 +13,7 @@ Repository = "https://github.com/reactor-team/comfyui-reactor-api"
 [tool.comfy]
 PublisherId = "reactor"
 DisplayName = "Reactor API: Realtime Video"
+Icon = "https://avatars.githubusercontent.com/u/216609888?s=400&v=4"
 
 [dependency-groups]
 dev = [

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { canMove, statusLine } from "./reactor_live_state.mjs";
+import { ClipQueue, canMove, statusLine } from "./reactor_live_state.mjs";
 
 const HINT = "Press Run to start a real-time session: the model plays in a window and you steer it as it runs. "
     + "Each run records a take. Set the seed's control after generate to fixed to keep the last take instead of starting a new session.";
@@ -145,12 +145,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let lastFrameAt = 0;        // when the latest frame of the model's output played
     let phase = "connecting";   // where the take is in its life, one of PHASES
     let continueField = null;   // the prompt field that carries a clip model's previous clip on, so Continue is offered
-    let lastClip = null;        // the clip that plays last so far, which Continue carries on
-    const built = new Map();    // a clip the model has finished with to whether it built, which some models need before continuing one
-    const builtWaiters = new Map();  // a clip to the Continue waiting for it to build, told whether it did
-    let playingClip = null;     // the clip playing now
-    let queued = { generation: [], playout: [] };  // the model's clips still to build, then built and still to play
-    const unsent = [];          // prompts applied here and not yet queued by the model, in order
+    const clips = new ClipQueue();
     let sending = Promise.resolve();  // prompts go out one at a time, so clips play in the order they were applied
     render();
 
@@ -408,25 +403,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         // A take can't start while another plays: the model rejects promptThen with a command_error message,
         // so it waits until a state_update lists it as valid again.
         reactor.on("message", (message) => {
-            const clip = message?.data?.clip?.clip_id;
-            if (clip) {
-                // The run queues the opening clip itself, so this browser learns its id from the clips it sees.
-                if (!lastClip && (message.type === "clip_generated" || message.type === "clip_started")) {
-                    lastClip = clip;
-                    proceed.disabled = !started();
-                }
-                if (message.type === "clip_generated" || message.type === "clip_failed") {
-                    built.set(clip, message.type === "clip_generated");
-                    builtWaiters.get(clip)?.(built.get(clip));
-                    builtWaiters.delete(clip);
-                }
-                if (message.type === "clip_started") playingClip = message.data.clip;
-                else if ((message.type === "clip_finished" || message.type === "clip_stopped") && playingClip?.clip_id === clip) playingClip = null;
-            }
-            if (message?.type === "queue_update" && continueField) {
-                queued = { generation: message.data?.generation ?? [], playout: message.data?.playout ?? [] };
-                showQueue();
-            } else if (clip && continueField) showQueue();
+            const hadLast = clips.last;
+            clips.seen(message);
+            if (!hadLast && clips.last) proceed.disabled = !started();
+            if (continueField && (message?.type === "queue_update" || message?.data?.clip?.clip_id)) showQueue();
             if (message?.type === "command_error" && message.data?.command === promptThen) {
                 thenWaiting = true;
                 say("");
@@ -434,8 +414,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             // A clip model holds its last frame once its queued clips have played, which reads as a stall without this.
             else if (message?.type === "clip_finished" || message?.type === "clip_stopped") {
                 // Asked only when nothing is on its way. A clip still building leaves the video waiting for it instead.
-                if (!queued.generation.length && !queued.playout.length && !unsent.length) setPhase("clipEnded");
-                else if (!queued.playout.length) setPhase("awaitingClip");
+                if (clips.empty) setPhase("clipEnded");
+                else if (!clips.queued.playout.length) setPhase("awaitingClip");
             } else if (message?.type === "clip_started") {
                 // The new clip's own frames end the wait; the old clip's last frames can still arrive before them.
                 if (phase === "awaitingClip") setPhase("stalled");
@@ -572,7 +552,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             heldFields = message.held ?? {};
             markStarted();
             apply.disabled = false;
-            proceed.disabled = !lastClip;
+            proceed.disabled = !clips.last;
             look?.refresh();
             if (held) drive();
         } else if (message.type === "stats") {
@@ -605,33 +585,20 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // A continuation waits for the clip before to build, since a model may otherwise drop it and open fresh.
     function sendPrompt(continuing) {
         if (look) return void switchTo();
-        const entry = { prompt: prompt.value, continuing };
-        if (continueField) {
-            unsent.push(entry);
-            showQueue();
-        }
+        const entry = clips.apply(prompt.value, continuing);
+        if (continueField) showQueue();
         sending = sending.then(async () => {
             const data = { ...heldFields, [promptField]: entry.prompt };
-            if (continuing && lastClip) {
-                const anchor = lastClip;
-                let ok = built.get(anchor);
-                if (ok === undefined) {
-                    entry.waiting = true;
-                    showQueue();
-                    ok = await new Promise((resolve) => builtWaiters.set(anchor, resolve));
-                }
-                if (ok) data[continueField] = anchor;
-                else say("The clip before failed to build, so the next one starts fresh.");
-            }
+            const waiting = clips.anchor(entry);
+            if (entry.waiting) showQueue();
+            const { anchor, failed } = await waiting;
+            if (anchor) data[continueField] = anchor;
+            else if (failed) say("The clip before failed to build, so the next one starts fresh.");
+            clips.dispatch(entry);
             const reply = await command(promptCommand, data);
-            unsent.splice(unsent.indexOf(entry), 1);
-            const clip = reply?.data?.clip;
-            if (clip) {
-                lastClip = clip.clip_id;
-                if (![...queued.generation, ...queued.playout].some((c) => c.clip_id === clip.clip_id)) queued.generation.push(clip);
-            }
+            clips.sent(entry, reply?.data?.clip);
             if (continueField) {
-                proceed.disabled = !lastClip;
+                proceed.disabled = !clips.last;
                 showQueue();
             }
             if (promptThen) sendThen();
@@ -650,12 +617,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                el("span", { className: `reactor-live-pill ${state.toLowerCase()}`, textContent: state }),
                el("span", { className: "reactor-live-enters", textContent: continues ? "↪ Continues" : "✂ New shot" }),
                el("span", { className: "reactor-live-queue-prompt", textContent: text }));
-        const rows = [
-            ...(playingClip ? [row("Playing", playingClip.continue_from_clip_id, playingClip.prompt)] : []),
-            ...queued.playout.filter((c) => c.clip_id !== playingClip?.clip_id).map((c) => row("Ready", c.continue_from_clip_id, c.prompt)),
-            ...queued.generation.map((c) => row("Building", c.continue_from_clip_id, c.prompt)),
-            ...unsent.map((e) => row(e.waiting ? "Waiting" : "Sending", e.continuing, e.prompt)),
-        ];
+        const rows = clips.rows().map((c) => row(c.stage, c.continues, c.prompt));
         queueList.replaceChildren(...rows);
         queueList.hidden = !rows.length;
     }

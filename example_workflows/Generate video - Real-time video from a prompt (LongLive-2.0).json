@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Generate video in real time from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
+        "Generate video in real time from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Save to save the take under reactor/realtime, or Cancel to drop it.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Generate video in real time from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
+        "text": "Generate video in real time from a prompt with LongLive-2.0. Queue the prompt and the video plays in the Reactor Realtime window. Edit the prompt there and press Apply to move the scene to the new prompt. Press Save to save the take under reactor/realtime, or Cancel to drop it.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nPick another model on Reactor Realtime and it shows that model's inputs. LongLive-2.0 takes no image or video, so the prompt is its only input. Set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"

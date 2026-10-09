@@ -151,7 +151,7 @@ and each example's note links it.
 | Model | What it does | Takes | Prompt guide |
 | --- | --- | --- | --- |
 | [FastH3](https://docs.reactor.inc/model-api-reference/fast-h3/overview) | Short clips with sound, one per prompt | prompt, image on any segment | [Prompt guide](https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide) |
-| [H3 Reference Turbo Realtime](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/overview) | Clips with sound, guided by up to nine pictures | prompt, pictures | [Prompt guide](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide) |
+| [H3 Reference Turbo Realtime](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/overview) | Clips with sound, guided by up to nine pictures, which prompts call Picture 1, Picture 2, … in socket order | prompt, pictures | [Prompt guide](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide) |
 | [Helios](https://docs.reactor.inc/model-api-reference/helios/overview) | One continuous scene steered by prompts | prompt, image on any segment | [Prompt guide](https://docs.reactor.inc/model-api-reference/helios/prompt-guide) |
 | [Visko Orbis Stable / Dynamic](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/overview) | One unbroken shot that morphs, with sound | prompt, optional first image | [Stable](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/prompt-guide), [Dynamic](https://docs.reactor.inc/model-api-reference/visko-orbis-dynamic/prompt-guide) |
 | [LongLive-2.0](https://docs.reactor.inc/model-api-reference/longlive-v2/overview) | A story across shots and cuts, from text | prompt | [Prompt guide](https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide) |
@@ -177,7 +177,6 @@ These are the nodes this plugin adds to ComfyUI, all under **Reactor** in the no
 | **Reactor&nbsp;Sequence&nbsp;Join** | Plays sequences for the same model one after another. |
 | **Reactor&nbsp;Sequence&nbsp;Visualizer** | Draws a sequence's segments and camera moves on a frame ruler. |
 | **Reactor&nbsp;Vidu&nbsp;S2-Avatar&nbsp;Reference** | Tags an image as an object, outfit or background for an avatar segment. |
-| **Reactor&nbsp;H3&nbsp;Reference&nbsp;Turbo&nbsp;Realtime&nbsp;Picture** | Turns an image into a picture for an H3 Reference Turbo Realtime segment or Realtime run. Prompts call the pictures Picture 1, Picture 2, … in the order they're connected. |
 | **Reactor&nbsp;Camera&nbsp;Capture&nbsp;/<br>Microphone&nbsp;Capture** | Pick this browser's camera or microphone for Reactor Realtime. |
 
 ## Tips

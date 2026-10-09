@@ -51,7 +51,7 @@ def image_to_png(image) -> bytes:
 
 
 # The factory node that makes each model's references.
-REFERENCE_NODES = {"Vidu S2-Avatar": "Reactor Vidu S2-Avatar Reference", "H3 Reference Turbo Realtime": "Reactor H3 Reference Turbo Realtime Picture"}
+REFERENCE_NODES = {"Vidu S2-Avatar": "Reactor Vidu S2-Avatar Reference"}
 
 
 def references_input(name: str, spec: ModelSpec, tooltip: str):
@@ -59,6 +59,31 @@ def references_input(name: str, spec: ModelSpec, tooltip: str):
     return io.Autogrow.Input("references", optional=True, template=io.Autogrow.TemplatePrefix(
         input=ReactorReferenceType.Input("reference", tooltip=f"A {REFERENCE_NODES[name]}, {tooltip}"),
         prefix="reference_", min=0, max=spec.max_references))
+
+
+# How a prompt names the pictures of a model that takes them; the example is the model's prompt guide's.
+PICTURES_PROMPT = ('Name each picture by its number: the connected pictures are Picture 1, Picture 2, … in socket order. '
+                   'For example: "The person in Picture 1 walks through the garden in Picture 2. The camera follows from the side."')
+
+
+def pictures_input(spec: ModelSpec, tooltip: str):
+    """Image sockets for a model that takes its references as plain pictures, one more appearing as each is connected."""
+    return io.Autogrow.Input("pictures", optional=True, template=io.Autogrow.TemplateNames(
+        input=io.Image.Input("picture", tooltip=f"One character, object or place for the clip to draw on, {tooltip} It guides the look "
+                                                "rather than fixing a frame. Prompts call the connected pictures Picture 1, Picture 2, … in socket order."),
+        names=[f"picture_{i}" for i in range(1, spec.max_references + 1)], min=0))
+
+
+def taken_references(name: str, references, pictures) -> tuple[Reference, ...]:
+    """The references connected to a node: its reference sockets, or its pictures in socket order."""
+    if pictures:
+        ordered = sorted(pictures.items(), key=lambda item: int(item[0].rsplit("_", 1)[1]))
+        return tuple(Reference(name, image_to_png(image), "image") for _, image in ordered if image is not None)
+    return tuple(r for r in (references or {}).values() if r is not None)
+
+
+def reference_inputs(name: str, spec: ModelSpec, tooltip: str) -> list:
+    return [] if not spec.references else [pictures_input(spec, tooltip) if spec.pictures else references_input(name, spec, tooltip)]
 
 
 def video_bytes(video) -> bytes:
@@ -113,7 +138,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                             "and feed the last one to Reactor Render, and to a Reactor Sequence Visualizer to see it.",
                 inputs=[
                     *([io.Combo.Input("model", options=models, tooltip="The model the sequence runs on. Read on the first segment.")] if len(models) > 1 else []),
-                    *([io.String.Input("prompt", multiline=True)] if spec.prompted else []),
+                    *([io.String.Input("prompt", multiline=True, tooltip=PICTURES_PROMPT if spec.pictures else None)] if spec.prompted else []),
                     io.Float.Input("seconds", default=0, min=0, max=spec.seconds[1], step=0.5,
                                    tooltip=f"How long this segment plays, {spec.seconds[0]:g} to {spec.seconds[1]:g} seconds. "
                                            "0 plays as long as the script needs at the pace.") if spec.seconds else
@@ -130,7 +155,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                       if spec.camera else []),
                     *[setting_input(key, setting, "Read on the first segment.") for key, setting in spec.settings.items()],
                     *[setting_input(key, setting, "Holds until a later segment changes it.") for key, setting in spec.beat_settings.items()],
-                    *([references_input(family, spec, "in effect during this segment.")] if spec.references else []),
+                    *reference_inputs(family, spec, "in effect during this segment."),
                     ReactorSequenceType.Input("sequence", optional=True, tooltip="The segments before this one. Leave it empty on the first segment.",
                                            extra_dict={"model_facts": {name: model_facts(MODELS[name]) for name in models},
                                                        "start_settings": list(spec.settings)}),
@@ -139,7 +164,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
             )
 
         @classmethod
-        def execute(cls, frames=0, prompt="", model=models[0], seconds=None, sequence=None, kind="shot", image=None, video=None, moves=None, references=None, **settings) -> io.NodeOutput:
+        def execute(cls, frames=0, prompt="", model=models[0], seconds=None, sequence=None, kind="shot", image=None, video=None, moves=None, references=None, pictures=None, **settings) -> io.NodeOutput:
             # A later segment's model and start settings are the first segment's, so its own are not read.
             name = model if sequence is None else sequence.model
             if name not in models:
@@ -148,7 +173,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                 frames = round(seconds * MODELS[name].fps)
             beat = Beat(prompt, frames, cut=kind == "cut", image=None if image is None else image_to_png(image),
                         video=None if video is None else video_bytes(video), moves=tuple(editor_moves(moves)) if moves else (),
-                        references=tuple(r for r in (references or {}).values() if r is not None),
+                        references=taken_references(name, references, pictures),
                         settings={key: value for key, value in settings.items() if key in spec.beat_settings and value is not None})
             if sequence is None:
                 return io.NodeOutput(Timeline(name, (beat,), {key: value for key, value in settings.items() if key in spec.settings and value is not None}))
@@ -222,26 +247,6 @@ class ReactorViduS2AvatarReference(io.ComfyNode):
     @classmethod
     def execute(cls, image, kind, text="") -> io.NodeOutput:
         return io.NodeOutput(Reference("Vidu S2-Avatar", image_to_png(image), kind, text.strip()))
-
-
-class ReactorH3ReferenceTurboRealtimePicture(io.ComfyNode):
-    @classmethod
-    def define_schema(cls):
-        return io.Schema(
-            node_id="ReactorH3ReferenceTurboRealtimePicture",
-            display_name="Reactor H3 Reference Turbo Realtime Picture",
-            category=f"Reactor/{CAPABILITY['H3 Reference Turbo Realtime']}",
-            search_aliases=["reactor reference", "reactor picture", "H3 Reference Turbo Realtime", "character", "object", "setting"],
-            description="A reference picture for an H3 Reference Turbo Realtime clip to draw on: a character, an object or a place. "
-                        "It guides the look rather than fixing a frame. Connect it to each segment it guides; "
-                        "a segment's prompt calls its first connected picture Picture 1, the next Picture 2, and so on.",
-            inputs=[io.Image.Input("image", tooltip="JPEG, PNG or WebP; only the first image of a batch is used.")],
-            outputs=[ReactorReferenceType.Output()],
-        )
-
-    @classmethod
-    def execute(cls, image) -> io.NodeOutput:
-        return io.NodeOutput(Reference("H3 Reference Turbo Realtime", image_to_png(image), "image"))
 
 
 class ReactorRender(io.ComfyNode):
@@ -411,11 +416,12 @@ def live_option(name: str) -> io.DynamicCombo.Option:
     return io.DynamicCombo.Option(name, [
         *([io.String.Input("prompt", multiline=True, tooltip="What you say to the character first; may be empty." if spec.pattern == "call"
                            else "The script the first take speaks. Required. Apply a new one in the window for the next take." if spec.pattern == "takes"
-                           else "The prompt the video starts from. Required. Change it in the window as it plays.")] if spec.prompted else []),
+                           else "The prompt the video starts from. Required. Change it in the window as it plays."
+                           + (" " + PICTURES_PROMPT if spec.pictures else ""))] if spec.prompted else []),
         *([io.Image.Input("image", optional=not spec.image_required,
                           tooltip="The person the character is made from." if spec.pattern == "call" else "Reference image.")]
           if spec.images != "none" else []),
-        *([references_input(name, spec, "kept by every clip.")] if spec.references and spec.pattern != "call" else []),
+        *(reference_inputs(name, spec, "kept by every clip.") if spec.pattern != "call" else []),
         *([io.Video.Input("video", optional=True, tooltip="Source clip to restyle, looped until you press Done."),
            ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera instead of a clip.")]
           if source else []),
@@ -466,7 +472,7 @@ class ReactorRealtime(io.ComfyNode):
             return await live_output("call", name, prompt, call_setup(name, png, settings), None, filename_prefix,
                                      microphone=model.get("microphone"))
         if spec.pattern != "source":
-            beat = Beat(prompt, 1, image=png, references=tuple(r for r in (model.get("references") or {}).values() if r is not None), settings=beat_settings)
+            beat = Beat(prompt, 1, image=png, references=taken_references(name, model.get("references"), model.get("pictures")), settings=beat_settings)
             return await live_output("drive", name, prompt, live.drive_setup(name, beat, seed, settings), None, filename_prefix)
         if (video is None) == (camera is None):
             raise ValueError(f"{name} edits one source: connect a video or a Reactor Camera Capture.")
@@ -487,7 +493,7 @@ class ReactorRealtime(io.ComfyNode):
 class ReactorExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [*SEGMENT_NODES, ReactorSequenceJoin, ReactorSequenceVisualizer, ReactorViduS2AvatarReference, ReactorH3ReferenceTurboRealtimePicture, ReactorRender, ReactorCameraCapture, ReactorMicrophoneCapture, ReactorRealtime]
+        return [*SEGMENT_NODES, ReactorSequenceJoin, ReactorSequenceVisualizer, ReactorViduS2AvatarReference, ReactorRender, ReactorCameraCapture, ReactorMicrophoneCapture, ReactorRealtime]
 
 
 async def comfy_entrypoint() -> ReactorExtension:

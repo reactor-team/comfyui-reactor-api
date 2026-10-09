@@ -110,7 +110,8 @@ class ModelSpec:
     "source" model's live source is pushed to. `first_chunk_frames` is the length of a scene's
     first chunk when it differs from the rest. `size` is the native frame size images and source
     frames are fitted to; with `keeps_aspect`, only its short side is fixed and the source's aspect holds.
-    `references` is whether beats may carry its references. `starts` is whether the model waits for a `start` command before generating. `live` is whether
+    `references` is whether beats may carry its references, and `pictures` whether those are plain images, which prompts
+    call Picture 1, Picture 2, … in order. `starts` is whether the model waits for a `start` command before generating. `live` is whether
     Reactor Realtime offers the model.
     `native` is the commands, sent before `start`, that keep the video at the model's native size, or its nearest.
     `settings` are the settings the model reads only at start, set on a chain's first link. `beat_settings` are settings the
@@ -137,6 +138,7 @@ class ModelSpec:
     videos: str = "none"
     video_required: bool = False
     references: bool = False
+    pictures: bool = False
     source_track: str | None = None
     first_chunk_frames: int | None = None
     size: tuple[int, int] = (1280, 704)
@@ -281,7 +283,7 @@ MODELS = {
                                  beat_settings={"editing_type": Setting("switch_reference", EDIT_TYPES, "style_transfer")}),
     # Every clip needs its own references, which guide its look rather than fix a frame; prompts call them Picture 1, 2, ...
     "H3 Reference Turbo Realtime": ModelSpec("reactor/h3-reference-to-video-turbo-realtime", "clips", 24.0, "none", True,
-                                             references=True, max_references=9, size=(1344, 768), keeps_aspect=True, starts=False,
+                                             references=True, pictures=True, max_references=9, size=(1344, 768), keeps_aspect=True, starts=False,
                                              settings=FAST_H3_SETTINGS, prompt_command="enqueue", audio=True,
                                              live_held=("reference_images",)),
     # Each segment is one take: its prompt is the script the avatar speaks, its length the take's.

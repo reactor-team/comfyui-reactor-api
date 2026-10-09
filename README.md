@@ -171,7 +171,7 @@ These are the nodes this plugin adds to ComfyUI, all under **Reactor** in the no
 
 | Node | What it does |
 | --- | --- |
-| **Reactor&nbsp;Realtime** | Runs a model in real time. Pick the model, queue it, and steer it in the window: edit the prompt and press Apply, drive the camera with W/A/S/D and the arrow keys, or talk to an avatar. Press Done to output the take as a video. |
+| **Reactor&nbsp;Realtime** | Runs a model in real time. Pick the model, queue it, and steer it in the window: edit the prompt and press Apply, drive the camera with W/A/S/D and the arrow keys, or talk to an avatar. Press Save to output the take as a video. |
 | **Reactor&nbsp;&lt;model&gt;&nbsp;Segment** | One segment of a scripted sequence, with that model's inputs. Chain segments through `sequence`. The first segment holds the model's settings. Since every input is a normal ComfyUI input, other nodes can write the prompts, make the images, or branch the story. |
 | **Reactor&nbsp;Render** | Renders a sequence and outputs a video. |
 | **Reactor&nbsp;Sequence&nbsp;Join** | Plays sequences for the same model one after another. |

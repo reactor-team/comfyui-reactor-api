@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "A person from a photo speaks your script in real time with LTX. Queue it and the first take plays in the Reactor Realtime window. Write the next script there and press Apply; it plays as the next take once the one before ends. Press Done to save the takes under reactor/realtime.\n\nThe photo sets who speaks. The scene, read at the start, casts the voice and the delivery. Pace is words per minute.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+        "A person from a photo speaks your script in real time with LTX. Queue it and the first take plays in the Reactor Realtime window. Write the next script there and press Apply; it plays as the next take once the one before ends. Press Save to save the takes under reactor/realtime.\n\nThe photo sets who speaks. The scene, read at the start, casts the voice and the delivery. Pace is words per minute.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "A person from a photo speaks your script in real time with LTX. Queue it and the first take plays in the Reactor Realtime window. Write the next script there and press Apply; it plays as the next take once the one before ends. Press Done to save the takes under reactor/realtime.\n\nThe photo sets who speaks. The scene, read at the start, casts the voice and the delivery. Pace is words per minute.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "A person from a photo speaks your script in real time with LTX. Queue it and the first take plays in the Reactor Realtime window. Write the next script there and press Apply; it plays as the next take once the one before ends. Press Save to save the takes under reactor/realtime.\n\nThe photo sets who speaks. The scene, read at the start, casts the voice and the delivery. Pace is words per minute.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"

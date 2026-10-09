@@ -22,10 +22,10 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Generate short clips with sound in real time with FastH3. Queue the prompt and its clip plays in the Reactor Realtime window. Write the next clip's prompt there and press Apply; each prompt becomes the next clip. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nEvery FastH3 clip starts from nothing, so each prompt describes the whole scene again, and its sound as well as its picture.\n\nFastH3 prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+        "Generate short clips with sound in real time with FastH3. Queue the prompt and its clip plays in the Reactor Realtime window. Write the next clip's prompt there and press Queue new shot, or Queue continuation to carry on from the last clip's final frame. Press Save to save the take under reactor/realtime, or Cancel to drop it.\n\nA new shot starts from nothing, so its prompt describes the whole scene again, and its sound as well as its picture.\n\nFastH3 prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Generate short clips with sound in real time with FastH3. Queue the prompt and its clip plays in the Reactor Realtime window. Write the next clip's prompt there and press Apply; each prompt becomes the next clip. Press Done to save the take under reactor/realtime, or Cancel to drop it.\n\nEvery FastH3 clip starts from nothing, so each prompt describes the whole scene again, and its sound as well as its picture.\n\nFastH3 prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Generate short clips with sound in real time with FastH3. Queue the prompt and its clip plays in the Reactor Realtime window. Write the next clip's prompt there and press Queue new shot, or Queue continuation to carry on from the last clip's final frame. Press Save to save the take under reactor/realtime, or Cancel to drop it.\n\nA new shot starts from nothing, so its prompt describes the whole scene again, and its sound as well as its picture.\n\nFastH3 prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"

@@ -56,6 +56,17 @@ const STYLE = `
 .reactor-live-composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .reactor-live-composer[hidden] { display: none; }
 .reactor-live-actions { display: flex; flex-direction: column; gap: 6px; }
+.reactor-live-queue { display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 4px; background: var(--comfy-input-bg); }
+.reactor-live-queue[hidden] { display: none; }
+.reactor-live-queue > div { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; }
+.reactor-live-queue > div + div { border-top: 1px solid var(--border-color); }
+.reactor-live-queue > div.playing { box-shadow: inset 2px 0 #3fb950; }
+.reactor-live-pill { flex: none; width: 5.5em; padding: 1px 0; border-radius: 9px; text-align: center; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; background: rgb(128 128 128 / 0.2); }
+.reactor-live-pill.playing { background: rgb(63 185 80 / 0.25); color: #6fdd8b; }
+.reactor-live-pill.ready { background: rgb(56 139 253 / 0.25); color: #79b8ff; }
+.reactor-live-pill.building { background: rgb(210 153 34 / 0.25); color: #e3b341; }
+.reactor-live-enters { flex: none; width: 6.5em; opacity: 0.7; }
+.reactor-live-queue-prompt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reactor-live-camera { margin-right: auto; max-width: 50%; }
 `;
 
@@ -95,14 +106,16 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // The Look panel, for a model steered by an image and settings instead of a prompt, filled from the config.
     const switcher = el("div", { className: "reactor-live-look", hidden: true });
     const apply = el("button", { textContent: "Apply", disabled: true });
-    const proceed = el("button", { textContent: "Continue shot", title: "Apply the prompt as more of the same shot, picking up from its last frame", disabled: true, hidden: true });
+    const proceed = el("button", { textContent: "Queue continuation", title: "Queue the prompt as more of the same shot, picking up from the last queued clip's final frame", disabled: true, hidden: true });
     const applyRow = el("div", { className: "reactor-live-actions" }, apply, proceed);
     // The prompt and the buttons that apply it sit side by side, the buttons stacked to its right.
     const composer = el("div", { className: "reactor-live-composer" }, prompt, applyRow);
-    const done = el("button", { textContent: "Done" });
+    // A clip model's clips from the one playing to the last asked for, so a prompt applied early shows it was taken.
+    const queueList = el("div", { className: "reactor-live-queue", hidden: true });
+    const done = el("button", { textContent: "Save", title: "End the take and output it as a video" });
     const cancel = el("button", { textContent: "Cancel" });
     const buttons = el("div", { className: "reactor-live-row" }, done, cancel);
-    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, composer, switcher, buttons, stats));
+    backdrop.append(el("div", { className: "reactor-live" }, header, preview, status, legend, composer, queueList, switcher, buttons, stats));
     document.body.append(backdrop);
 
     const url = new URL(api.apiURL(`/reactor/live/${run_id}`), location.href);
@@ -135,16 +148,19 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let stage = "Connecting…";  // the server's latest step toward the first frame
     let joining = null;         // this browser's own step while it joins the session
     let playing = false;        // a frame of the model's output has played since setup
-    let saving = false;         // Done was pressed and the take is being saved
+    let saving = false;         // Save was pressed and the take is being saved
     let lastFrameAt = 0;        // when the latest frame of the model's output played
     let stalled = false;        // frames stopped while the model should be sending them
     let clipEnded = false;      // a clip model played its clips and holds its last frame until the next Apply
     let nextClip = false;       // Apply asked an ended clip model for another clip, which hasn't started yet
     let continueField = null;   // the prompt field that carries a clip model's previous clip on, so Continue is offered
     let lastClip = null;        // the clip that plays last so far, which Continue carries on
-    const built = new Set();    // clips the model has finished building or failed, which some models need before continuing one
+    const built = new Map();    // a clip the model has finished with to whether it built, which some models need before continuing one
     const builtWaiters = new Map();  // a clip to the Continue waiting for it to build, told whether it did
-    let waitingToContinue = false;
+    let playingClip = null;     // the clip playing now
+    let queued = { generation: [], playout: [] };  // the model's clips still to build, then built and still to play
+    const unsent = [];          // prompts applied here and not yet queued by the model, in order
+    let sending = Promise.resolve();  // prompts go out one at a time, so clips play in the order they were applied
     showLoading();
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
@@ -387,22 +403,34 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 // The run queues the opening clip itself, so this browser learns its id from the clips it sees.
                 if (!lastClip && (message.type === "clip_generated" || message.type === "clip_started")) {
                     lastClip = clip;
-                    proceed.disabled = !started || waitingToContinue;
+                    proceed.disabled = !started;
                 }
                 if (message.type === "clip_generated" || message.type === "clip_failed") {
-                    built.add(clip);
-                    builtWaiters.get(clip)?.(message.type === "clip_generated");
+                    built.set(clip, message.type === "clip_generated");
+                    builtWaiters.get(clip)?.(built.get(clip));
                     builtWaiters.delete(clip);
                 }
+                if (message.type === "clip_started") playingClip = message.data.clip;
+                else if ((message.type === "clip_finished" || message.type === "clip_stopped") && playingClip?.clip_id === clip) playingClip = null;
             }
+            if (message?.type === "queue_update" && continueField) {
+                queued = { generation: message.data?.generation ?? [], playout: message.data?.playout ?? [] };
+                showQueue();
+            } else if (clip && continueField) showQueue();
             if (message?.type === "command_error" && message.data?.command === promptThen) {
                 thenWaiting = true;
                 status.textContent = THEN_WAITING;
             } else if (thenWaiting && message?.type === "state_update" && message.data?.valid_commands?.includes(promptThen)) sendThen();
             // A clip model holds its last frame once its queued clips have played, which reads as a stall without this.
             else if (message?.type === "clip_finished" || message?.type === "clip_stopped") {
-                clipEnded = true;
-                status.textContent = CLIP_ENDED;
+                // Asked only when nothing is on its way. A clip still building leaves the video waiting for it instead.
+                if (!queued.generation.length && !queued.playout.length && !unsent.length) {
+                    clipEnded = true;
+                    status.textContent = CLIP_ENDED;
+                } else if (!queued.playout.length) {
+                    stalled = nextClip = true;
+                    showLoading();
+                }
             } else if (message?.type === "clip_started") {
                 clipEnded = nextClip = false;
                 if (status.textContent === CLIP_ENDED) status.textContent = "";
@@ -423,7 +451,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         });
         const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
             if (s === "ready") resolve();
-            // This browser's side dropped: end the run on the server too, so neither side outlives the other. After Done
+            // This browser's side dropped: end the run on the server too, so neither side outlives the other. After Save
             // the server leaves the session to save the take, so a drop then is expected and the window waits for "ended".
             if (s === "disconnected" && joined && !tornDown && !saving) {
                 const error = lost ?? "This browser lost its connection to the Reactor session.";
@@ -492,8 +520,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             promptThen = message.prompt_then;
             if (message.continue_field) {
                 continueField = message.continue_field;
-                apply.textContent = "Cut to new shot";
-                apply.title = "Apply the prompt as a new shot, starting fresh";
+                apply.textContent = "Queue new shot";
+                apply.title = "Queue the prompt as a new shot, starting fresh after the clips already queued";
                 proceed.hidden = false;
             }
             if (mode === "call") {
@@ -531,7 +559,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 }
             });
         } else if (message.type === "status") {
-            // Steps toward the first frame show on the video; anything said while it plays shows below. Once Done
+            // Steps toward the first frame show on the video; anything said while it plays shows below. Once Save
             // is pressed the overlay keeps its own "Saving the take…".
             if (saving) return;
             if (playing) status.textContent = message.text;
@@ -579,26 +607,40 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     proceed.onclick = () => sendPrompt(true);
 
     // Continue chains the new clip onto the clip that plays last so far; a new shot opens fresh.
-    async function sendPrompt(continuing) {
+    // A continuation waits for the clip before to build, since a model may otherwise drop it and open fresh.
+    function sendPrompt(continuing) {
         if (look) return void switchTo();
-        const data = { ...heldFields, [promptField]: prompt.value };
-        if (continuing) {
-            const anchor = lastClip;
-            // A model may drop a continuation of a clip it hasn't built, opening fresh instead, so Continue waits for it.
-            if (!built.has(anchor)) {
-                waitingToContinue = apply.disabled = proceed.disabled = true;
-                status.textContent = "Continues once the clip before is built…";
-                const ok = await new Promise((resolve) => builtWaiters.set(anchor, resolve));
-                waitingToContinue = apply.disabled = proceed.disabled = false;
-                if (status.textContent === "Continues once the clip before is built…") status.textContent = "";
-                if (!ok) return void (status.textContent = "The clip before failed to build, so there is nothing to continue.");
-            }
-            data[continueField] = anchor;
+        const entry = { prompt: prompt.value, continuing };
+        if (continueField) {
+            unsent.push(entry);
+            showQueue();
         }
-        const reply = await command(promptCommand, data);
-        lastClip = reply?.data?.clip?.clip_id ?? lastClip;
-        if (continueField) proceed.disabled = !lastClip;
-        if (promptThen) sendThen();
+        sending = sending.then(async () => {
+            const data = { ...heldFields, [promptField]: entry.prompt };
+            if (continuing && lastClip) {
+                const anchor = lastClip;
+                let ok = built.get(anchor);
+                if (ok === undefined) {
+                    entry.waiting = true;
+                    showQueue();
+                    ok = await new Promise((resolve) => builtWaiters.set(anchor, resolve));
+                }
+                if (ok) data[continueField] = anchor;
+                else status.textContent = "The clip before failed to build, so the next one starts fresh.";
+            }
+            const reply = await command(promptCommand, data);
+            unsent.splice(unsent.indexOf(entry), 1);
+            const clip = reply?.data?.clip;
+            if (clip) {
+                lastClip = clip.clip_id;
+                if (![...queued.generation, ...queued.playout].some((c) => c.clip_id === clip.clip_id)) queued.generation.push(clip);
+            }
+            if (continueField) {
+                proceed.disabled = !lastClip;
+                showQueue();
+            }
+            if (promptThen) sendThen();
+        });
         // The next clip takes a while to build, and the video holds the last one's final frame meanwhile.
         // The old clip's last frames can still arrive after it ends, so only the new clip's start ends the wait.
         if (clipEnded) {
@@ -609,6 +651,23 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         }
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
+    }
+
+    // One line per clip in play order: where it is, how it enters, and its prompt.
+    function showQueue() {
+        const row = (state, continues, text) =>
+            el("div", { className: state.toLowerCase(), title: text },
+               el("span", { className: `reactor-live-pill ${state.toLowerCase()}`, textContent: state }),
+               el("span", { className: "reactor-live-enters", textContent: continues ? "↪ Continues" : "✂ New shot" }),
+               el("span", { className: "reactor-live-queue-prompt", textContent: text }));
+        const rows = [
+            ...(playingClip ? [row("Playing", playingClip.continue_from_clip_id, playingClip.prompt)] : []),
+            ...queued.playout.filter((c) => c.clip_id !== playingClip?.clip_id).map((c) => row("Ready", c.continue_from_clip_id, c.prompt)),
+            ...queued.generation.map((c) => row("Building", c.continue_from_clip_id, c.prompt)),
+            ...unsent.map((e) => row(e.waiting ? "Waiting" : "Sending", e.continuing, e.prompt)),
+        ];
+        queueList.replaceChildren(...rows);
+        queueList.hidden = !rows.length;
     }
     // Each option value reads as its label: `style_transfer` is "Style transfer".
     const optionLabel = (option) => option.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());

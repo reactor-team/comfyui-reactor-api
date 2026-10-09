@@ -307,6 +307,8 @@ class LiveRun:
                     stats = asyncio.create_task(self._report_stats(reactor))
                     stats.add_done_callback(self._stats_failed)
                     await self._pump(check_interrupt)
+                    # The session leaves once the take ends, so stats have no peer to read from.
+                    stats.cancel()
                     if self._error is None:
                         clip = await recording.finish()
                 finally:

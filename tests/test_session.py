@@ -902,7 +902,7 @@ async def test_a_take_of_no_planned_frames_is_recorded_until_the_model_ends_it(t
 async def test_sound_before_a_takes_first_frame_is_left_out(tmp_path):
     writer = session.FrameWriter(str(tmp_path / "out.mp4"), 24)
     running = session.Session(None, writer, 24, lambda: None, lambda *args: None)
-    running.capture_on_frame = True
+    running.arm_capture("frame")
     # Measured on LTX: faint noise, not digital silence, streams while a take is generated.
     for _ in range(10):
         running.push_audio(np.full((4800, 1), 3, dtype=np.int16), 48000)
@@ -912,6 +912,97 @@ async def test_sound_before_a_takes_first_frame_is_left_out(tmp_path):
         assert running.capturing and writer.audio_samples == 2000
     finally:
         writer.close()
+
+
+class MarkCountingRecording:
+    """A Recording stand-in that counts each mark()."""
+
+    def __init__(self):
+        self.marks = 0
+
+    def mark(self):
+        self.marks += 1
+
+
+class GateWriter:
+    """A FrameWriter stand-in that keeps the frames and sound pushed to it."""
+
+    def __init__(self):
+        self.frames, self.audio = [], []
+        self.received = 0
+        self.limit = None
+
+    def push(self, frame):
+        self.frames.append(frame)
+        self.received += 1
+
+    def push_audio(self, pcm, sample_rate):
+        self.audio.append(pcm)
+
+
+class ReplyingReactor:
+    """Answers every command with no reply."""
+
+    async def send_command(self, command, data):
+        return None
+
+
+def gated_session():
+    running = session.Session(ReplyingReactor(), GateWriter(), 0, lambda: None, lambda *args: None)
+    running.recording = MarkCountingRecording()
+    return running, running.writer
+
+
+async def test_start_turns_capture_on_and_marks_the_recording_once():
+    running, _ = gated_session()
+    await running.send("start", {})
+    assert running.capturing and running.recording.marks == 1
+
+
+async def test_start_while_armed_for_a_frame_does_not_capture():
+    running, _ = gated_session()
+    running.arm_capture("frame")
+    await running.send("start", {})
+    assert not running.capturing and running.recording.marks == 0
+
+
+def test_a_frame_arm_captures_from_the_frame_that_trips_it():
+    running, writer = gated_session()
+    running.arm_capture("frame")
+    frame = np.zeros((16, 16, 3), dtype=np.uint8)
+    running.push_video(frame)
+    assert running.capturing and writer.frames == [frame] and running.recording.marks == 1
+
+
+def test_a_speech_arm_ignores_quiet_audio_and_captures_from_the_loud_packet():
+    running, writer = gated_session()
+    running.arm_capture("speech")
+    running.push_audio(np.full((480, 1), 3, dtype=np.int16), 48000)
+    assert not running.capturing and not writer.audio and running.recording.marks == 0
+    running.push_audio(np.full((480, 1), 8000, dtype=np.int16), 48000)
+    assert running.capturing and len(writer.audio) == 1 and running.recording.marks == 1
+
+
+def test_capture_until_stops_after_the_frame_that_reaches_it():
+    running, writer = gated_session()
+    running.start_capture()
+    running.capture_until = 2
+    frame = lambda: np.zeros((16, 16, 3), dtype=np.uint8)
+    running.push_video(frame())
+    assert running.capturing
+    running.push_video(frame())
+    assert not running.capturing and len(writer.frames) == 2
+    running.push_video(frame())
+    assert len(writer.frames) == 2 and running.recording.marks == 2
+
+
+def test_repeating_a_start_or_stop_does_not_mark_again():
+    running, _ = gated_session()
+    running.start_capture()
+    running.start_capture()
+    running.stop_capture()
+    running.stop_capture()
+    assert running.recording.marks == 2
 
 
 async def test_a_take_that_fails_fails_the_render(tmp_path, monkeypatch, fast_grace):

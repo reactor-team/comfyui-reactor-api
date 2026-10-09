@@ -5,6 +5,7 @@ import logging
 import math
 import time
 from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 
@@ -51,6 +52,9 @@ REPLY_ESTIMATE_SECONDS = 9.0
 SPEECH_LEVEL = 330.0
 
 Progress = Callable[[int, int, np.ndarray | None], None]
+# Whether a session writes what it receives: "off", "on", or off until the next frame or the character's next speech,
+# so sound sent before a take's first frame, or silence before a reply, stays out.
+Capture = Literal["off", "await_frame", "await_speech", "on"]
 
 
 class Session:
@@ -64,13 +68,9 @@ class Session:
         self.check_interrupt, self.on_progress = check_interrupt, on_progress
         self.messages: asyncio.Queue[dict] = asyncio.Queue()
         # Observed on cloud sessions: the stream opens with a placeholder frame at connect, before the model produces anything.
-        self._capturing = False
+        self.capture: Capture = "off"
         # The session's own recording, which keeps the spans captured here; None saves only the frames received.
         self.recording: Recording | None = None
-        # Set to start capturing at the character's next speech rather than at once.
-        self.capture_on_speech = False
-        # Set to start capturing at the next frame rather than at `start`, so sound sent before it stays out.
-        self.capture_on_frame = False
         # A frame count at which capturing stops by itself, so frames past a take's end stay out.
         self.capture_until: int | None = None
         self.frame_shape: tuple[int, ...] | None = None
@@ -83,29 +83,40 @@ class Session:
 
     @property
     def capturing(self) -> bool:
-        return self._capturing
+        return self.capture == "on"
 
-    @capturing.setter
-    def capturing(self, on: bool) -> None:
-        if on != self._capturing and self.recording is not None:
+    def start_capture(self) -> None:
+        self._set_capture("on")
+
+    def stop_capture(self) -> None:
+        self._set_capture("off")
+
+    def arm_capture(self, on: Literal["frame", "speech"]) -> None:
+        # An open gate stays open.
+        if self.capture != "on":
+            self._set_capture(f"await_{on}")
+
+    def _set_capture(self, value: Capture) -> None:
+        # A recording span runs between on/off changes, so arming doesn't mark.
+        if (value == "on") != (self.capture == "on") and self.recording is not None:
             self.recording.mark()
-        self._capturing = on
+        self.capture = value
 
     def push_video(self, frame: np.ndarray) -> None:
         self.frame_shape = frame.shape
-        if self.capture_on_frame:
-            self.capture_on_frame, self.capturing = False, True
-        if self.capturing:
+        if self.capture == "await_frame":
+            self.start_capture()
+        if self.capture == "on":
             self.writer.push(frame)
             if self.capture_until is not None and self.writer.received >= self.capture_until:
-                self.capturing = False
+                self.stop_capture()
 
     def push_audio(self, pcm: np.ndarray, sample_rate: int) -> None:
         if np.sqrt(np.mean(np.square(pcm, dtype=np.float32))) > SPEECH_LEVEL:
             self.sounded_at = time.monotonic()
-            if self.capture_on_speech:
-                self.capture_on_speech, self.capturing = False, True
-        if self.capturing:
+            if self.capture == "await_speech":
+                self.start_capture()
+        if self.capture == "on":
             self.writer.push_audio(pcm, sample_rate)
 
     async def send(self, command: str, data: dict) -> dict | None:
@@ -122,8 +133,8 @@ class Session:
             return self.uploads[value]
 
         data = {k: await upload(k, v) for k, v in data.items()}
-        if command == "start" and not self.capture_on_frame:
-            self.capturing = True
+        if command == "start" and self.capture != "await_frame":
+            self.start_capture()
         reply = await self.reactor.send_command(command, data)
         if reply is not None and reply.get("type") == "command_error":
             raise RuntimeError(f"Reactor rejected {command}: {reply.get('data', {}).get('reason')}")
@@ -220,7 +231,7 @@ async def push_source(session: Session, spec: ModelSpec, plan: Plan, frames: Cli
         if command in SETUP_PHASES:
             await hold_until(session, spec, track, frames.first, SETUP_PHASES[command], SETUP_READY.get(command))
     timed = sorted(plan.timed, key=lambda t: t[0])
-    session.capturing = True
+    session.start_capture()
     pushed = 0
     model_done_at = None
     # The clip's length is the plan's until the clip runs out first; only frames up to it are ever decoded.
@@ -326,7 +337,8 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
         session_phase(await session.next_message(timeout=0.05))
     # With no greeting the character waits for the first line, so the take starts at its answer.
     greeting = any(data.get("greeting") for command, data in plan.setup if command == "start_call")
-    session.capturing = greeting
+    if greeting:
+        session.start_capture()
     session.writer.fill_gaps = True
     session.planned = sum(max(hold, round(REPLY_ESTIMATE_SECONDS * spec.fps)) for hold in plan.holds)
     timed = sorted(plan.timed, key=lambda t: t[0])
@@ -337,7 +349,7 @@ async def run_call(session: Session, spec: ModelSpec, plan: Plan) -> None:
             _, command, data = timed.pop(0)
             await session.send(command, data)
         if replies == 0 and not greeting:
-            session.capture_on_speech = True
+            session.arm_capture("speech")
         give_up = time.monotonic() + REPLY_TIMEOUT_SECONDS
         finish_by = None
         while (session.sounded_at <= since or time.monotonic() - session.sounded_at < REPLY_QUIET_SECONDS
@@ -402,7 +414,7 @@ async def run_clips(session: Session, spec: ModelSpec, plan: Plan) -> None:
         elif kind == "clip_failed" and clip_id in ids:
             raise RuntimeError(f"Segment {ids.index(clip_id) + 1} failed to build: {data.get('reason') or data.get('error') or 'no reason given'}")
         elif kind == "clip_started" and ids and clip_id == ids[0]:
-            session.capturing = True
+            session.start_capture()
         elif kind in ("clip_finished", "clip_stopped") and not pending and clip_id == ids[-1]:
             model_done_at = model_done_at or time.monotonic()
 
@@ -419,7 +431,7 @@ async def run_takes(session: Session, spec: ModelSpec, plan: Plan) -> None:
     for take, frames in enumerate(plan.holds):
         session.capture_until = session.writer.received + frames if frames else None
         # Measured on LTX: sound keeps streaming while a take is generated, before its first frame arrives.
-        session.capture_on_frame = True
+        session.arm_capture("frame")
         for _, command, data in (t for t in plan.timed if t[0] == take):
             await session.send(command, data)
         done = False
@@ -438,7 +450,7 @@ async def run_takes(session: Session, spec: ModelSpec, plan: Plan) -> None:
                 done, last_sign_at = True, time.monotonic()
             elif kind in ("generation_failed", "generation_stopped", "generation_reset"):
                 raise RuntimeError(f"Segment {take + 1} did not finish: {data.get('reason') or kind}")
-        session.capturing = session.capture_on_frame = False
+        session.stop_capture()
     session.planned = session.writer.received
 
 

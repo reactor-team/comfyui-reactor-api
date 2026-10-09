@@ -220,7 +220,7 @@ def test_model_facts_carry_the_chunk_grid_compile_timeline_snaps_to():
     facts = model_facts(MODELS["LongLive-2.0"])
     assert facts == {"fps": 24.0, "frames_per_chunk": 32, "first_chunk_frames": 29,
                      "supports_cuts": True, "max_scene_chunks": 48, "images": "none", "image_required": False, "references": False,
-                     "videos": "none", "video_required": False, "camera": {}}
+                     "videos": "none", "video_required": False, "script_length": None, "camera": {}}
     camera = model_facts(MODELS["LingBot"])["camera"]
     assert "rotation_speed_deg" not in camera
     assert camera["look_horizontal"]["speed"] == {"idle": 5.0, "maximum": 30.0}
@@ -483,3 +483,71 @@ def test_an_avatar_call_needs_a_persona_a_photo_and_something_to_say():
         compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0)], seed=0, settings=AVATAR)
     with pytest.raises(ValueError, match="Segment 2 says nothing"):
         compile_timeline("Vidu S2-Avatar", [Beat("Hi.", 0, image=b"photo"), Beat(" ", 0)], seed=0, settings=AVATAR)
+
+
+def test_fast_h3_enqueues_a_clip_per_segment_after_its_canvas():
+    plan = compile_timeline("FastH3", [Beat("a", 192), Beat("b", 240), Beat("c", 144, cut=True), Beat("d", 120, image=b"png")],
+                            seed=3, settings={"aspect": "9:16"})
+    assert plan.setup == [("set_seed", {"seed": 3}), ("set_flush_on_clip_end", {"enabled": False}), ("set_canvas", {"aspect": "9:16"})]
+    assert plan.timed == [
+        (0, "enqueue", {"prompt": "a", "seconds": 8.0}),
+        # A shot continues from the clip before; a cut and an image each open fresh.
+        (1, "enqueue", {"prompt": "b", "seconds": 10.0, "continue_from_clip_id": 0}),
+        (2, "enqueue", {"prompt": "c", "seconds": 6.0}),
+        (3, "enqueue", {"prompt": "d", "seconds": 5.0, "starting_frame": b"png"}),
+    ]
+    assert plan.chunks == 696
+
+
+def h3_ref(png: bytes) -> Reference:
+    return Reference("H3 Reference Turbo Realtime", png, "image")
+
+
+def test_h3_reference_sends_each_segments_references_in_order_and_chains_shots():
+    a, b = h3_ref(b"a"), h3_ref(b"b")
+    plan = compile_timeline("H3 Reference Turbo Realtime",
+                            [Beat("x", 120, references=(a, b)), Beat("y", 144, references=(b,)), Beat("z", 120, cut=True, references=(a,))], seed=1)
+    assert plan.timed == [
+        (0, "enqueue", {"prompt": "x", "seconds": 5.0, "reference_images": [b"a", b"b"]}),
+        # References guide the look, so a shot keeps continuing whatever its references are.
+        (1, "enqueue", {"prompt": "y", "seconds": 6.0, "reference_images": [b"b"], "continue_from_clip_id": 0}),
+        (2, "enqueue", {"prompt": "z", "seconds": 5.0, "reference_images": [b"a"]}),
+    ]
+
+
+def test_h3_reference_refuses_a_segment_without_references_or_with_too_many():
+    with pytest.raises(ValueError, match="Segment 2 has no references"):
+        compile_timeline("H3 Reference Turbo Realtime", [Beat("x", 120, references=(h3_ref(b"a"),)), Beat("y", 120)], seed=1)
+    with pytest.raises(ValueError, match="takes at most 9"):
+        compile_timeline("H3 Reference Turbo Realtime", [Beat("x", 120, references=tuple(h3_ref(bytes([i])) for i in range(10)))], seed=1)
+    with pytest.raises(ValueError, match="does not take Vidu S2-Avatar references"):
+        compile_timeline("H3 Reference Turbo Realtime", [Beat("x", 120, references=(Reference("Vidu S2-Avatar", b"a", "object"),))], seed=1)
+
+
+def test_ltx_speaks_each_segment_as_a_take_from_the_first_segments_avatar():
+    plan = compile_timeline("LTX", [Beat("Hello.", 120, image=b"face"), Beat("Goodbye.", 240)], seed=2,
+                            settings={"scene": "News anchor at a desk", "pace": 160})
+    assert plan.setup == [("set_seed", {"seed": 2}), ("set_avatar_image", {"avatar_image": b"face"}),
+                          ("set_prompt", {"prompt": "News anchor at a desk"}), ("set_wpm", {"wpm": 160})]
+    assert plan.timed == [(0, "set_script", {"script": "Hello."}), (0, "set_duration_seconds", {"duration_seconds": 5.0}), (0, "start", {}),
+                          (1, "set_script", {"script": "Goodbye."}), (1, "set_duration_seconds", {"duration_seconds": 10.0}), (1, "start", {})]
+    assert plan.chunks == 2
+
+
+def test_an_ltx_segment_of_0_frames_lasts_as_long_as_its_script():
+    plan = compile_timeline("LTX", [Beat("Hello there.", 0, image=b"face"), Beat("Goodbye.", 120)], seed=1)
+    assert (1, "set_duration_seconds", {"duration_seconds": 5.0}) in plan.timed
+    assert (0, "set_duration_seconds", {"duration_seconds": 0}) in plan.timed
+    assert plan.holds == [0, 120]
+    assert model_facts(MODELS["LTX"])["script_length"]["wpm"] == 140
+    assert not model_facts(MODELS["FastH3"])["script_length"]
+
+
+def test_ltx_refuses_a_silent_segment_or_one_outside_a_takes_length():
+    with pytest.raises(ValueError, match="Segment 2 says nothing"):
+        compile_timeline("LTX", [Beat("Hi.", 120, image=b"face"), Beat(" ", 120)], seed=1)
+    with pytest.raises(ValueError, match="a LTX take lasts 4–300s"):
+        compile_timeline("LTX", [Beat("Hi.", 48, image=b"face")], seed=1)
+    with pytest.raises(ValueError, match="needs an image"):
+        compile_timeline("LTX", [Beat("Hi.", 120)], seed=1)
+

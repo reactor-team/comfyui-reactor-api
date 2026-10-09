@@ -1,8 +1,8 @@
 {
-  "id": "35fb2323-e49f-4ae3-994e-5e00e2668b1f",
+  "id": "6459e6da-2dcb-4edb-b99b-d79d7bd342d5",
   "revision": 0,
-  "last_node_id": 8,
-  "last_link_id": 7,
+  "last_node_id": 7,
+  "last_link_id": 5,
   "nodes": [
     {
       "id": 1,
@@ -13,7 +13,7 @@
       ],
       "size": [
         560,
-        150
+        180
       ],
       "flags": {},
       "order": 0,
@@ -22,29 +22,36 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Each Reactor LongLive-2.0 Segment node is one segment: it plays its prompt for its frames, starting where the segment before it ends. The first segment sets the model and its settings, later segments take them from the first, and the last one feeds Reactor Render.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nkind is how a segment enters from the one before: shot blends softly, cut starts a fresh scene. The first segment just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+        "Three FastH3 clips with sound, one segment node each. The second is a shot, so it continues from the first clip's last frame; the third is a cut, so it opens fresh. Each prompt describes the scene and its sound again, since a clip remembers nothing of the one before.\n\nFastH3 prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Each Reactor LongLive-2.0 Segment node is one segment: it plays its prompt for its frames, starting where the segment before it ends. The first segment sets the model and its settings, later segments take them from the first, and the last one feeds Reactor Render.\n\nLongLive-2.0 prompt guide: https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide\n\nkind is how a segment enters from the one before: shot blends softly, cut starts a fresh scene. The first segment just opens the video.\n\nSet your Reactor API key in this plugin's config.ini."
+        "text": "Three FastH3 clips with sound, one segment node each. The second is a shot, so it continues from the first clip's last frame; the third is a cut, so it opens fresh. Each prompt describes the scene and its sound again, since a clip remembers nothing of the one before.\n\nFastH3 prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
       "id": 2,
-      "type": "ReactorLongLive20Segment",
+      "type": "ReactorFastH3Segment",
       "pos": [
         40,
-        270
+        300
       ],
       "size": [
-        300,
-        220
+        400,
+        360
       ],
       "flags": {},
       "order": 1,
       "mode": 0,
       "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
         {
           "localized_name": "sequence",
           "name": "sequence",
@@ -78,6 +85,16 @@
             "name": "kind"
           },
           "link": null
+        },
+        {
+          "localized_name": "aspect",
+          "name": "aspect",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -91,34 +108,43 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Segment"
+        "Node name for S&R": "ReactorFastH3Segment"
       },
       "widgets_values": [
-        "A powerful Bengal tiger prowls slowly through tall sun-bleached savanna grass at golden hour, muscles rolling beneath its orange-and-black striped fur, amber eyes fixed ahead, whiskers catching the light. Warm low sunlight rakes through the swaying grass. Long telephoto, very shallow depth of field, slow tracking dolly, rich golden-amber palette, fine fur detail, photoreal nature-documentary look.",
-        317,
-        "shot"
+        "A small harbor at dawn, pale pink sky over still grey water. An old fisherman in a yellow raincoat coils rope on the deck of a wooden boat tied to the pier. Static medium wide shot from the pier, eye-level. Gulls cry overhead, water laps against the hull, and the rope creaks as he pulls it tight.",
+        144,
+        "shot",
+        "16:9"
       ],
       "widgets_values_named": {
-        "prompt": "A powerful Bengal tiger prowls slowly through tall sun-bleached savanna grass at golden hour, muscles rolling beneath its orange-and-black striped fur, amber eyes fixed ahead, whiskers catching the light. Warm low sunlight rakes through the swaying grass. Long telephoto, very shallow depth of field, slow tracking dolly, rich golden-amber palette, fine fur detail, photoreal nature-documentary look.",
-        "frames": 317,
-        "kind": "shot"
+        "prompt": "A small harbor at dawn, pale pink sky over still grey water. An old fisherman in a yellow raincoat coils rope on the deck of a wooden boat tied to the pier. Static medium wide shot from the pier, eye-level. Gulls cry overhead, water laps against the hull, and the rope creaks as he pulls it tight.",
+        "frames": 144,
+        "kind": "shot",
+        "aspect": "16:9"
       }
     },
     {
       "id": 3,
-      "type": "ReactorLongLive20Segment",
+      "type": "ReactorFastH3Segment",
       "pos": [
-        400,
-        270
+        500,
+        300
       ],
       "size": [
-        300,
-        200
+        400,
+        360
       ],
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
         {
           "localized_name": "sequence",
           "name": "sequence",
@@ -152,6 +178,16 @@
             "name": "kind"
           },
           "link": null
+        },
+        {
+          "localized_name": "aspect",
+          "name": "aspect",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -165,34 +201,43 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Segment"
+        "Node name for S&R": "ReactorFastH3Segment"
       },
       "widgets_values": [
-        "A pod of bottlenose dolphins leaps in unison through the glittering turquoise surface of a calm open ocean, sleek grey bodies arcing clear of the water, sheets of spray catching the bright midday sun. Low angle just above the waterline, crisp high-shutter clarity, deep blue-green palette with sparkling highlights, photoreal.",
-        317,
-        "cut"
+        "A small harbor at dawn, pale pink sky over still grey water. An old fisherman in a yellow raincoat on the deck of a wooden boat tied to the pier lifts a crate of silver fish onto the planks. Slow push-in to a medium shot, eye-level. Fish slap wetly in the crate, gulls cry overhead, and he grunts with the effort.",
+        144,
+        "shot",
+        "16:9"
       ],
       "widgets_values_named": {
-        "prompt": "A pod of bottlenose dolphins leaps in unison through the glittering turquoise surface of a calm open ocean, sleek grey bodies arcing clear of the water, sheets of spray catching the bright midday sun. Low angle just above the waterline, crisp high-shutter clarity, deep blue-green palette with sparkling highlights, photoreal.",
-        "frames": 317,
-        "kind": "cut"
+        "prompt": "A small harbor at dawn, pale pink sky over still grey water. An old fisherman in a yellow raincoat on the deck of a wooden boat tied to the pier lifts a crate of silver fish onto the planks. Slow push-in to a medium shot, eye-level. Fish slap wetly in the crate, gulls cry overhead, and he grunts with the effort.",
+        "frames": 144,
+        "kind": "shot",
+        "aspect": "16:9"
       }
     },
     {
       "id": 4,
-      "type": "ReactorLongLive20Segment",
+      "type": "ReactorFastH3Segment",
       "pos": [
-        760,
-        270
+        960,
+        300
       ],
       "size": [
-        300,
-        200
+        400,
+        360
       ],
       "flags": {},
       "order": 4,
       "mode": 0,
       "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
         {
           "localized_name": "sequence",
           "name": "sequence",
@@ -226,6 +271,16 @@
             "name": "kind"
           },
           "link": null
+        },
+        {
+          "localized_name": "aspect",
+          "name": "aspect",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -234,30 +289,66 @@
           "name": "REACTOR_SEQUENCE",
           "type": "REACTOR_SEQUENCE",
           "links": [
-            5
+            3,
+            4
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "ReactorLongLive20Segment"
+        "Node name for S&R": "ReactorFastH3Segment"
       },
       "widgets_values": [
-        "A herd of African elephants \u2014 towering adults sheltering a small calf \u2014 wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
-        317,
-        "cut"
+        "Inside a warm harbor caf\u00e9 at dawn, steamed-up windows and a pale pink sky beyond. An old fisherman in a yellow raincoat sits at a wooden table and wraps both hands around a mug of tea. Static close-up, eye-level, shallow depth of field. Cups clink, a kettle whistles softly, and he lets out a long, tired sigh.",
+        144,
+        "cut",
+        "16:9"
       ],
       "widgets_values_named": {
-        "prompt": "A herd of African elephants \u2014 towering adults sheltering a small calf \u2014 wade and drink at a broad watering hole at sunset, trunks curling up to spray arcs of water, acacia trees silhouetted on the horizon. Wide cinematic shot, golden-hour backlight, dust and mist in the air, earthy amber tones, serene and majestic, photoreal.",
-        "frames": 317,
-        "kind": "cut"
+        "prompt": "Inside a warm harbor caf\u00e9 at dawn, steamed-up windows and a pale pink sky beyond. An old fisherman in a yellow raincoat sits at a wooden table and wraps both hands around a mug of tea. Static close-up, eye-level, shallow depth of field. Cups clink, a kettle whistles softly, and he lets out a long, tired sigh.",
+        "frames": 144,
+        "kind": "cut",
+        "aspect": "16:9"
       }
     },
     {
-      "id": 7,
+      "id": 5,
+      "type": "ReactorSequenceVisualizer",
+      "pos": [
+        40,
+        760
+      ],
+      "size": [
+        1320,
+        160
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 3
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "ReactorSequenceVisualizer"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "timeline": ""
+      }
+    },
+    {
+      "id": 6,
       "type": "ReactorRender",
       "pos": [
-        1120,
-        270
+        1420,
+        300
       ],
       "size": [
         400,
@@ -271,7 +362,7 @@
           "localized_name": "sequence",
           "name": "sequence",
           "type": "REACTOR_SEQUENCE",
-          "link": 5
+          "link": 4
         },
         {
           "localized_name": "seed",
@@ -289,7 +380,7 @@
           "name": "VIDEO",
           "type": "VIDEO",
           "links": [
-            6
+            5
           ]
         }
       ],
@@ -306,25 +397,25 @@
       }
     },
     {
-      "id": 8,
+      "id": 7,
       "type": "SaveVideo",
       "pos": [
-        1580,
-        270
+        1880,
+        300
       ],
       "size": [
         270,
         106
       ],
       "flags": {},
-      "order": 7,
+      "order": 2,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "video",
           "name": "video",
           "type": "VIDEO",
-          "link": 6
+          "link": 5
         },
         {
           "localized_name": "filename_prefix",
@@ -336,20 +427,20 @@
           "link": null
         },
         {
-          "localized_name": "format",
-          "name": "format",
-          "type": "COMFY_DYNAMICCOMBO_V3",
-          "widget": {
-            "name": "format"
-          },
-          "link": null
-        },
-        {
           "localized_name": "codec",
           "name": "format.codec",
           "type": "COMFY_DYNAMICCOMBO_V3",
           "widget": {
             "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
           },
           "link": null
         },
@@ -374,13 +465,13 @@
       ],
       "properties": {},
       "widgets_values": [
-        "reactor/segments",
+        "reactor/fasth3",
         "auto",
         "auto",
         "auto"
       ],
       "widgets_values_named": {
-        "filename_prefix": "reactor/segments",
+        "filename_prefix": "reactor/fasth3",
         "format": "auto",
         "format.codec": "auto",
         "codec": "auto"
@@ -389,27 +480,11 @@
   ],
   "links": [
     [
-      5,
-      4,
-      0,
-      7,
-      0,
-      "REACTOR_SEQUENCE"
-    ],
-    [
-      6,
-      7,
-      0,
-      8,
-      0,
-      "VIDEO"
-    ],
-    [
       1,
       2,
       0,
       3,
-      0,
+      1,
       "REACTOR_SEQUENCE"
     ],
     [
@@ -417,18 +492,42 @@
       3,
       0,
       4,
+      1,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      3,
+      4,
+      0,
+      5,
       0,
       "REACTOR_SEQUENCE"
+    ],
+    [
+      4,
+      4,
+      0,
+      6,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      5,
+      6,
+      0,
+      7,
+      0,
+      "VIDEO"
     ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
-      "scale": 1,
+      "scale": 0.45,
       "offset": [
-        0,
-        0
+        100,
+        100
       ]
     }
   },

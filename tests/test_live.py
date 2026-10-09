@@ -3,6 +3,7 @@ import io
 import itertools
 import json
 import logging
+import shutil
 from types import SimpleNamespace
 
 import av
@@ -10,8 +11,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render import live, timeline
+from reactor_render import live, recording, timeline
 from reactor_render.clip import ClipStream
+from reactor_render.encode import FrameWriter
 from reactor_render.timeline import MODELS, POSES
 
 X2_INPUT = MODELS["X2"].frame_size(1920, 1080)
@@ -547,3 +549,55 @@ async def test_a_call_that_fails_on_the_server_fails_the_run(tmp_path, monkeypat
     with pytest.raises(RuntimeError, match="upstream error"):
         await asyncio.wait_for(task, 10)
     assert {"type": "ended", "error": "The session failed: upstream error"} in texts(sent)
+
+
+def test_held_refs_reach_the_browser_as_json_its_sdk_reads_as_file_refs():
+    from reactor_sdk import FileRef
+    refs = [FileRef("u1", "a.png", "image/png", 3), FileRef("u2", "b.png", "image/png", 4)]
+    sent = json.loads(json.dumps({"held": {"reference_images": live.browser_ref(refs), "prompt": live.browser_ref("x")}}))
+    assert sent["held"]["reference_images"][0] == {"uploadId": "u1", "name": "a.png", "mimeType": "image/png", "size": 3}
+    assert sent["held"]["prompt"] == "x"
+
+
+class FakeLiveRecorded(FakeLiveReactor):
+    """A live session that keeps a recording (gray 128, where the streamed frames are white); its media clock is the time since connect."""
+
+    async def connect(self):
+        self.connected_at = asyncio.get_running_loop().time()
+        await super().connect()
+
+    def now(self):
+        return asyncio.get_running_loop().time() - self.connected_at
+
+    async def request_clip(self, seconds):
+        return SimpleNamespace(now_marker=self.now(), end_marker=self.now())
+
+    async def request_recording(self):
+        return SimpleNamespace(end_marker=self.now())
+
+
+async def test_a_take_is_saved_from_the_sessions_recording_with_the_browsers_token(tmp_path, monkeypatch):
+    source = tmp_path / "served.mp4"
+    writer = FrameWriter(str(source), 30)
+    for _ in range(300):
+        writer.push(np.full((16, 16, 3), 128, dtype=np.uint8))
+    writer.close()
+    downloads = []
+
+    async def download_clip(clip, path, jwt=None, ready_timeout=None):
+        downloads.append(jwt)
+        shutil.copy(source, path)
+    monkeypatch.setattr(recording, "download_clip", download_clip)
+    fake = FakeLiveRecorded()
+    path = tmp_path / "take.mp4"
+    run = make_run(fake, monkeypatch, "style", "X2", path, size=X2_INPUT)
+    task = asyncio.create_task(run.run(lambda: None))
+    run.connected(lambda m: None)
+    run.receive('{"type":"published"}')
+    assert await until(lambda: run._writer is not None and run._writer.received > 0)
+    await asyncio.sleep(0.3)
+    run.receive('{"type":"done"}')
+    assert await asyncio.wait_for(task, 10) == str(path)
+    assert downloads == ["jwt-test"]
+    frames = frames_in(path)
+    assert frames and all(abs(f.mean() - 128) < 4 for f in frames)

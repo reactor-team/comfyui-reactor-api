@@ -1,0 +1,226 @@
+{
+  "id": "953f32ed-1bdb-44eb-8046-1b6d95a3eda9",
+  "revision": 0,
+  "last_node_id": 3,
+  "last_link_id": 1,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        560,
+        180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "A person from a photo speaks your script in real time with LTX. Queue it and the first take plays in the Reactor Realtime window. Write the next script there and press Apply; it plays as the next take once the one before ends. Press Done to save the takes under reactor/realtime.\n\nThe photo sets who speaks. The scene, read at the start, casts the voice and the delivery. Pace is words per minute.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "A person from a photo speaks your script in real time with LTX. Queue it and the first take plays in the Reactor Realtime window. Write the next script there and press Apply; it plays as the next take once the one before ends. Press Done to save the takes under reactor/realtime.\n\nThe photo sets who speaks. The scene, read at the start, casts the voice and the delivery. Pace is words per minute.\n\nLTX prompt guide: https://docs.reactor.inc/model-api-reference/ltx/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        300
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_gardener_portrait.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_gardener_portrait.jpg"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorRealtime",
+      "pos": [
+        400,
+        300
+      ],
+      "size": [
+        400,
+        330
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "model.prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "model.prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image",
+          "name": "model.image",
+          "type": "IMAGE",
+          "link": 1
+        },
+        {
+          "localized_name": "scene",
+          "name": "model.scene",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model.scene"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "pace",
+          "name": "model.pace",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "model.pace"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRealtime"
+      },
+      "widgets_values": [
+        "LTX",
+        "Welcome to my garden. These tomatoes took all summer, but look at them now. They're finally ripe.",
+        "A single person speaks directly to the camera in a sunny greenhouse. Her voice is a warm, bright mezzo with an easy smile in it, unhurried and conversational, with a soft breath between sentences.",
+        140,
+        42,
+        "randomize",
+        "reactor/realtime"
+      ],
+      "widgets_values_named": {
+        "model": "LTX",
+        "model.prompt": "Welcome to my garden. These tomatoes took all summer, but look at them now. They're finally ripe.",
+        "model.scene": "A single person speaks directly to the camera in a sunny greenhouse. Her voice is a warm, bright mezzo with an easy smile in it, unhurried and conversational, with a soft breath between sentences.",
+        "model.pace": 140,
+        "seed": 42,
+        "control_after_generate": "randomize",
+        "filename_prefix": "reactor/realtime",
+        "hint": ""
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      3,
+      2,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.45,
+      "offset": [
+        100,
+        100
+      ]
+    }
+  },
+  "version": 0.4
+}

@@ -10,10 +10,11 @@ import uuid
 from dataclasses import replace
 import numpy as np
 
-from reactor_sdk import DEFAULT_API_URL, Reactor, ReactorStatus
+from reactor_sdk import DEFAULT_API_URL, FileRef, Reactor, ReactorStatus
 
 from .clip import ClipStream
 from .encode import FrameWriter
+from .recording import Recording
 from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       api_message, closing_session, connect_with_retry, watch_for_failure)
 from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_setup
@@ -90,8 +91,20 @@ def drive_lanes(spec: ModelSpec) -> list[dict]:
 
 
 def drive_setup(model: str, beat: Beat, seed: int, settings: dict[str, object]) -> list[tuple[str, dict]]:
-    """The commands that open a live drive run from `beat`: its setup as a one-chunk timeline, without its camera moves."""
-    return compile_timeline(model, [replace(beat, frames=MODELS[model].frames_in(1), moves=())], seed, settings).setup
+    """The commands that open a live drive run from `beat`: its setup as a one-chunk timeline, without its camera moves.
+
+    A "clips" model plays each clip as it is built, and its first clip takes the default length, as the window's later ones do.
+    """
+    spec = MODELS[model]
+    if spec.pattern == "clips":
+        plan = compile_timeline(model, [replace(beat, frames=1, moves=())], seed, settings)
+        return [*plan.setup, ("set_autoplay", {"enabled": True}),
+                *((command, {k: v for k, v in data.items() if k != "seconds"}) for _, command, data in plan.timed)]
+    if spec.pattern == "takes":
+        # A live take lasts as long as its script takes to say.
+        plan = compile_timeline(model, [replace(beat, frames=0, moves=())], seed, settings)
+        return [*plan.setup, *((command, data) for _, command, data in plan.timed)]
+    return compile_timeline(model, [replace(beat, frames=spec.frames_in(1), moves=())], seed, settings).setup
 
 
 def style_setup(spec: ModelSpec, prompt: str, seed: int, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
@@ -120,6 +133,15 @@ def switch_controls(spec: ModelSpec, settings: dict[str, object], setup: list[tu
     return {"image": spec.switch_image, "reference": reference and data_url(reference),
             "settings": [{"field": setting.field or name, "options": list(setting.options), "value": settings.get(name, setting.default)}
                          for name, setting in spec.beat_settings.items() if setting.command == spec.prompt_command and setting.options]}
+
+
+def browser_ref(value):
+    """An uploaded file ref in the form the browser's SDK takes as one, so the browser can resend it."""
+    if isinstance(value, FileRef):
+        return {"uploadId": value.upload_id, "name": value.name, "mimeType": value.mime_type, "size": value.size}
+    if isinstance(value, list):
+        return [browser_ref(v) for v in value]
+    return value
 
 
 class LiveRun:
@@ -194,9 +216,10 @@ class LiveRun:
         try:
             await self._poll(self._connected, BROWSER_TIMEOUT_SECONDS, OPEN_TAB_ERROR, check_interrupt)
             # On a call, the text box sends the character a message, as if spoken, instead of a new prompt.
-            command, field = ("say", "text") if self.mode == "call" else (self.spec.prompt_command, "prompt" if self.spec.prompted else None)
+            command, field = ("say", "text") if self.mode == "call" else (self.spec.prompt_command, self.spec.prompt_field if self.spec.prompted else None)
             self._send_json({"type": "config", "mode": self.mode, "prompt": self.prompt,
                              "lanes": drive_lanes(self.spec), "prompt_command": command, "prompt_field": field,
+                             **({"prompt_then": self.spec.live_then} if self.spec.live_then else {}),
                              "switch": switch_controls(self.spec, self.settings, self.setup),
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else
@@ -241,7 +264,7 @@ class LiveRun:
         def dropped(_) -> None:
             self._loop.call_soon_threadsafe(self._dropped)
 
-        push = stats = None
+        push = stats = clip = jwt = None
         try:
             async with closing_session(reactor):
                 await self._connect(reactor, check_interrupt)
@@ -264,8 +287,11 @@ class LiveRun:
                         # The clip flows from before setup, as a camera does, for a model that warms up on its source.
                         push = asyncio.create_task(self._push_clip(await reactor.publish_track(self.spec.source_track)))
                         push.add_done_callback(self._push_failed)
+                    held = {}
                     for command, data in self.setup:
-                        await self._send_command(command, data)
+                        sent = await self._send_command(command, data)
+                        if command == self.spec.prompt_command:
+                            held.update({key: browser_ref(sent[key]) for key in self.spec.live_held if key in sent})
                         if command in SETUP_PHASES:
                             self._status("Starting the call…" if self.mode == "call" else "Starting…")
                             await self._wait_for_phase(SETUP_PHASES[command], SETUP_READY.get(command), command != "create_avatar", check_interrupt)
@@ -273,12 +299,16 @@ class LiveRun:
                         await self._wait_for_character(check_interrupt)
                         writer.fill_gaps = True
                     self.capturing = True
+                    recording = Recording(reactor)
+                    recording.mark()
                     self._status("")
                     # From here the browser sends the model its prompt and drive commands itself.
-                    self._send_json({"type": "started"})
+                    self._send_json({"type": "started", **({"held": held} if held else {})})
                     stats = asyncio.create_task(self._report_stats(reactor))
                     stats.add_done_callback(self._stats_failed)
                     await self._pump(check_interrupt)
+                    if self._error is None:
+                        clip = await recording.finish()
                 finally:
                     self._watching = False
         except BaseException:
@@ -300,6 +330,9 @@ class LiveRun:
                 raise
         if self._error is not None:
             raise RuntimeError(self._error)
+        if clip is not None:
+            self._status("Saving the session's recording…")
+            await recording.save(clip, jwt, self.path, self.spec.fps)
 
     async def _connect(self, reactor, check_interrupt) -> None:
         task = asyncio.ensure_future(connect_with_retry(reactor, check_interrupt, self._status))
@@ -397,12 +430,19 @@ class LiveRun:
         if not task.cancelled() and task.exception() is not None:
             logging.error("Reactor live: stats task died.", exc_info=task.exception())
 
-    async def _send_command(self, command: str, data: dict) -> None:
-        data = {key: await self._reactor.upload_file(value, name=f"{key}.png", mime_type="image/png")
-                if isinstance(value, bytes) else value for key, value in data.items()}
+    async def _send_command(self, command: str, data: dict) -> dict:
+        """Send a command, uploading its images first; return the data as sent, with the uploads' file refs."""
+        async def upload(key: str, value):
+            if isinstance(value, bytes):
+                return await self._reactor.upload_file(value, name=f"{key}.png", mime_type="image/png")
+            if isinstance(value, list) and value and all(isinstance(v, bytes) for v in value):
+                return [await upload(key, v) for v in value]
+            return value
+        data = {key: await upload(key, value) for key, value in data.items()}
         reply = await self._reactor.send_command(command, data)
         if reply is not None and reply.get("type") == "command_error":
             raise RuntimeError(f"Reactor rejected {command}: {reply.get('data', {}).get('reason')}")
+        return data
 
     def _on_message(self, message) -> None:
         try:

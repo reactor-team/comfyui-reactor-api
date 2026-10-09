@@ -1,5 +1,8 @@
 import asyncio
+import shutil
 import time
+import urllib.error
+from types import SimpleNamespace
 
 import dataclasses
 
@@ -8,9 +11,10 @@ import io
 import numpy as np
 import pytest
 
-from reactor_sdk.errors import BadRequestError, RateLimitedError
+from reactor_sdk.errors import BadRequestError, RateLimitedError, ReactorError
 
-from reactor_render import clip, session
+from reactor_render import clip, live, recording, session
+from reactor_render.encode import FrameWriter
 from reactor_render.timeline import MODELS, Plan
 
 BLACK, WHITE = 0, 255
@@ -770,3 +774,231 @@ async def test_queued_messages_do_not_accelerate_source_warmup(tmp_path):
         writer.close()
     assert len(pushed_at) == 4
     assert pushed_at[-1] - pushed_at[0] >= 3 / 24 - 0.01
+
+
+class FakeClips(FakeReactor):
+    """A clip model: `enqueue` answers `clip_queued` with the clip's snapped `frames`, builds each
+    clip after a moment, and with autoplay on plays the built clips in order, `frames` white frames each.
+    `fail` names the segment whose build fails."""
+
+    def __init__(self, frames=(3, 2), fail=None, capacity=8):
+        super().__init__(chunks=0)
+        self.clip_frames, self.fail, self.capacity = list(frames), fail, capacity
+        self.queued, self.built, self.early = [], set(), []
+
+    async def send_command(self, command, data):
+        self.sent.append((command, data))
+        if command == "enqueue":
+            # The model opens a continuation of an unbuilt clip fresh, so the runner must not send one.
+            if data.get("continue_from_clip_id") and data["continue_from_clip_id"] not in self.built:
+                self.early.append(data["continue_from_clip_id"])
+            clip = {"clip_id": f"id{len(self.queued)}", "frames": self.clip_frames[len(self.queued)]}
+            self.queued.append(clip)
+            asyncio.get_running_loop().create_task(self._build(len(self.queued) - 1))
+            return {"type": "clip_queued", "data": {"clip": clip}}
+        if command == "set_autoplay":
+            asyncio.get_running_loop().create_task(self._play())
+        return None
+
+    async def _build(self, i):
+        await asyncio.sleep(0.01 * (i + 1))
+        if self.fail == i + 1:
+            self.handler({"type": "clip_failed", "data": {"clip": self.queued[i], "reason": "boom"}})
+        else:
+            self.built.add(self.queued[i]["clip_id"])
+            self.handler({"type": "clip_generated", "data": {"clip": self.queued[i]}})
+
+    async def _play(self):
+        for clip in self.queued:
+            self.handler({"type": "clip_started", "data": {"clip": clip}})
+            await asyncio.sleep(0.01)
+            for _ in range(clip["frames"]):
+                self.track.push(np.full((16, 16, 3), WHITE, dtype=np.uint8))
+            await asyncio.sleep(0.01)
+            self.handler({"type": "clip_finished", "data": {"clip": clip}})
+
+
+async def test_clips_chain_by_id_play_once_built_and_record_the_frames_the_model_made(tmp_path, monkeypatch, fast_grace):
+    fake = FakeClips(frames=(3, 2))
+    plan = Plan(setup=[("set_seed", {"seed": 1})], chunks=99,
+                timed=[(0, "enqueue", {"prompt": "a"}), (1, "enqueue", {"prompt": "b", "continue_from_clip_id": 0})])
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="FastH3")
+    await coro
+    assert [c for c, _ in fake.sent] == ["set_seed", "enqueue", "enqueue", "set_autoplay"]
+    assert fake.sent[2][1]["continue_from_clip_id"] == "id0" and not fake.early
+    frames = frames_in(tmp_path / "out.mp4")
+    # The connect placeholder is skipped, and the take is the 3 + 2 frames the model reported.
+    assert len(frames) == 5 and all(f.mean() > 200 for f in frames)
+
+
+async def test_a_clip_that_fails_to_build_fails_the_render(tmp_path, monkeypatch, fast_grace):
+    fake = FakeClips(frames=(3, 2), fail=2)
+    plan = Plan(setup=[], chunks=5, timed=[(0, "enqueue", {"prompt": "a"}), (1, "enqueue", {"prompt": "b"})])
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="FastH3")
+    with pytest.raises(RuntimeError, match="Segment 2 failed to build: boom"):
+        await coro
+    assert fake.disconnected
+
+
+class FakeTakes(FakeReactor):
+    """A take model at 2 fps: `start` plays a take of the last `set_duration_seconds` in white frames, or of
+    `script_seconds` when that is 0, ends it with `generation_complete`. `start` mid-take is refused. `fail`
+    names the take that fails."""
+
+    def __init__(self, fail=None):
+        super().__init__(chunks=0)
+        self.fail, self.seconds, self.running = fail, 0, False
+        self.script_seconds = 2.5
+        self.takes = 0
+
+    async def send_command(self, command, data):
+        self.sent.append((command, data))
+        if command == "set_duration_seconds":
+            self.seconds = data["duration_seconds"]
+        if command == "start":
+            if self.running:
+                return {"type": "command_error", "data": {"reason": "a take is in flight"}}
+            self.running, self.takes = True, self.takes + 1
+            asyncio.get_running_loop().create_task(self._take(self.takes))
+        return None
+
+    async def _take(self, take):
+        self.handler({"type": "generation_started", "data": {"seconds": self.seconds}})
+        await asyncio.sleep(0.01)
+        if self.fail == take:
+            self.running = False
+            self.handler({"type": "generation_failed", "data": {"reason": "boom", "seconds_sent": 0}})
+            return
+        for _ in range(round((self.seconds or self.script_seconds) * 2)):
+            self.track.push(np.full((16, 16, 3), WHITE, dtype=np.uint8))
+        self.running = False
+        self.handler({"type": "generation_complete", "data": {"seconds_sent": self.seconds}})
+
+
+async def test_takes_run_one_after_another_and_record_only_the_takes(tmp_path, monkeypatch, fast_grace):
+    fake = FakeTakes()
+    plan = Plan(setup=[("set_seed", {"seed": 1})], chunks=2, holds=[3, 2],
+                timed=[(i, command, data) for i, seconds in enumerate((1.5, 1.0))
+                       for command, data in (("set_script", {"script": "hi"}), ("set_duration_seconds", {"duration_seconds": seconds}), ("start", {}))])
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="LTX", fps=2)
+    await coro
+    assert [c for c, _ in fake.sent] == ["set_seed", *["set_script", "set_duration_seconds", "start"] * 2]
+    frames = frames_in(tmp_path / "out.mp4")
+    # The take is the 3 + 2 frames the takes played.
+    assert len(frames) == 5 and all(f.mean() > 200 for f in frames)
+
+
+async def test_a_take_of_no_planned_frames_is_recorded_until_the_model_ends_it(tmp_path, monkeypatch, fast_grace):
+    fake = FakeTakes()
+    plan = Plan(setup=[], chunks=2, holds=[0, 2],
+                timed=[(i, command, data) for i, seconds in enumerate((0, 1.0))
+                       for command, data in (("set_duration_seconds", {"duration_seconds": seconds}), ("start", {}))])
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="LTX", fps=2)
+    await coro
+    # The first take's script plays 5 frames, then the second take's 2.
+    assert len(frames_in(tmp_path / "out.mp4")) == 7
+
+
+async def test_sound_before_a_takes_first_frame_is_left_out(tmp_path):
+    writer = session.FrameWriter(str(tmp_path / "out.mp4"), 24)
+    running = session.Session(None, writer, 24, lambda: None, lambda *args: None)
+    running.capture_on_frame = True
+    # Measured on LTX: faint noise, not digital silence, streams while a take is generated.
+    for _ in range(10):
+        running.push_audio(np.full((4800, 1), 3, dtype=np.int16), 48000)
+    running.push_video(np.zeros((16, 16, 3), dtype=np.uint8))
+    running.push_audio(np.full((2000, 1), 8000, dtype=np.int16), 48000)
+    try:
+        assert running.capturing and writer.audio_samples == 2000
+    finally:
+        writer.close()
+
+
+async def test_a_take_that_fails_fails_the_render(tmp_path, monkeypatch, fast_grace):
+    fake = FakeTakes(fail=2)
+    plan = Plan(setup=[], chunks=2, holds=[2, 2], timed=[(i, "start", {}) for i in range(2)])
+    _, coro = run(fake, plan, tmp_path, monkeypatch, model="LTX", fps=2)
+    with pytest.raises(RuntimeError, match="Segment 2 did not finish: boom"):
+        await coro
+
+
+class FakeRecorded(FakeReactor):
+    """A FakeReactor whose session keeps a recording: its media clock is the time since connect, and its
+    recording (gray 128, where the streamed frames are white) is written to wherever it's downloaded."""
+
+    def __init__(self, *args, unavailable=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.unavailable = unavailable
+        self.session_id = "session-1"
+
+    async def connect(self):
+        self.connected_at = asyncio.get_running_loop().time()
+        await super().connect()
+
+    def now(self):
+        return asyncio.get_running_loop().time() - self.connected_at
+
+    async def request_clip(self, seconds):
+        return SimpleNamespace(now_marker=self.now(), end_marker=self.now())
+
+    async def request_recording(self):
+        if self.unavailable:
+            raise ReactorError("recording error (INTERNAL_ERROR): recording disabled")
+        return SimpleNamespace(end_marker=self.now(), recorded_until=self.now())
+
+
+def serve_recording(monkeypatch, tmp_path, downloads):
+    source = tmp_path / "served.mp4"
+    writer = FrameWriter(str(source), 30)
+    for _ in range(300):
+        writer.push(np.full((16, 16, 3), 128, dtype=np.uint8))
+    writer.close()
+
+    async def download_clip(clip, path, jwt=None, ready_timeout=None):
+        downloads.append(jwt)
+        shutil.copy(source, path)
+    monkeypatch.setattr(recording, "download_clip", download_clip)
+    monkeypatch.setattr(live, "session_token", lambda key, model, session_id: f"jwt:{session_id}")
+
+
+async def render(fake, tmp_path, monkeypatch):
+    monkeypatch.setattr(session, "Reactor", fake)
+    monkeypatch.setattr(session, "CONNECT_SETTLE_SECONDS", 0)
+    spec = dataclasses.replace(MODELS["LongLive-2.0"], frames_per_chunk=fake.frames)
+    await session.render(spec, Plan(setup=[("start", {})], chunks=3), str(tmp_path / "out.mp4"),
+                         lambda *a: None, lambda text: None, lambda: None, api_key="rk_test")
+    return frames_in(tmp_path / "out.mp4")
+
+
+async def test_a_render_is_saved_from_the_sessions_recording(tmp_path, monkeypatch):
+    downloads = []
+    serve_recording(monkeypatch, tmp_path, downloads)
+    frames = await render(FakeRecorded(chunks=10, complete_after=3), tmp_path, monkeypatch)
+    assert downloads == ["jwt:session-1"]
+    # The recording's frames, cut to the 6 the model reported, not the white ones streamed here.
+    assert frames and len(frames) <= 6 and all(abs(f.mean() - 128) < 4 for f in frames)
+
+
+async def test_a_render_keeps_the_frames_it_received_when_the_recording_is_unavailable(tmp_path, monkeypatch):
+    downloads = []
+    serve_recording(monkeypatch, tmp_path, downloads)
+    frames = await render(FakeRecorded(chunks=10, complete_after=3, unavailable=True), tmp_path, monkeypatch)
+    assert downloads == []
+    assert len(frames) == 6 and all(f.mean() > 200 for f in frames)
+
+
+async def test_a_segment_not_served_yet_is_retried_before_falling_back(tmp_path, monkeypatch):
+    downloads = []
+    serve_recording(monkeypatch, tmp_path, downloads)
+    served = recording.download_clip
+
+    async def flaky(clip, path, jwt=None, ready_timeout=None):
+        if len(downloads) < 2:
+            downloads.append(jwt)
+            raise urllib.error.HTTPError("segment", 404, "Not Found", {}, None)
+        await served(clip, path, jwt=jwt, ready_timeout=ready_timeout)
+    monkeypatch.setattr(recording, "download_clip", flaky)
+    monkeypatch.setattr(recording, "RETRY_SECONDS", 0)
+    frames = await render(FakeRecorded(chunks=10, complete_after=3), tmp_path, monkeypatch)
+    assert len(downloads) == 3
+    assert frames and all(abs(f.mean() - 128) < 4 for f in frames)

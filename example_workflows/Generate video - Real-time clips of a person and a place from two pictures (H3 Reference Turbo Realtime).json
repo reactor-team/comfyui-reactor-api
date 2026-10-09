@@ -186,18 +186,25 @@
           "link": null
         },
         {
-          "localized_name": "reference_0",
+          "localized_name": "picture_1",
           "name": "model.pictures.picture_1",
           "shape": 7,
           "type": "IMAGE",
           "link": 3
         },
         {
-          "localized_name": "reference_1",
+          "localized_name": "picture_2",
           "name": "model.pictures.picture_2",
           "shape": 7,
           "type": "IMAGE",
           "link": 4
+        },
+        {
+          "localized_name": "picture_3",
+          "name": "model.pictures.picture_3",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
         },
         {
           "localized_name": "aspect",

@@ -196,6 +196,7 @@ Reactor API key:
 
 ```bash
 uv run pytest -q tests
+node --test "tests/web/*.test.mjs"
 ```
 
 Sign off every commit (`git commit -s`): pull requests are checked for a

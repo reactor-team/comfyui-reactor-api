@@ -121,4 +121,4 @@ ticket IDs. This applies to code, comments, the README and commit messages.
 
 ## Tests
 
-`uv run pytest -q tests`
+`uv run pytest -q tests`, and for the window's state in `web/*.mjs`, `node --test "tests/web/*.test.mjs"`

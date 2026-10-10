@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { canMove, statusLine } from "./reactor_live_state.mjs";
 
 const HINT = "Press Run to start a real-time session: the model plays in a window and you steer it as it runs. "
     + "Each run records a take. Set the seed's control after generate to fixed to keep the last take instead of starting a new session.";
@@ -130,29 +131,19 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let promptThen = null;   // a command sent after each prompt, such as the start of a take
     let heldFields = {};     // fields every prompt repeats from the opening one, such as a clip's references
     let thenWaiting = false; // the model rejected promptThen, so it waits until a state_update lists it as valid
-    const THEN_WAITING = "Starts when the current take ends.";
-    const CLIP_ENDED = "What happens next?";
+    let note = "";           // the latest message for the status line, which covers what the take is waiting on
     const STALL_MS = 2000;
     let look = null;         // the Look panel's image field, next image and setting pickers, for a model without a prompt
-    let started = false;     // setup is done, and this browser sends the model its commands
     let markStarted;
     const startedSignal = new Promise((resolve) => { markStarted = resolve; });
     const lastSent = new Map();  // each lane's field to the value last sent
     let reactor = null;      // this browser's own client in the session
     let input = null;        // the camera size and rate the server asked for
     let own = null;          // this browser's connection stats: the preview it receives, the camera it sends
-    let ended = false;       // an "ended" message arrived; the socket close after it is expected
-    let staying = false;     // the modal stays open on an error or a take that needs pasting
-    let closed = false;
-    let tornDown = false;
     let stage = "Connecting…";  // the server's latest step toward the first frame
     let joining = null;         // this browser's own step while it joins the session
-    let playing = false;        // a frame of the model's output has played since setup
-    let saving = false;         // Save was pressed and the take is being saved
     let lastFrameAt = 0;        // when the latest frame of the model's output played
-    let stalled = false;        // frames stopped while the model should be sending them
-    let clipEnded = false;      // a clip model played its clips and holds its last frame until the next Apply
-    let nextClip = false;       // Apply asked an ended clip model for another clip, which hasn't started yet
+    let phase = "connecting";   // where the take is in its life, one of PHASES
     let continueField = null;   // the prompt field that carries a clip model's previous clip on, so Continue is offered
     let lastClip = null;        // the clip that plays last so far, which Continue carries on
     const built = new Map();    // a clip the model has finished with to whether it built, which some models need before continuing one
@@ -161,7 +152,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let queued = { generation: [], playout: [] };  // the model's clips still to build, then built and still to play
     const unsent = [];          // prompts applied here and not yet queued by the model, in order
     let sending = Promise.resolve();  // prompts go out one at a time, so clips play in the order they were applied
-    showLoading();
+    render();
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
 
@@ -184,8 +175,6 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     }
 
     function teardown() {
-        if (tornDown) return;
-        tornDown = true;
         stopKeys();
         window.removeEventListener("paste", onPaste);
         if (stream) for (const track of stream.getTracks()) track.stop();
@@ -194,52 +183,73 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     }
 
     function close() {
-        if (closed) return;
-        closed = true;
-        teardown();
+        setPhase("closed");
         backdrop.remove();
     }
 
-    // The overlay covers the video until the model's output plays, and again while a take saves.
-    function showLoading() {
-        loading.hidden = playing && !saving && !stalled;
-        loadingText.textContent = saving ? stage : stalled ? "Waiting for frames…"
-                                : joining ?? (started ? "Waiting for the first frame…" : stage);
+    function over() { return phase === "held" || phase === "closed"; }
+    function started() { return phase !== "connecting"; }
+    function played() { return ["playing", "stalled", "awaitingClip", "clipEnded"].includes(phase); }
+
+    // Moves the take to `next` when the phase table allows it from here, and shows the new phase. False when it didn't move.
+    function setPhase(next) {
+        if (next === phase) return false;
+        if (!canMove(phase, next)) {
+            console.warn(`Reactor: ignored a move from ${phase} to ${next}.`);
+            return false;
+        }
+        const was = phase;
+        phase = next;
+        if (next === "clipEnded") note = "";
+        if (over() && was !== "held") teardown();
+        render();
+        return true;
+    }
+
+    function say(text) {
+        note = text;
+        status.textContent = statusLine({ phase, note, thenWaiting });
+    }
+
+    // The overlay covers the video until the model's output plays, while frames stop, and while a take saves.
+    function render() {
+        status.textContent = statusLine({ phase, note, thenWaiting });
+        if (over()) return;
+        loading.hidden = phase === "playing" || phase === "clipEnded";
+        loadingText.textContent = phase === "saving" ? stage
+                                : phase === "stalled" || phase === "awaitingClip" ? "Waiting for frames…"
+                                : joining ?? (phase === "firstFrame" ? "Waiting for the first frame…" : stage);
     }
 
     // The overlay leaves on a frame played after setup, so a placeholder the session shows before it doesn't count.
     function onFrame() {
-        if (tornDown) return;
+        if (over()) return;
         nextFrame();
-        if (!started) return;
+        if (!started()) return;
         lastFrameAt = performance.now();
-        if ((playing && !stalled) || nextClip) return;
-        playing = true;
-        stalled = false;
-        showLoading();
+        if (phase === "firstFrame" || phase === "stalled") setPhase("playing");
     }
     const nextFrame = () => (output.requestVideoFrameCallback ? output.requestVideoFrameCallback(onFrame)
                                                                : output.addEventListener("timeupdate", onFrame, { once: true }));
 
     // Frames that stop for longer than a network hiccup bring the overlay back, unless a clip model is holding its last frame.
     const stallCheck = setInterval(() => {
-        if (tornDown) return void clearInterval(stallCheck);
-        if (!playing || stalled || saving || staying || clipEnded || performance.now() - lastFrameAt < STALL_MS) return;
-        stalled = true;
-        showLoading();
+        if (over()) return void clearInterval(stallCheck);
+        if (phase === "playing" && performance.now() - lastFrameAt >= STALL_MS) setPhase("stalled");
     }, 500);
 
     // The run is over but the user has something to read: an error, or a take to paste by hand.
     function stay(text, error = false) {
-        staying = true;
+        if (over()) return;
+        setPhase("held");
         if (error) {
             loading.hidden = false;
             loading.classList.add("error");
             loadingText.textContent = text;
-            status.textContent = "";
+            say("");
         } else {
             loading.hidden = true;
-            status.textContent = text;
+            say(text);
         }
         buttons.replaceChildren(el("button", { textContent: "Close", onclick: close }));
     }
@@ -253,21 +263,21 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // fire; the drive keys drive only while the preview has focus, and a blur releases them all.
     function command(name, data) {
         return reactor?.sendCommand(name, data).then((reply) => {
-            if (reply?.type === "command_error") status.textContent = `Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`;
+            if (reply?.type === "command_error") say(`Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`);
             return reply;
-        }, (e) => { status.textContent = `Sending ${name} failed: ${errorText(e)}`; });
+        }, (e) => say(`Sending ${name} failed: ${errorText(e)}`));
     }
 
     function sendThen() {
         thenWaiting = false;
-        if (status.textContent === THEN_WAITING) status.textContent = "";
+        render();
         command(promptThen, {});
     }
 
     // Each lane follows the first of its key pairs with exactly one key held, and rests at idle otherwise.
     function drive() {
         for (const [code, cap] of caps) cap.classList.toggle("on", held.has(code));
-        if (!started) return;
+        if (!started()) return;
         for (const lane of lanes) {
             let value = lane.idle;
             for (const [low, high, negative, positive] of lane.axes) {
@@ -323,7 +333,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         const wanted = camera && camera !== DEFAULT_DEVICE
             && (await navigator.mediaDevices.enumerateDevices()).find((device) => device.kind === "videoinput" && device.label === camera);
         const media = await openCamera(wanted?.deviceId);
-        if (tornDown) return media.getTracks().forEach((track) => track.stop());
+        if (over()) return media.getTracks().forEach((track) => track.stop());
         stream = media;
         preview.append(el("video", { className: "reactor-live-self", autoplay: true, muted: true, playsInline: true, srcObject: stream }));
     }
@@ -338,8 +348,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                                                                          selected: camera.deviceId === current })));
         picker.addEventListener("change", async () => {
             const next = await openCamera(picker.value).catch(() => null);
-            if (!next) return void (status.textContent = "That camera is unavailable.");
-            if (tornDown) return next.getTracks().forEach((track) => track.stop());
+            if (!next) return void say("That camera is unavailable.");
+            if (over()) return next.getTracks().forEach((track) => track.stop());
             await sender.replaceTrack(next.getVideoTracks()[0]);
             for (const track of stream.getTracks()) track.stop();
             stream = next;
@@ -355,7 +365,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             audio: { deviceId: wanted && { exact: wanted.deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             video: false,
         });
-        if (tornDown) return media.getTracks().forEach((track) => track.stop());
+        if (over()) return media.getTracks().forEach((track) => track.stop());
         stream = media;
     }
 
@@ -365,7 +375,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         await startedSignal;
         for (let attempt = 1; attempt <= PREVIEW_RETRIES; attempt++) {
             await new Promise((resolve) => setTimeout(resolve, PREVIEW_WAIT_MS));
-            if (tornDown || output.videoWidth) return;
+            if (over() || output.videoWidth) return;
             console.warn(`Reactor: no preview video yet, asking for it again (${attempt} of ${PREVIEW_RETRIES}).`);
             for (const name of names) await reactor.resumeTrack(name);
         }
@@ -375,17 +385,17 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         const mic = join.tracks.find((track) => track.name === join.publish)?.kind === "audio";
         if (join.publish) {
             joining = mic ? "Waiting for microphone access…" : "Waiting for camera access…";
-            showLoading();
+            render();
             try {
                 await (mic ? startMic() : startCamera());
             } catch {
                 throw new Error(mic ? "The microphone is unavailable; allow microphone access and run again."
                                     : "The camera is unavailable; allow camera access and run again.");
             }
-            if (tornDown) return;
+            if (over()) return;
         }
         const { Reactor } = await import("./vendor/reactor-sdk.mjs");
-        if (tornDown) return;
+        if (over()) return;
         reactor = new Reactor({ modelName: join.model, local: join.local, modelTracks: join.tracks });
         reactor.on("trackReceived", (name, track, media) => {
             if (name === join.publish) return;
@@ -403,7 +413,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 // The run queues the opening clip itself, so this browser learns its id from the clips it sees.
                 if (!lastClip && (message.type === "clip_generated" || message.type === "clip_started")) {
                     lastClip = clip;
-                    proceed.disabled = !started;
+                    proceed.disabled = !started();
                 }
                 if (message.type === "clip_generated" || message.type === "clip_failed") {
                     built.set(clip, message.type === "clip_generated");
@@ -419,21 +429,17 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             } else if (clip && continueField) showQueue();
             if (message?.type === "command_error" && message.data?.command === promptThen) {
                 thenWaiting = true;
-                status.textContent = THEN_WAITING;
+                say("");
             } else if (thenWaiting && message?.type === "state_update" && message.data?.valid_commands?.includes(promptThen)) sendThen();
             // A clip model holds its last frame once its queued clips have played, which reads as a stall without this.
             else if (message?.type === "clip_finished" || message?.type === "clip_stopped") {
                 // Asked only when nothing is on its way. A clip still building leaves the video waiting for it instead.
-                if (!queued.generation.length && !queued.playout.length && !unsent.length) {
-                    clipEnded = true;
-                    status.textContent = CLIP_ENDED;
-                } else if (!queued.playout.length) {
-                    stalled = nextClip = true;
-                    showLoading();
-                }
+                if (!queued.generation.length && !queued.playout.length && !unsent.length) setPhase("clipEnded");
+                else if (!queued.playout.length) setPhase("awaitingClip");
             } else if (message?.type === "clip_started") {
-                clipEnded = nextClip = false;
-                if (status.textContent === CLIP_ENDED) status.textContent = "";
+                // The new clip's own frames end the wait; the old clip's last frames can still arrive before them.
+                if (phase === "awaitingClip") setPhase("stalled");
+                else if (phase === "clipEnded") setPhase("playing");
             }
         });
         let joined = false;
@@ -444,37 +450,36 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         });
         reactor.on("error", (e) => {
             console.error("Reactor:", e);
-            if (e?.recoverable || tornDown || saving) return;
+            if (e?.recoverable || over() || phase === "saving") return;
             lost ??= errorText(e);
-            status.textContent = lost;
+            say(lost);
             status.classList.add("error");
         });
         const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
             if (s === "ready") resolve();
             // This browser's side dropped: end the run on the server too, so neither side outlives the other. After Save
             // the server leaves the session to save the take, so a drop then is expected and the window waits for "ended".
-            if (s === "disconnected" && joined && !tornDown && !saving) {
+            if (s === "disconnected" && joined && !over() && phase !== "saving") {
                 const error = lost ?? "This browser lost its connection to the Reactor session.";
                 send({ type: "cancel", error });
-                teardown();
                 stay(error, true);
             }
         }));
         joining = "Joining the session…";
-        showLoading();
+        render();
         try {
             await reactor.connect(join.jwt ?? undefined, { sessionId: join.session_id });
             await ready;
             joined = true;
             joining = null;
             stage = "Waiting for the first frame…";  // the server had connected before this browser joined
-            showLoading();
+            render();
         } catch (e) {
             console.error("Reactor: this browser could not join the session.", e);
             throw new Error(`This browser could not join the Reactor session: ${errorText(e)}`);
         }
         keepPreview(join.tracks.filter((track) => track.direction === "recvonly").map((track) => track.name)).catch(() => {});
-        if (!join.publish || tornDown) return;
+        if (!join.publish || over()) return;
         const track = mic ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
         // The SDK gives up on a publish after a fixed 10 s, which a slow link can miss; try again before failing.
         for (let attempt = 1; ; attempt++) {
@@ -482,12 +487,12 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 await reactor.publishTrack(join.publish, track);
                 break;
             } catch (e) {
-                if (attempt === 3 || tornDown || !/timed out/.test(e?.message ?? e)) throw e;
+                if (attempt === 3 || over() || !/timed out/.test(e?.message ?? e)) throw e;
                 console.warn(`Reactor: publishing ${join.publish} timed out, retrying.`, e);
                 await reactor.unpublishTrack(join.publish);
             }
         }
-        if (tornDown) return;
+        if (over()) return;
         const sender = reactor.getPeerConnection()?.getSenders().find((s) => s.track === track);
         if (sender && !mic) {
             // The model's input size is fixed for the session: drop frames on a slow link, never resolution.
@@ -551,25 +556,19 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 preview.focus();
             }
         } else if (message.type === "join") {
-            joinSession(message).catch((e) => {
-                // A run already torn down (the socket closed first) keeps its own message.
-                if (!tornDown) {
-                    teardown();
-                    stay(e.message, true);
-                }
-            });
+            // A run already over (the socket closed first) keeps its own message.
+            joinSession(message).catch((e) => stay(e.message, true));
         } else if (message.type === "status") {
             // Steps toward the first frame show on the video; anything said while it plays shows below. Once Save
             // is pressed the overlay keeps its own "Saving the take…".
-            if (saving) return;
-            if (playing) status.textContent = message.text;
+            if (phase === "saving") return;
+            if (played()) say(message.text);
             else if (message.text) {
                 stage = message.text;
-                showLoading();
+                render();
             }
         } else if (message.type === "started") {
-            started = true;
-            showLoading();
+            setPhase("firstFrame");
             heldFields = message.held ?? {};
             markStarted();
             apply.disabled = false;
@@ -588,16 +587,12 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 message.loss != null && `loss ${(message.loss * 100).toFixed(1)}%`,
             ].filter(Boolean).join(" · ");
         } else if (message.type === "ended") {
-            ended = true;
-            teardown();
             if (message.error) stay(message.error, true);
             else close();
         }
     });
     socket.addEventListener("close", (event) => {
-        if (ended || closed || staying) return;
-        // The server cancels the run on a closed socket; leave the session with it.
-        teardown();
+        // The server cancels the run on a closed socket; leave the session with it. A run already over expected the close.
         if (event.code === 4404) stay("This run is unknown to the server.", true);
         else if (event.code === 4409) stay("This run already has another browser connected.", true);
         else stay("Connection lost.", true);
@@ -626,7 +621,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                     ok = await new Promise((resolve) => builtWaiters.set(anchor, resolve));
                 }
                 if (ok) data[continueField] = anchor;
-                else status.textContent = "The clip before failed to build, so the next one starts fresh.";
+                else say("The clip before failed to build, so the next one starts fresh.");
             }
             const reply = await command(promptCommand, data);
             unsent.splice(unsent.indexOf(entry), 1);
@@ -643,12 +638,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         });
         // The next clip takes a while to build, and the video holds the last one's final frame meanwhile.
         // The old clip's last frames can still arrive after it ends, so only the new clip's start ends the wait.
-        if (clipEnded) {
-            clipEnded = false;
-            stalled = nextClip = true;
-            if (status.textContent === CLIP_ENDED) status.textContent = "";
-            showLoading();
-        }
+        if (phase === "clipEnded") setPhase("awaitingClip");
         // A message to the character is gone once sent; a prompt stays to be edited.
         if (mode === "call") prompt.value = "";
     }
@@ -700,7 +690,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         panel.refresh = () => {
             for (const picker of panel.pickers) picker.buttons.forEach((button, i) => button.classList.toggle("on", picker.setting.options[i] === picker.value));
             const changed = panel.next || panel.pickers.some((picker) => picker.value !== picker.sent);
-            apply.disabled = !started || panel.busy || !changed;
+            apply.disabled = !started() || panel.busy || !changed;
         };
         // After a switch the chosen image becomes the one in use.
         panel.commit = () => {
@@ -755,9 +745,9 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             const reply = await reactor.sendCommand(promptCommand, data);
             if (reply?.type === "command_error") throw new Error(reply.data?.reason ?? "no reason given");
             look.commit();
-            status.textContent = "Switched; the new look shows in a moment.";
+            say("Switched; the new look shows in a moment.");
         } catch (e) {
-            status.textContent = `The switch failed: ${errorText(e)}`;
+            say(`The switch failed: ${errorText(e)}`);
         } finally {
             look.busy = false;
             apply.textContent = "Apply";
@@ -767,10 +757,9 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     done.onclick = () => {
         done.disabled = true;
         send({ type: "done" });
-        saving = true;
-        status.textContent = "";
+        say("");
         stage = "Saving the take…";
-        showLoading();
+        setPhase("saving");
     };
     cancel.onclick = cancelRun;
 

@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-reactor-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "ComfyUI nodes that render timelines on Reactor real-time video models."
 requires-python = ">=3.10"
 license = "Apache-2.0"

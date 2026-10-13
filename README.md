@@ -34,7 +34,7 @@ pip install -r comfyui-reactor-api/requirements.txt
 set `REACTOR_API_KEY` in ComfyUI's environment (it takes priority).
 
 **3. Copy the example inputs.** Copy `example_inputs/` into ComfyUI's `input` folder so the examples
-find their images.
+find their images and sounds.
 
 ## Examples
 
@@ -82,8 +82,9 @@ prompt. Source on the left, result on the right.
 ### Generate video
 
 Short clips with sound from a prompt with FastH3, or from pictures of a person and a place with
-H3 Reference Turbo Realtime. Stories across shots and cuts, one continuous scene steered by prompts,
-or a single shot that morphs, all from text.
+H3 Reference Turbo Realtime. FastH3-Omni adds audio input and first-to-last frame to reference
+images. Stories across shots and cuts, one continuous scene steered by prompts, or a single shot
+that morphs, all from text.
 
 <table>
 <tr>
@@ -93,6 +94,10 @@ or a single shot that morphs, all from text.
 <tr>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Real-time%20clips%20of%20a%20person%20and%20a%20place%20from%20two%20pictures%20%28H3%20Reference%20Turbo%20Realtime%29.json"><img src="example_outputs/reactor_h3_reference_realtime.webp" width="100%" alt="Real-time clips of a person and a place from two pictures"></a><br><sub><b>Real-time clips of a person and a place from two pictures</b><br>H3 Reference Turbo Realtime · ⚡ Real time</sub></td>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20A%20person%20and%20a%20place%20from%20two%20pictures%20%28H3%20Reference%20Turbo%20Realtime%29.json"><img src="example_outputs/reactor_h3_reference.webp" width="100%" alt="A person and a place from two pictures"></a><br><sub><b>A person and a place from two pictures</b><br>H3 Reference Turbo Realtime · 🎬 Render</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Real-time%20talking%20video%20with%20audio%20input%20%28FastH3-Omni%29.json"><img src="example_outputs/reactor_fasth3_omni_audio_input.webp" width="100%" alt="Real-time talking video with audio input"></a><br><sub><b>Real-time talking video with audio input</b><br>FastH3-Omni · ⚡ Real time</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Generate%20video%20-%20Nine%20reference%20images%2C%20one%20scene%20%28FastH3-Omni%29.json"><img src="example_outputs/reactor_fasth3_omni_nine_references.webp" width="100%" alt="Nine reference images, one scene"></a><br><sub><b>Nine reference images, one scene</b><br>FastH3-Omni · 🎬 Render</sub></td>
 </tr>
 </table>
 
@@ -152,6 +157,7 @@ and each example's note links it.
 | --- | --- | --- | --- |
 | [FastH3](https://docs.reactor.inc/model-api-reference/fast-h3/overview) | Short clips with sound, one per prompt | prompt, image on any segment | [Prompt guide](https://docs.reactor.inc/model-api-reference/fast-h3/prompt-guide) |
 | [H3 Reference Turbo Realtime](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/overview) | Clips with sound, guided by up to nine pictures, which prompts call Picture 1, Picture 2, … in socket order | prompt, pictures | [Prompt guide](https://docs.reactor.inc/model-api-reference/h3-reference-to-video-turbo-realtime/prompt-guide) |
+| [FastH3-Omni](https://docs.reactor.inc/model-api-reference/fast-h3-omni/overview) | Clips with sound from up to three reference images and three audio inputs, which prompts call `<Picture 1>` and `<Audio 1>`, with an optional first-to-last frame. Render takes up to nine images, more slowly than real time | prompt, pictures, sounds, first and last frame | [Prompt guide](https://docs.reactor.inc/model-api-reference/fast-h3-omni/prompt-guide) |
 | [Helios](https://docs.reactor.inc/model-api-reference/helios/overview) | One continuous scene steered by prompts | prompt, image on any segment | [Prompt guide](https://docs.reactor.inc/model-api-reference/helios/prompt-guide) |
 | [Visko Orbis Stable / Dynamic](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/overview) | One unbroken shot that morphs, with sound | prompt, optional first image | [Stable](https://docs.reactor.inc/model-api-reference/visko-orbis-stable/prompt-guide), [Dynamic](https://docs.reactor.inc/model-api-reference/visko-orbis-dynamic/prompt-guide) |
 | [LongLive-2.0](https://docs.reactor.inc/model-api-reference/longlive-v2/overview) | A story across shots and cuts, from text | prompt | [Prompt guide](https://docs.reactor.inc/model-api-reference/longlive-v2/prompt-guide) |

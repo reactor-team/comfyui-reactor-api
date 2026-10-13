@@ -15,7 +15,7 @@ from reactor_sdk.errors import RateLimitedError, ReactorError, UnauthorizedError
 from .clip import ClipStream
 from .encode import FrameWriter
 from .recording import Recording
-from .timeline import ModelSpec, Plan
+from .timeline import ModelSpec, Plan, upload_type
 
 # Once the model is done, how long to wait without a frame before closing a short capture.
 FRAME_GRACE_SECONDS = 3.0
@@ -127,8 +127,7 @@ class Session:
                 return value
             # A file is uploaded once a session, however many clips reuse it.
             if value not in self.uploads:
-                # An upload under `video` is the source clip; every other file is a PNG image.
-                name, mime_type = ("video.mp4", "video/mp4") if key == "video" else (f"{key}.png", "image/png")
+                name, mime_type = upload_type(key)
                 self.uploads[value] = await self.reactor.upload_file(value, name=name, mime_type=mime_type)
             return self.uploads[value]
 

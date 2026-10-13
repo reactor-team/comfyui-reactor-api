@@ -601,3 +601,11 @@ async def test_a_take_is_saved_from_the_sessions_recording_with_the_browsers_tok
     assert downloads == ["jwt-test"]
     frames = frames_in(path)
     assert frames and all(abs(f.mean() - 128) < 4 for f in frames)
+
+
+def test_a_live_clips_length_is_set_as_a_number_before_the_first_clip():
+    picture = timeline.Reference("FastH3-Omni", b"a", "image")
+    setup = live.drive_setup("FastH3-Omni", timeline.Beat("x", 1, references=(picture,)), 1, {"aspect": "9:16", "clip_seconds": "8"})
+    assert [command for command, _ in setup] == ["set_seed", "set_flush_on_clip_end", "set_canvas", "set_clip_seconds", "set_autoplay", "enqueue"]
+    assert setup[3] == ("set_clip_seconds", {"seconds": 8.0})
+    assert "seconds" not in setup[-1][1]

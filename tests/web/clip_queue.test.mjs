@@ -96,6 +96,18 @@ test("a continuation waits, listed as Waiting, until the clip it continues build
     assert.deepEqual(await pending, { anchor: "a", failed: false });
 });
 
+test("a clip queued here as a continuation is listed as one, though the model's clip doesn't say so", async () => {
+    const q = new ClipQueue();
+    q.seen(msg("clip_generated", { clip: clip("a", "first") }));
+    const entry = q.apply("more", true);
+    await q.anchor(entry);
+    q.sent(entry, clip("b", "more"));
+    assert.deepEqual(stages(q), ["Building:more+"]);
+    q.seen(msg("queue_update", { generation: [], playout: [] }));
+    q.seen(msg("clip_started", { clip: clip("b", "more") }));
+    assert.deepEqual(stages(q), ["Playing:more+"]);
+});
+
 test("a continuation of a clip that failed to build starts fresh and says why", async () => {
     const q = new ClipQueue();
     const first = q.apply("first", false);
@@ -135,4 +147,10 @@ test("a prompt still waiting its turn is not mistaken for an earlier clip with t
     q.apply("again", false);
     q.seen(msg("queue_update", { generation: [clip("a", "again")], playout: [] }));
     assert.deepEqual(stages(q), ["Building:again", "Sending:again"]);
+});
+
+test("a clip the model marks with a continue mode shows as continuing", () => {
+    const q = new ClipQueue();
+    q.seen(msg("queue_update", { generation: [{ clip_id: "b", prompt: "next", continue_mode: "frame" }, { clip_id: "c", prompt: "cut", continue_mode: null }], playout: [] }));
+    assert.deepEqual(stages(q), ["Building:next+", "Building:cut"]);
 });

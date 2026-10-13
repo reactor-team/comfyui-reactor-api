@@ -40,6 +40,7 @@ export class ClipQueue {
     unsent = [];             // prompts applied here and not yet queued by the model, in order
     #built = new Map();      // a clip the model has finished with to whether it built
     #waiters = new Map();    // a clip to the continuation waiting for it to build; prompts go out one at a time
+    #continued = new Set();  // clips queued here as continuations, since a model need not say which clip one continues
 
     // Takes in a message from the model.
     seen(message) {
@@ -78,6 +79,7 @@ export class ClipQueue {
             entry.waiting = true;
             ok = await new Promise((resolve) => this.#waiters.set(anchor, resolve));
         }
+        entry.anchor = ok ? anchor : null;
         return ok ? { anchor, failed: false } : { anchor: null, failed: true };
     }
 
@@ -92,6 +94,7 @@ export class ClipQueue {
         this.unsent.splice(this.unsent.indexOf(entry), 1);
         if (!clip) return;
         this.last = clip.clip_id;
+        if (entry.anchor) this.#continued.add(clip.clip_id);
         if (![...this.queued.generation, ...this.queued.playout].some((c) => c.clip_id === clip.clip_id)) this.queued.generation.push(clip);
     }
 
@@ -109,11 +112,12 @@ export class ClipQueue {
     // build) or Sending.
     rows() {
         const { playing, queued } = this;
+        const continues = (c) => this.#continued.has(c.clip_id) || !!c.continue_from_clip_id || !!c.continue_mode;
         return [
-            ...(playing ? [{ stage: "Playing", continues: !!playing.continue_from_clip_id, prompt: playing.prompt }] : []),
+            ...(playing ? [{ stage: "Playing", continues: continues(playing), prompt: playing.prompt }] : []),
             ...queued.playout.filter((c) => c.clip_id !== playing?.clip_id)
-                .map((c) => ({ stage: "Ready", continues: !!c.continue_from_clip_id, prompt: c.prompt })),
-            ...queued.generation.map((c) => ({ stage: "Building", continues: !!c.continue_from_clip_id, prompt: c.prompt })),
+                .map((c) => ({ stage: "Ready", continues: continues(c), prompt: c.prompt })),
+            ...queued.generation.map((c) => ({ stage: "Building", continues: continues(c), prompt: c.prompt })),
             ...this.unsent.filter((e) => !this.#queuedFor(e))
                 .map((e) => ({ stage: e.waiting ? "Waiting" : "Sending", continues: e.continuing, prompt: e.prompt })),
         ];

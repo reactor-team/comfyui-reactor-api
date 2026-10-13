@@ -1,0 +1,1040 @@
+{
+  "id": "4f418cc2-5a23-42a4-8b97-6dba472989a6",
+  "revision": 0,
+  "last_node_id": 14,
+  "last_link_id": 12,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        1880,
+        560
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Nine reference images, one scene with sound: FastH3-Omni weaves people, outfits, an object, places and a style into a single 8-second shot. The three people are Pictures 1 to 3, the marble statue is Picture 4, the samurai armour and the gold jacket are Pictures 5 and 6, which the fisherman and the gardener wear, the beach is Picture 7, on a billboard, the neon street is Picture 8, where the scene takes place, and the anime character is Picture 9, on a poster.\n\nWhat FastH3-Omni can do:\n\u2022 Reference images: up to 3 in real time, and up to 9 when real-time speed isn't needed, as in this render.\n\u2022 Audio input: up to 3 sounds guide voices and soundtracks, and the prompt writes the speech, sound effects and music.\n\u2022 First-to-last frame: start a clip on a first frame (image), end it on a last frame (last_image), or both, with at least one picture beside them.\n\nWriting prompts for FastH3-Omni:\n\u2022 Name inputs in angle brackets: <Picture 1>, <Picture 2>, \u2026 in picture-socket order, and say what each one is and where it goes in the scene.\n\u2022 Tie each picture to one thing on screen: a person, what they wear, an object, the place, or a sign or poster in the scene.\n\u2022 With many pictures, details can cross between them: in our run the fisherman picked up the samurai's topknot for part of the shot.\n\nFastH3-Omni prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3-omni/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Nine reference images, one scene with sound: FastH3-Omni weaves people, outfits, an object, places and a style into a single 8-second shot. The three people are Pictures 1 to 3, the marble statue is Picture 4, the samurai armour and the gold jacket are Pictures 5 and 6, which the fisherman and the gardener wear, the beach is Picture 7, on a billboard, the neon street is Picture 8, where the scene takes place, and the anime character is Picture 9, on a poster.\n\nWhat FastH3-Omni can do:\n\u2022 Reference images: up to 3 in real time, and up to 9 when real-time speed isn't needed, as in this render.\n\u2022 Audio input: up to 3 sounds guide voices and soundtracks, and the prompt writes the speech, sound effects and music.\n\u2022 First-to-last frame: start a clip on a first frame (image), end it on a last frame (last_image), or both, with at least one picture beside them.\n\nWriting prompts for FastH3-Omni:\n\u2022 Name inputs in angle brackets: <Picture 1>, <Picture 2>, \u2026 in picture-socket order, and say what each one is and where it goes in the scene.\n\u2022 Tie each picture to one thing on screen: a person, what they wear, an object, the place, or a sign or poster in the scene.\n\u2022 With many pictures, details can cross between them: in our run the fisherman picked up the samurai's topknot for part of the shot.\n\nFastH3-Omni prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3-omni/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        640
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_fisherman_portrait.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_fisherman_portrait.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        1000
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_gardener_portrait.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_gardener_portrait.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        1360
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            3
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_webcam_portrait.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_webcam_portrait.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        1720
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_character_marble_statue.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_character_marble_statue.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 6,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        2080
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            5
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_outfit_samurai_armor.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_outfit_samurai_armor.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 7,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        2440
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            6
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_outfit_sequined_jacket.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_outfit_sequined_jacket.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        2800
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            7
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_jet_ski_cruise.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_jet_ski_cruise.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 9,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        3160
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_city.png",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_city.png",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 10,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        3520
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_style_anime.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_style_anime.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 11,
+      "type": "ReactorFastH3OmniSegment",
+      "pos": [
+        400,
+        640
+      ],
+      "size": [
+        560,
+        760
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "last_image",
+          "name": "last_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "picture_1",
+          "name": "pictures.picture_1",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 1
+        },
+        {
+          "localized_name": "picture_2",
+          "name": "pictures.picture_2",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "localized_name": "picture_3",
+          "name": "pictures.picture_3",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 3
+        },
+        {
+          "localized_name": "picture_4",
+          "name": "pictures.picture_4",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "localized_name": "picture_5",
+          "name": "pictures.picture_5",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 5
+        },
+        {
+          "localized_name": "picture_6",
+          "name": "pictures.picture_6",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "localized_name": "picture_7",
+          "name": "pictures.picture_7",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "localized_name": "picture_8",
+          "name": "pictures.picture_8",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "localized_name": "picture_9",
+          "name": "pictures.picture_9",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "localized_name": "sound_1",
+          "name": "sounds.sound_1",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "shape": 7,
+          "type": "REACTOR_SEQUENCE",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seconds",
+          "name": "seconds",
+          "type": "COMBO",
+          "widget": {
+            "name": "seconds"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "kind",
+          "name": "kind",
+          "type": "COMBO",
+          "widget": {
+            "name": "kind"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect",
+          "name": "aspect",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            10,
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorFastH3OmniSegment"
+      },
+      "widgets_values": [
+        "<Subject 1> is the weathered fisherman in <Picture 1>, with grey stubble, wearing the red lacquered samurai armour from <Picture 5> instead of his oilskins.\n<Subject 2> is the woman in <Picture 2>, with dark tied-back hair, wearing the gold sequined jacket from <Picture 6>.\n<Subject 3> is the woman in <Picture 3>, with long dark curly hair and a pale blue hoodie.\n<Subject 4> is the white marble statue of a robed woman in <Picture 4>, standing on its plinth.\nIn one shot at night on the rain-soaked neon street from <Picture 8>, <Subject 1>, <Subject 2> and <Subject 3> walk toward the camera side by side and stop beside <Subject 4>, which stands on the pavement. <Subject 3> points up and laughs.\nAbove them a huge lit billboard shows the turquoise beach and the jet ski from <Picture 7>. On a shop window beside the statue hangs a poster of the anime character with teal hair and a denim jacket from <Picture 9>.\nCamera: a slow push in from a wide shot to a medium shot of the three friends beside the statue.\nDialogue: <Subject 3> says, \"Look, we're on the billboard!\"\nSound: rain on the pavement, distant traffic, buzzing neon.",
+        "8",
+        "shot",
+        "16:9"
+      ],
+      "widgets_values_named": {
+        "prompt": "<Subject 1> is the weathered fisherman in <Picture 1>, with grey stubble, wearing the red lacquered samurai armour from <Picture 5> instead of his oilskins.\n<Subject 2> is the woman in <Picture 2>, with dark tied-back hair, wearing the gold sequined jacket from <Picture 6>.\n<Subject 3> is the woman in <Picture 3>, with long dark curly hair and a pale blue hoodie.\n<Subject 4> is the white marble statue of a robed woman in <Picture 4>, standing on its plinth.\nIn one shot at night on the rain-soaked neon street from <Picture 8>, <Subject 1>, <Subject 2> and <Subject 3> walk toward the camera side by side and stop beside <Subject 4>, which stands on the pavement. <Subject 3> points up and laughs.\nAbove them a huge lit billboard shows the turquoise beach and the jet ski from <Picture 7>. On a shop window beside the statue hangs a poster of the anime character with teal hair and a denim jacket from <Picture 9>.\nCamera: a slow push in from a wide shot to a medium shot of the three friends beside the statue.\nDialogue: <Subject 3> says, \"Look, we're on the billboard!\"\nSound: rain on the pavement, distant traffic, buzzing neon.",
+        "seconds": "8",
+        "kind": "shot",
+        "aspect": "16:9"
+      }
+    },
+    {
+      "id": 12,
+      "type": "ReactorRender",
+      "pos": [
+        1000,
+        640
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 10
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        9,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "seed": 9,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 13,
+      "type": "SaveVideo",
+      "pos": [
+        1440,
+        640
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 12
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/fasth3_omni_nine_references",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/fasth3_omni_nine_references",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    },
+    {
+      "id": 14,
+      "type": "ReactorSequenceVisualizer",
+      "pos": [
+        1000,
+        1000
+      ],
+      "size": [
+        880,
+        166
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "ReactorSequenceVisualizer"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "timeline": ""
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      11,
+      2,
+      "IMAGE"
+    ],
+    [
+      2,
+      3,
+      0,
+      11,
+      3,
+      "IMAGE"
+    ],
+    [
+      3,
+      4,
+      0,
+      11,
+      4,
+      "IMAGE"
+    ],
+    [
+      4,
+      5,
+      0,
+      11,
+      5,
+      "IMAGE"
+    ],
+    [
+      5,
+      6,
+      0,
+      11,
+      6,
+      "IMAGE"
+    ],
+    [
+      6,
+      7,
+      0,
+      11,
+      7,
+      "IMAGE"
+    ],
+    [
+      7,
+      8,
+      0,
+      11,
+      8,
+      "IMAGE"
+    ],
+    [
+      8,
+      9,
+      0,
+      11,
+      9,
+      "IMAGE"
+    ],
+    [
+      9,
+      10,
+      0,
+      11,
+      10,
+      "IMAGE"
+    ],
+    [
+      10,
+      11,
+      0,
+      12,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      11,
+      11,
+      0,
+      14,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      12,
+      12,
+      0,
+      13,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.45,
+      "offset": [
+        100,
+        100
+      ]
+    }
+  },
+  "version": 0.4
+}

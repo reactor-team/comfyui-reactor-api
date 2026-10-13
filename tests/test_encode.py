@@ -1,10 +1,11 @@
+import io
 import threading
 
 import av
 import numpy as np
 import pytest
 
-from reactor_render.encode import FrameWriter
+from reactor_render.encode import FrameWriter, opus_bytes
 
 
 def read(path):
@@ -146,3 +147,18 @@ def test_container_finalization_failure_does_not_hang_close(tmp_path, monkeypatc
         if thread.is_alive():
             writer.frames.put(None)
             thread.join(timeout=2)
+
+
+
+@pytest.mark.parametrize("channels, sample_rate", [(1, 44100), (2, 48000)])
+def test_opus_bytes_keeps_a_sounds_length_and_channels_at_a_fraction_of_its_pcm(channels, sample_rate):
+    t = np.arange(3 * sample_rate) / sample_rate
+    samples = np.tile(0.5 * np.sin(2 * np.pi * 440 * t), (channels, 1)).astype(np.float32)
+    data = opus_bytes(samples, sample_rate)
+    with av.open(io.BytesIO(data)) as decoded:
+        stream = decoded.streams.audio[0]
+        assert (stream.codec_context.name, stream.channels, stream.rate) == ("opus", channels, 48000)
+        pcm = np.concatenate([frame.to_ndarray().reshape(channels, -1) for frame in decoded.decode(stream)], axis=1)
+    assert abs(pcm.shape[1] / 48000 - 3) < 0.05
+    # 96 kbps a channel, against 16-bit PCM's 768 kbps a channel at 48 kHz, with room for variable bitrate and Ogg framing.
+    assert len(data) < samples.nbytes / 2 / 4

@@ -110,10 +110,12 @@ function beatsUpTo(last) {
         const prompted = beat.inputs?.some((i) => i.name === "prompt") || beat.widgets?.some((w) => w.name === "prompt");
         const prompt = prompted ? inputValue(beat, "prompt") ?? "(linked prompt)" : "(no prompt)";
         // A model timed in seconds takes `seconds`, which beatFrames turns into frames.
-        const seconds = inputValue(beat, "seconds"), frames = seconds === undefined ? inputValue(beat, "frames") : null;
+        // A model with only a few clip lengths picks one from a list, as text.
+        const picked = inputValue(beat, "seconds"), seconds = typeof picked === "string" ? Number(picked) : picked;
+        const frames = seconds === undefined ? inputValue(beat, "frames") : null;
         const kind = widgetValue(beat, "kind");
         if (typeof prompt !== "string" || (typeof frames !== "number" && typeof seconds !== "number")) return "unknown";
-        beats.push({ prompt, frames, seconds, pace: widgetValue(beat, "pace"), cut: kind === "cut", image: upstream(beat, "image") ? "image" : null,
+        beats.push({ prompt, frames, seconds, pace: widgetValue(beat, "pace"), cut: kind === "cut", frame: kind === "frame", image: upstream(beat, "image") ? "image" : null,
                      video: upstream(beat, "video") ? "video" : null, moves: widgetValue(beat, "moves")?.moves ?? [],
                      references: connectedSlots(beat, "references") });
     }
@@ -211,7 +213,8 @@ function adaptBeat(node) {
     const reads = (taken) => !facts || taken === "any" || (taken === "first" && opens);
     let changed = fitInputs(node, [["image", "IMAGE", reads(facts?.images)], ["video", "VIDEO", reads(facts?.videos)]].filter(([name]) => has(name)))
         | (has("references") && showGrown(node, "references", "reference_0", "REACTOR_REFERENCE", true))
-        | (has("pictures") && showGrown(node, "pictures", "picture_1", "IMAGE", true));
+        | (has("pictures") && showGrown(node, "pictures", "picture_1", "IMAGE", true))
+        | (has("sounds") && showGrown(node, "sounds", "sound_1", "AUDIO", true));
     for (const widget of node.widgets ?? [])
         if (node.reactorStart.has(widget.name) && widget.hidden !== !opens) {
             widget.hidden = !opens;
@@ -469,7 +472,8 @@ function createViewer(node) {
             track.append(block);
             // Shot or cut is how this beat enters from the one before, so it is drawn on their boundary.
             if (i) track.append(el("div", { className: `reactor-tl-boundary ${b.cut ? "cut" : "shot"} locked`, style: `left:${pct(start)}`,
-                                            title: b.cut ? "Cut: starts fresh, with no blend." : "Shot: blends from the segment before." }));
+                                            title: b.cut ? "Cut: starts fresh, with no blend." : b.frame ? "Frame: starts afresh from the segment before's last frame."
+                                                   : "Shot: blends from the segment before." }));
         });
 
         drawLanes(lanes, moves, { camera, facts: s.facts, length, pct, found: moveProblems(moves, s.facts), selectedMove: null,

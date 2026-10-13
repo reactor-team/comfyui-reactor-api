@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render.timeline import MODELS, POSES, Beat, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts
+from reactor_render.timeline import MODELS, check_sound, POSES, Beat, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts, upload_type, clip_seconds
 
 # LongLive: a scene opens with a 29-frame chunk, then 32 frames a chunk. A beat's start is the chunk
 # whose video comes nearest its running total of frames: 96 -> 3, 175 -> 6.
@@ -524,6 +524,106 @@ def test_h3_reference_refuses_a_segment_without_references_or_with_too_many():
         compile_timeline("H3 Reference Turbo Realtime", [Beat("x", 120, references=(Reference("Vidu S2-Avatar", b"a", "object"),))], seed=1)
 
 
+def test_fast_h3_omni_snaps_each_clip_to_a_length_it_takes_and_allows_a_prompt_alone():
+    a = Reference("FastH3-Omni", b"a", "image")
+    plan = compile_timeline("FastH3-Omni", [Beat("x", 120), Beat("y", 200, references=(a,)), Beat("z", 1000, cut=True)], seed=1)
+    assert plan.timed == [
+        (0, "enqueue", {"prompt": "x", "seconds": 5.875}),
+        (1, "enqueue", {"prompt": "y", "seconds": 8.0, "reference_images": [b"a"], "continue_from_clip_id": 0}),
+        (2, "enqueue", {"prompt": "z", "seconds": 14.375}),
+    ]
+    assert plan.chunks == 141 + 192 + 345
+
+
+def test_fast_h3_omni_sends_each_segments_sounds_beside_its_pictures_or_the_clip_before():
+    a = Reference("FastH3-Omni", b"a", "image")
+    plan = compile_timeline("FastH3-Omni", [Beat("x", 141, references=(a,), sounds=(b"v1", b"v2", b"v3")), Beat("y", 141, sounds=(b"v1",))], seed=1)
+    assert plan.timed == [
+        (0, "enqueue", {"prompt": "x", "seconds": 5.875, "reference_images": [b"a"], "reference_audios": [b"v1", b"v2", b"v3"]}),
+        # A continued clip carries the sound on, so it may take audio without a picture.
+        (1, "enqueue", {"prompt": "y", "seconds": 5.875, "continue_from_clip_id": 0, "reference_audios": [b"v1"]}),
+    ]
+
+
+def test_fast_h3_omni_refuses_sounds_it_cannot_place():
+    a = Reference("FastH3-Omni", b"a", "image")
+    with pytest.raises(ValueError, match="Segment 1 has audio but no pictures"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141, sounds=(b"v",))], seed=1)
+    with pytest.raises(ValueError, match="Segment 2 has audio but no pictures"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141, references=(a,)), Beat("y", 141, cut=True, sounds=(b"v",))], seed=1)
+    # The clip before's own sound takes one of the three slots.
+    with pytest.raises(ValueError, match="at most 2 on a segment that continues"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141, references=(a,)), Beat("y", 141, references=(a,), sounds=(b"1", b"2", b"3"))], seed=1)
+    with pytest.raises(ValueError, match="at most 3 on a segment"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141, references=(a,), sounds=(b"1", b"2", b"3", b"4"))], seed=1)
+    with pytest.raises(ValueError, match="does not take reference audio"):
+        compile_timeline("H3 Reference Turbo Realtime", [Beat("x", 120, references=(h3_ref(b"a"),), sounds=(b"v",))], seed=1)
+
+
+def test_fast_h3_omni_pins_a_clips_first_and_last_frame_and_starts_one_from_the_frame_before():
+    a = Reference("FastH3-Omni", b"a", "image")
+    plan = compile_timeline("FastH3-Omni", [Beat("x", 141, image=b"first", last_image=b"last", references=(a,)),
+                                            Beat("y", 141, from_frame=True, last_image=b"end", references=(a,), sounds=(b"1", b"2")),
+                                            Beat("z", 141, image=b"open", references=(a,))], seed=1)
+    assert plan.timed == [
+        (0, "enqueue", {"prompt": "x", "seconds": 5.875, "reference_images": [b"a"], "first_frame_image": b"first", "last_frame_image": b"last"}),
+        (1, "enqueue", {"prompt": "y", "seconds": 5.875, "reference_images": [b"a"], "continue_from_clip_id": 0, "continue_mode": "frame",
+                        "last_frame_image": b"end", "reference_audios": [b"1", b"2"]}),
+        # A first frame opens the clip fresh, as a cut does.
+        (2, "enqueue", {"prompt": "z", "seconds": 5.875, "reference_images": [b"a"], "first_frame_image": b"open"}),
+    ]
+
+
+def test_fast_h3_omni_refuses_keyframes_it_cannot_place():
+    a = Reference("FastH3-Omni", b"a", "image")
+    with pytest.raises(ValueError, match="Segment 1 has a first or last frame but no pictures"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141, image=b"f")], seed=1)
+    with pytest.raises(ValueError, match="Segment 2 starts from the last frame of the one before but no pictures"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141), Beat("y", 141, from_frame=True)], seed=1)
+    with pytest.raises(ValueError, match="Segment 2 has a last frame but carries on the motion"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141), Beat("y", 141, last_image=b"l", references=(a,))], seed=1)
+    with pytest.raises(ValueError, match="Segment 2 starts from the last frame of the one before, so it takes no image"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141), Beat("y", 141, from_frame=True, image=b"f", references=(a,))], seed=1)
+    with pytest.raises(ValueError, match="at most 2 on a segment that continues"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141), Beat("y", 141, from_frame=True, references=(a,), sounds=(b"1", b"2", b"3"))], seed=1)
+    with pytest.raises(ValueError, match="does not take a last frame"):
+        compile_timeline("FastH3", [Beat("x", 120, last_image=b"l")], seed=1)
+    with pytest.raises(ValueError, match="can't start a segment from the last frame"):
+        compile_timeline("FastH3", [Beat("x", 120), Beat("y", 120, from_frame=True)], seed=1)
+
+
+def test_a_keyframe_is_cropped_to_the_canvas_shape():
+    spec = MODELS["FastH3-Omni"]
+    assert spec.keyframe_aspect({}) == "16:9" and spec.keyframe_aspect({"aspect": "9:16"}) == "9:16"
+    assert MODELS["FastH3"].keyframe_aspect({"aspect": "1:1"}) is None
+    square = Image.new("RGB", (1000, 1000))
+    assert spec.fit(square, "16:9").size == (1366, 768)
+    assert spec.fit(square, "9:16").size == (768, 1366)
+    assert spec.fit(square).size == (768, 768)
+
+
+def test_fast_h3_omnis_clip_lengths_are_listed_in_seconds_that_play_whole_frames():
+    spec = MODELS["FastH3-Omni"]
+    assert clip_seconds(spec.clip_frames, spec.fps) == ("5.875", "8", "10.125", "12.25", "14.375")
+    assert [round(float(s) * spec.fps) for s in clip_seconds(spec.clip_frames, spec.fps)] == list(spec.clip_frames)
+    assert spec.live_settings["clip_seconds"].options == clip_seconds(spec.clip_frames, spec.fps)
+
+
+def test_fast_h3_omni_takes_three_pictures_live_and_nine_in_a_render():
+    a = Reference("FastH3-Omni", b"a", "image")
+    spec = MODELS["FastH3-Omni"]
+    assert (spec.live_max_references, spec.max_references) == (3, 9)
+    assert MODELS["H3 Reference Turbo Realtime"].live_max_references is None
+    with pytest.raises(ValueError, match="takes at most 9"):
+        compile_timeline("FastH3-Omni", [Beat("x", 141, references=(a,) * 10)], seed=1)
+
+
+def test_files_upload_as_their_own_media_type():
+    assert upload_type("reference_audios") == ("audio.ogg", "audio/ogg")
+    assert upload_type("video") == ("video.mp4", "video/mp4")
+    assert upload_type("reference_images") == ("reference_images.png", "image/png")
+
+
 def test_ltx_speaks_each_segment_as_a_take_from_the_first_segments_avatar():
     plan = compile_timeline("LTX", [Beat("Hello.", 120, image=b"face"), Beat("Goodbye.", 240)], seed=2,
                             settings={"scene": "News anchor at a desk", "pace": 160})
@@ -551,3 +651,14 @@ def test_ltx_refuses_a_silent_segment_or_one_outside_a_takes_length():
     with pytest.raises(ValueError, match="needs an image"):
         compile_timeline("LTX", [Beat("Hi.", 120)], seed=1)
 
+
+
+def test_fast_h3_omni_refuses_a_sound_outside_two_to_fifteen_seconds_or_past_stereo():
+    spec = MODELS["FastH3-Omni"]
+    check_sound(spec, "sound_1", 2.0, 1)
+    check_sound(spec, "sound_1", 15.0, 2)
+    for seconds in (1.9, 15.1):
+        with pytest.raises(ValueError, match="2 to 15 seconds"):
+            check_sound(spec, "sound_1", seconds, 1)
+    with pytest.raises(ValueError, match="mono or stereo"):
+        check_sound(spec, "sound_1", 5.0, 6)

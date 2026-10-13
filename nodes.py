@@ -20,8 +20,9 @@ from server import PromptServer
 from .reactor_render import live
 from .reactor_render.config import connect_args, max_sessions
 from .reactor_render.clip import ClipStream
+from .reactor_render.encode import opus_bytes
 from .reactor_render.session import render
-from .reactor_render.timeline import MODELS, Beat, ModelSpec, Reference, Setting, Timeline, call_setup, compile_timeline, editor_moves, model_facts, join_chains
+from .reactor_render.timeline import MODELS, Beat, check_sound, ModelSpec, Reference, Setting, Timeline, call_setup, clip_seconds, compile_timeline, editor_moves, model_facts, join_chains
 
 ReactorSequenceType = io.Custom("REACTOR_SEQUENCE")
 ReactorReferenceType = io.Custom("REACTOR_REFERENCE")
@@ -54,11 +55,11 @@ def image_to_png(image) -> bytes:
 REFERENCE_NODES = {"Vidu S2-Avatar": "Reactor Vidu S2-Avatar Reference"}
 
 
-def references_input(name: str, spec: ModelSpec, tooltip: str):
-    """Sockets for a model's own references, one more appearing as each is connected."""
+def references_input(name: str, most: int, tooltip: str):
+    """Sockets for a model's own references, one more appearing as each is connected, up to `most`."""
     return io.Autogrow.Input("references", optional=True, template=io.Autogrow.TemplatePrefix(
         input=ReactorReferenceType.Input("reference", tooltip=f"A {REFERENCE_NODES[name]}, {tooltip}"),
-        prefix="reference_", min=0, max=spec.max_references))
+        prefix="reference_", min=0, max=most))
 
 
 # How a prompt names the pictures of a model that takes them; the example is the model's prompt guide's.
@@ -66,12 +67,12 @@ PICTURES_PROMPT = ('Name each picture by its number: the connected pictures are 
                    'For example: "The person in Picture 1 walks through the garden in Picture 2. The camera follows from the side."')
 
 
-def pictures_input(spec: ModelSpec, tooltip: str):
-    """Image sockets for a model that takes its references as plain pictures, one more appearing as each is connected."""
+def pictures_input(most: int, tooltip: str):
+    """Image sockets for a model that takes its references as plain pictures, one more appearing as each is connected, up to `most`."""
     return io.Autogrow.Input("pictures", optional=True, template=io.Autogrow.TemplateNames(
         input=io.Image.Input("picture", tooltip=f"One character, object or place for the clip to draw on, {tooltip} It guides the look "
                                                 "rather than fixing a frame. Prompts call the connected pictures Picture 1, Picture 2, … in socket order."),
-        names=[f"picture_{i}" for i in range(1, spec.max_references + 1)], min=0))
+        names=[f"picture_{i}" for i in range(1, most + 1)], min=0))
 
 
 def taken_references(name: str, references, pictures) -> tuple[Reference, ...]:
@@ -82,8 +83,43 @@ def taken_references(name: str, references, pictures) -> tuple[Reference, ...]:
     return tuple(r for r in (references or {}).values() if r is not None)
 
 
-def reference_inputs(name: str, spec: ModelSpec, tooltip: str) -> list:
-    return [] if not spec.references else [pictures_input(spec, tooltip) if spec.pictures else references_input(name, spec, tooltip)]
+def reference_inputs(name: str, spec: ModelSpec, tooltip: str, most: int | None = None) -> list:
+    most = most or spec.max_references
+    return ([] if not spec.references else [pictures_input(most, tooltip) if spec.pictures else references_input(name, most, tooltip)]) + \
+           ([sounds_input(spec, tooltip)] if spec.max_sounds else [])
+
+
+# How a prompt names the sounds of a model that takes them.
+SOUNDS_PROMPT = ('Name each sound by its number: the connected sounds are <Audio 1>, <Audio 2>, … in socket order. '
+                 'Give each its own sentence saying whether it is a voice, a sound or music, or the model may ignore it. '
+                 'For example: "<Audio 1> is the voice reference for <Subject 1>."')
+
+
+def sounds_input(spec: ModelSpec, tooltip: str):
+    """Audio sockets for a model that takes reference audio, one more appearing as each is connected."""
+    return io.Autogrow.Input("sounds", optional=True, template=io.Autogrow.TemplateNames(
+        input=io.Audio.Input("sound", tooltip=f"A voice, a piece of music or a sound for the clip's audio to follow, {tooltip} It shapes the "
+                                              "sound, not the picture, and needs a picture or the clip before beside it. "
+                                              "Prompts call the connected sounds <Audio 1>, <Audio 2>, … in socket order."),
+        names=[f"sound_{i}" for i in range(1, spec.max_sounds + 1)], min=0))
+
+
+def taken_sounds(spec: ModelSpec, sounds) -> tuple[bytes, ...]:
+    """The sounds connected to a node, in socket order, as Ogg/Opus files, the smallest the model takes."""
+    ordered = sorted((sounds or {}).items(), key=lambda item: int(item[0].rsplit("_", 1)[1]))
+    taken = []
+    for key, audio in ordered:
+        if audio is None:
+            continue
+        samples = audio["waveform"][0].cpu().numpy()
+        check_sound(spec, key, samples.shape[1] / audio["sample_rate"], samples.shape[0])
+        taken.append(opus_bytes(samples, audio["sample_rate"]))
+    return tuple(taken)
+
+
+def prompt_tooltip(spec: ModelSpec) -> str:
+    """How a prompt names the pictures and sounds its model takes."""
+    return " ".join(text for text, taken in ((PICTURES_PROMPT, spec.pictures), (SOUNDS_PROMPT, spec.max_sounds)) if taken)
 
 
 def video_bytes(video) -> bytes:
@@ -110,6 +146,7 @@ SEGMENT_FAMILIES = {"Visko Orbis": ("Visko Orbis Dynamic", "Visko Orbis Stable")
 FAMILY_OF = {name: next((f for f, names in SEGMENT_FAMILIES.items() if name in names), name) for name in MODELS}
 # What each model does, as the node menu groups them.
 CAPABILITY = {"LongLive-2.0": "Generate video", "Helios": "Generate video", "FastH3": "Generate video", "H3 Reference Turbo Realtime": "Generate video",
+              "FastH3-Omni": "Generate video",
               "Visko Orbis Dynamic": "Generate video", "Visko Orbis Stable": "Generate video",
               "LingBot": "Explore worlds", "LingBot World 2": "Explore worlds",
               "Sana Streaming": "Edit video", "X2": "Edit video", "Vidu S2-Editing": "Edit video",
@@ -138,18 +175,25 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                             "and feed the last one to Reactor Render, and to a Reactor Sequence Visualizer to see it.",
                 inputs=[
                     *([io.Combo.Input("model", options=models, tooltip="The model the sequence runs on. Read on the first segment.")] if len(models) > 1 else []),
-                    *([io.String.Input("prompt", multiline=True, tooltip=PICTURES_PROMPT if spec.pictures else None)] if spec.prompted else []),
+                    *([io.String.Input("prompt", multiline=True, tooltip=prompt_tooltip(spec) or None)] if spec.prompted else []),
+                    io.Combo.Input("seconds", options=list(clip_seconds(spec.clip_frames, spec.fps)),
+                                   tooltip="How many seconds this segment plays. The model makes clips of only these lengths.") if spec.clip_frames else
                     io.Float.Input("seconds", default=0, min=0, max=spec.seconds[1], step=0.5,
                                    tooltip=f"How long this segment plays, {spec.seconds[0]:g} to {spec.seconds[1]:g} seconds. "
                                            "0 plays as long as the script needs at the pace.") if spec.seconds else
                     io.Int.Input("frames", default=max(1, round(120 / step)) * step, min=1, max=100000, step=step,
                                  tooltip="How many frames of video this segment plays. It starts where the segment before it in the sequence ends"
                                          + ("; both ends round to the nearest chunk." + length if spec.frames_per_chunk else ".")),
-                    *([io.Combo.Input("kind", options=["shot", "cut"],
-                                      tooltip="How this segment enters from the one before: shot blends softly, cut starts fresh. The first segment just opens the video.")]
+                    *([io.Combo.Input("kind", options=["shot", "cut", *(["frame"] if spec.keyframes else [])],
+                                      tooltip="How this segment enters from the one before: shot blends softly, cut starts fresh"
+                                              + (", frame starts afresh from its last frame and carries its sound on as an audio reference"
+                                                 if spec.keyframes else "") + ". The first segment just opens the video.")]
                       if spec.supports_cuts else []),
-                    *([io.Image.Input("image", optional=True, tooltip="Reference image." if spec.images == "any" else "Reference image, read on the first segment.")]
+                    *([io.Image.Input("image", optional=True, tooltip="The frame this segment starts on. It starts fresh, as a cut does; needs a picture beside it."
+                                      if spec.keyframes else "Reference image." if spec.images == "any" else "Reference image, read on the first segment.")]
                       if spec.images != "none" else []),
+                    *([io.Image.Input("last_image", optional=True, tooltip="The frame this segment ends on, on a cut or frame segment; needs a picture beside it.")]
+                      if spec.keyframes else []),
                     *([io.Video.Input("video", optional=True, tooltip="Source clip to edit, read on the first segment.")] if spec.videos != "none" else []),
                     *([MoveEditor.Input("moves", tooltip="Camera moves during this segment. A move ends with its segment; continue it on the next segment to keep it going.")]
                       if spec.camera else []),
@@ -164,16 +208,17 @@ def segment_node(family: str) -> type[io.ComfyNode]:
             )
 
         @classmethod
-        def execute(cls, frames=0, prompt="", model=models[0], seconds=None, sequence=None, kind="shot", image=None, video=None, moves=None, references=None, pictures=None, **settings) -> io.NodeOutput:
+        def execute(cls, frames=0, prompt="", model=models[0], seconds=None, sequence=None, kind="shot", image=None, last_image=None, video=None, moves=None, references=None, pictures=None, sounds=None, **settings) -> io.NodeOutput:
             # A later segment's model and start settings are the first segment's, so its own are not read.
             name = model if sequence is None else sequence.model
             if name not in models:
                 raise ValueError(f"{display_name} can't take {name}; use Reactor {FAMILY_OF[name]} Segment.")
             if seconds is not None:
-                frames = round(seconds * MODELS[name].fps)
-            beat = Beat(prompt, frames, cut=kind == "cut", image=None if image is None else image_to_png(image),
+                frames = round(float(seconds) * MODELS[name].fps)
+            beat = Beat(prompt, frames, cut=kind == "cut", from_frame=kind == "frame", image=None if image is None else image_to_png(image),
+                        last_image=None if last_image is None else image_to_png(last_image),
                         video=None if video is None else video_bytes(video), moves=tuple(editor_moves(moves)) if moves else (),
-                        references=taken_references(name, references, pictures),
+                        references=taken_references(name, references, pictures), sounds=taken_sounds(MODELS[name], sounds),
                         settings={key: value for key, value in settings.items() if key in spec.beat_settings and value is not None})
             if sequence is None:
                 return io.NodeOutput(Timeline(name, (beat,), {key: value for key, value in settings.items() if key in spec.settings and value is not None}))
@@ -269,7 +314,9 @@ class ReactorRender(io.ComfyNode):
     async def execute(cls, sequence, seed) -> io.NodeOutput:
         connect = connect_args()
         spec = MODELS[sequence.model]
-        beats = [replace(b, image=spec.fit_png(b.image)) if b.image is not None else b for b in sequence.beats]
+        aspect = spec.keyframe_aspect(sequence.settings)
+        beats = [replace(b, image=b.image and spec.fit_png(b.image, aspect), last_image=b.last_image and spec.fit_png(b.last_image, aspect))
+                 for b in sequence.beats]
         plan = compile_timeline(sequence.model, beats, seed, sequence.settings)
         out_path = os.path.join(folder_paths.get_temp_directory(), f"reactor_{uuid.uuid4().hex}.mp4")
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -417,18 +464,19 @@ def live_option(name: str) -> io.DynamicCombo.Option:
         *([io.String.Input("prompt", multiline=True, tooltip="What you say to the character first; may be empty." if spec.pattern == "call"
                            else "The script the first take speaks. Required. Apply a new one in the window for the next take." if spec.pattern == "takes"
                            else "The prompt the video starts from. Required. Change it in the window as it plays."
-                           + (" " + PICTURES_PROMPT if spec.pictures else ""))] if spec.prompted else []),
+                           + (" " + prompt_tooltip(spec)).rstrip())] if spec.prompted else []),
         *([io.Image.Input("image", optional=not spec.image_required,
-                          tooltip="The person the character is made from." if spec.pattern == "call" else "Reference image.")]
+                          tooltip="The person the character is made from." if spec.pattern == "call"
+                          else "The frame the first clip starts on; needs a picture beside it." if spec.keyframes else "Reference image.")]
           if spec.images != "none" else []),
-        *(reference_inputs(name, spec, "kept by every clip.") if spec.pattern != "call" else []),
+        *(reference_inputs(name, spec, "kept by every clip.", spec.live_max_references) if spec.pattern != "call" else []),
         *([io.Video.Input("video", optional=True, tooltip="Source clip to restyle, looped until you press Save."),
            ReactorCameraType.Input("camera", optional=True, tooltip="A Reactor Camera Capture, to stream a camera instead of a clip.")]
           if source else []),
         *([ReactorMicrophoneType.Input("microphone", optional=True,
                                        tooltip="A Reactor Microphone Capture, to talk through a chosen microphone. Default is the browser's default microphone.")]
           if spec.pattern == "call" else []),
-        *[setting_input(key, setting, "Read at start.") for key, setting in spec.settings.items()],
+        *[setting_input(key, setting, "Read at start.") for key, setting in {**spec.settings, **spec.live_settings}.items()],
         *[setting_input(key, setting, "Read at start." if spec.prompted else "Change it in the window as it plays.")
           for key, setting in spec.beat_settings.items()],
     ])
@@ -465,14 +513,15 @@ class ReactorRealtime(io.ComfyNode):
     async def execute(cls, model, seed, filename_prefix) -> io.NodeOutput:
         name, prompt, image, video, camera = model["model"], model.get("prompt", ""), model.get("image"), model.get("video"), model.get("camera")
         spec = MODELS[name]
-        settings = {key: model[key] for key in spec.settings if model.get(key) is not None}
+        settings = {key: model[key] for key in (*spec.settings, *spec.live_settings) if model.get(key) is not None}
         beat_settings = {key: model[key] for key in spec.beat_settings if model.get(key) is not None}
-        png = None if image is None else spec.fit_png(image_to_png(image))
+        png = None if image is None else spec.fit_png(image_to_png(image), spec.keyframe_aspect(settings))
         if spec.pattern == "call":
             return await live_output("call", name, prompt, call_setup(name, png, settings), None, filename_prefix,
                                      microphone=model.get("microphone"))
         if spec.pattern != "source":
-            beat = Beat(prompt, 1, image=png, references=taken_references(name, model.get("references"), model.get("pictures")), settings=beat_settings)
+            beat = Beat(prompt, 1, image=png, references=taken_references(name, model.get("references"), model.get("pictures")),
+                        sounds=taken_sounds(spec, model.get("sounds")), settings=beat_settings)
             return await live_output("drive", name, prompt, live.drive_setup(name, beat, seed, settings), None, filename_prefix)
         if (video is None) == (camera is None):
             raise ValueError(f"{name} edits one source: connect a video or a Reactor Camera Capture.")

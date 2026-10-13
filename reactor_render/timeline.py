@@ -13,19 +13,24 @@ from PIL import Image, ImageOps
 class Beat:
     """A timeline beat: for `frames` frames of video, the video follows `prompt`. Beats play in order.
 
-    `cut` asks for a hard scene break from the beat before instead of a soft transition. `image`
-    is PNG bytes for models that condition on a reference image. `video` is the source clip as
+    `cut` asks for a hard scene break from the beat before instead of a soft transition, and `from_frame` starts
+    afresh from the beat before's last frame instead of carrying its motion on. `image` is PNG bytes for models that
+    condition on a reference image; on a model with `keyframes` it is the beat's first frame, and `last_image` its last. `video` is the source clip as
     an encoded video file, for video-to-video models, and only the first beat's is read. `moves` are camera
     moves counted from the beat's own start and cut at its end. `references` are the model's own
-    reference images in effect during the beat, in order. `settings` holds the beat's values of the model's `beat_settings`.
+    reference images in effect during the beat, in order. `sounds` are its reference audio clips as Ogg/Opus files, in the order
+    prompts call them Audio 1, Audio 2, …. `settings` holds the beat's values of the model's `beat_settings`.
     """
     prompt: str
     frames: int
     cut: bool = False
     image: bytes | None = None
+    last_image: bytes | None = None
+    from_frame: bool = False
     video: bytes | None = None
     moves: tuple["Move", ...] = ()
     references: tuple["Reference", ...] = ()
+    sounds: tuple[bytes, ...] = ()
     settings: dict[str, object] = field(default_factory=dict)
 
 
@@ -70,7 +75,8 @@ class Setting:
     """A model option sent as `command` with one field: before `start` as the first link sets it, when a later beat changes it, or as a field of a call's `start_call`.
 
     `field` is that field's name, when it differs from the setting's. A setting with no `options`
-    takes a value of its `default`'s type: a toggle, a number from `minimum` to `maximum`, or text.
+    takes a value of its `default`'s type: a toggle, a number from `minimum` to `maximum`, or text. With `numeric`, its
+    options are numbers, picked as text and sent as numbers.
     """
     command: str
     options: tuple[str, ...]
@@ -78,6 +84,7 @@ class Setting:
     field: str | None = None
     maximum: float | None = None
     minimum: float = 0.0
+    numeric: bool = False
 
 
 @dataclass(frozen=True)
@@ -120,11 +127,18 @@ class ModelSpec:
     takes a prompt at all. `switch_image` names the field of `prompt_command` that takes a new image mid-run, for a model whose
     live change is an image and settings rather than a prompt. `audio` is whether the model plays
     sound, so its session carries a `main_audio` track. `max_references` is how many references a beat may
-    carry. `live_held` are fields of the live prompt command that every later prompt repeats from the opening one.
+    carry, and `live_max_references` how many a live run may, when fewer keep it in real time. `live_held` are fields of the live prompt command that every later prompt repeats from the opening one.
     `prompt_field` is the field of `prompt_command` the prompt goes in, and `live_then` a command the live
     window sends after each prompt. `crop_focus` is where a fitted image's crop sits, from 0 (its top) to 1 (its bottom).
     `seconds` is set for a model timed in seconds: the range of a segment's length, which its segments take in
-    seconds, with 0 lasting as long as the script needs.
+    seconds, with 0 lasting as long as the script needs. `clip_frames` are the only clip lengths a "clips" model
+    accepts, when it refuses others; each segment is snapped to the nearest. `references_required` is whether every
+    segment must carry at least one reference. `max_sounds` is how many reference audio clips a beat may carry; they
+    shape the clip's sound, not its picture, and go beside a reference or the clip before. `sound_seconds` is the
+    shortest and longest each may last. `keyframes` is whether a
+    beat's image is its first frame and it may pin its last, and whether a beat may start from the last frame of the one
+    before; both go beside at least one reference, and are cropped to the shape of the `aspect` setting. `live_settings`
+    are settings only a live run takes, read at start, for a value a render sets on each segment instead.
     """
     slug: str
     pattern: str
@@ -155,11 +169,18 @@ class ModelSpec:
     audio: bool = False
     switch_image: str | None = None
     max_references: int = 3
+    live_max_references: int | None = None
     prompt_field: str = "prompt"
     live_then: str | None = None
     live_held: tuple[str, ...] = ()
     crop_focus: float = 0.5
     seconds: tuple[float, float] | None = None
+    clip_frames: tuple[int, ...] = ()
+    references_required: bool = False
+    max_sounds: int = 0
+    sound_seconds: tuple[float, float] = (0, float("inf"))
+    keyframes: bool = False
+    live_settings: dict[str, Setting] = field(default_factory=dict)
 
     def frame_size(self, width: int, height: int) -> tuple[int, int]:
         """The size a width x height input is sent at."""
@@ -168,14 +189,22 @@ class ModelSpec:
         scale = min(self.size) / min(width, height)
         return round(width * scale / 2) * 2, round(height * scale / 2) * 2
 
-    def fit(self, image: Image.Image) -> Image.Image:
-        """The image scaled to cover `frame_size` and cropped to it, centered across and at `crop_focus` down."""
-        return ImageOps.fit(image.convert("RGB"), self.frame_size(*image.size), Image.LANCZOS, centering=(0.5, self.crop_focus))
+    def fit(self, image: Image.Image, aspect: str | None = None) -> Image.Image:
+        """The image scaled to cover `frame_size` and cropped to it, centered across and at `crop_focus` down.
 
-    def fit_png(self, png: bytes) -> bytes:
+        With `aspect`, such as "16:9", it is cropped to that shape instead of keeping its own.
+        """
+        size = self.frame_size(*image.size) if aspect is None else self.frame_size(*map(int, aspect.split(":")))
+        return ImageOps.fit(image.convert("RGB"), size, Image.LANCZOS, centering=(0.5, self.crop_focus))
+
+    def fit_png(self, png: bytes, aspect: str | None = None) -> bytes:
         buf = io.BytesIO()
-        self.fit(Image.open(io.BytesIO(png))).save(buf, format="PNG")
+        self.fit(Image.open(io.BytesIO(png)), aspect).save(buf, format="PNG")
         return buf.getvalue()
+
+    def keyframe_aspect(self, settings: dict[str, object]) -> str | None:
+        """The shape a keyframe is cropped to, the run's canvas, since the model stretches it to fill the canvas; None without keyframes."""
+        return settings.get("aspect", self.settings["aspect"].default) if self.keyframes else None
 
     def chunks_for(self, frames: float) -> int:
         """How many chunks of a scene come nearest to `frames` of video, halves rounding up as the editor's do."""
@@ -231,6 +260,15 @@ EDIT_TYPES = ("style_transfer", "virtual_tryon", "subject_replacement", "backgro
 LTX_DEFAULT_WPM = 140
 LTX_SETTINGS = {"scene": Setting("set_prompt", (), "", field="prompt"),
                 "pace": Setting("set_wpm", (), LTX_DEFAULT_WPM, field="wpm", minimum=80, maximum=220)}
+# FastH3-Omni's clip lengths in frames at 24 fps: 5.875, 8, 10.125, 12.25 and 14.375 seconds.
+FAST_H3_OMNI_CLIPS = (141, 192, 243, 294, 345)
+
+
+def clip_seconds(clip_frames: tuple[int, ...], fps: float) -> tuple[str, ...]:
+    """Clip lengths in frames as the seconds a picker lists, such as "5.875"."""
+    return tuple(f"{frames / fps:g}" for frames in clip_frames)
+
+
 FAST_H3_SETTINGS = {"aspect": Setting("set_canvas", ("16:9", "1:1", "9:16", "4:3"), "16:9")}
 
 
@@ -285,13 +323,30 @@ MODELS = {
     "H3 Reference Turbo Realtime": ModelSpec("reactor/h3-reference-to-video-turbo-realtime", "clips", 24.0, "none", True,
                                              references=True, pictures=True, max_references=9, size=(1344, 768), keeps_aspect=True, starts=False,
                                              settings=FAST_H3_SETTINGS, prompt_command="enqueue", audio=True,
-                                             live_held=("reference_images",)),
+                                             live_held=("reference_images",), references_required=True),
+    # A clip may carry pictures or follow its prompt alone. The model refuses any length but these five, the ones
+    # whose sound lasts exactly as long as the picture. Its image is a clip's first frame.
+    "FastH3-Omni": ModelSpec("reactor/fast-h3-omni", "clips", 24.0, "any", True, references=True, pictures=True, max_references=9, live_max_references=3,
+                             size=(1344, 768), keeps_aspect=True, starts=False, settings=FAST_H3_SETTINGS, prompt_command="enqueue",
+                             audio=True, live_held=("reference_images", "reference_audios"), clip_frames=FAST_H3_OMNI_CLIPS,
+                             max_sounds=3, sound_seconds=(2, 15), keyframes=True,
+                             live_settings={"clip_seconds": Setting("set_clip_seconds", clip_seconds(FAST_H3_OMNI_CLIPS, 24.0), "14.375",
+                                                                    field="seconds", numeric=True)}),
     # Each segment is one take: its prompt is the script the avatar speaks, its length the take's.
     # Live, each prompt is the next take's script, started once the take before ends.
     # A portrait fitted to its wide frame keeps the face, which sits near its top.
     "LTX": ModelSpec("reactor/ltx2", "takes", 24.0, "first", False, image_required=True, size=(640, 352), crop_focus=0.1, settings=LTX_SETTINGS,
                      prompt_command="set_script", prompt_field="script", live_then="start", audio=True, seconds=(4, 300)),
 }
+
+
+def check_sound(spec: ModelSpec, name: str, seconds: float, channels: int):
+    """Refuse a sound the model would refuse: one too short or too long, or with more than two channels."""
+    shortest, longest = spec.sound_seconds
+    if not shortest <= seconds <= longest:
+        raise ValueError(f"{name} lasts {seconds:.1f} s; each sound must last {shortest:g} to {longest:g} seconds.")
+    if channels > 2:
+        raise ValueError(f"{name} has {channels} channels; each sound must be mono or stereo.")
 
 
 def model_facts(spec: ModelSpec) -> dict:
@@ -353,6 +408,12 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
             raise ValueError(f"{model} does not take reference images.")
         if beat.video is not None and spec.videos == "none":
             raise ValueError(f"{model} does not take a source video.")
+        if beat.sounds and not spec.max_sounds:
+            raise ValueError(f"{model} does not take reference audio.")
+        if beat.last_image is not None and not spec.keyframes:
+            raise ValueError(f"{model} does not take a last frame.")
+        if i and beat.from_frame and not spec.keyframes:
+            raise ValueError(f"{model} can't start a segment from the last frame of the one before; use a shot or a cut.")
         if other := next((r.model for r in beat.references if r.model != model), None):
             raise ValueError(f"{model} does not take {other} references.")
         if unknown := next((name for name in beat.settings if name not in spec.beat_settings), None):
@@ -588,24 +649,57 @@ def compile_edit(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> P
     return plan
 
 
+def upload_type(key: str) -> tuple[str, str]:
+    """The file name and media type a command's file under `key` is uploaded as: a source clip, a reference audio, or an image."""
+    return {"video": ("video.mp4", "video/mp4"), "reference_audios": ("audio.ogg", "audio/ogg")}.get(key, (f"{key}.png", "image/png"))
+
+
 def compile_clips(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
     """One clip per beat. A shot continues from the clip before it; a cut opens fresh, and so does a beat with
-    a starting image. A model that takes references gets each beat's, in order.
+    a starting image. A model that takes references gets each beat's, in order, and one with keyframes may also
+    pin a clip's last frame, or start it from the clip before's last frame.
 
     Boundaries hold the last frame instead of cutting to black. The runner turns on autoplay once the clips are built.
     """
+    if spec.clip_frames:
+        beats = [replace(beat, frames=min(spec.clip_frames, key=lambda n: abs(n - beat.frames))) for beat in beats]
     plan = Plan(setup=[("set_seed", {"seed": seed}), ("set_flush_on_clip_end", {"enabled": False})],
                 chunks=sum(beat.frames for beat in beats))
     for i, beat in enumerate(beats):
         data = {"prompt": beat.prompt, "seconds": beat.frames / spec.fps}
         if spec.references:
-            if not beat.references:
+            if spec.references_required and not beat.references:
                 raise ValueError(f"Segment {i + 1} has no references; every {model} segment needs at least one.")
             if len(beat.references) > spec.max_references:
                 raise ValueError(f"Segment {i + 1} has {len(beat.references)} references; {model} takes at most {spec.max_references}.")
-            data["reference_images"] = [r.png for r in beat.references]
-            if i and not beat.cut:
+            if beat.references:
+                data["reference_images"] = [r.png for r in beat.references]
+            # A first frame opens the clip fresh, as a cut does.
+            if i and not beat.cut and beat.image is None:
                 data["continue_from_clip_id"] = i - 1
+                if beat.from_frame:
+                    data["continue_mode"] = "frame"
+                elif beat.last_image is not None:
+                    raise ValueError(f"Segment {i + 1} has a last frame but carries on the motion of the one before; "
+                                     f"{model} takes one on a cut or a frame segment.")
+            elif i and not beat.cut and beat.from_frame:
+                raise ValueError(f"Segment {i + 1} starts from the last frame of the one before, so it takes no image.")
+            if beat.image is not None:
+                data["first_frame_image"] = beat.image
+            if beat.last_image is not None:
+                data["last_frame_image"] = beat.last_image
+            if not beat.references and ("continue_mode" in data or beat.image is not None or beat.last_image is not None):
+                raise ValueError(f"Segment {i + 1} " + ("starts from the last frame of the one before" if "continue_mode" in data
+                                                        else "has a first or last frame") + f" but no pictures; {model} needs at least one beside it.")
+            if beat.sounds:
+                # A continued clip's own sound takes one of the audio slots.
+                most = spec.max_sounds - ("continue_from_clip_id" in data)
+                if len(beat.sounds) > most:
+                    raise ValueError(f"Segment {i + 1} has {len(beat.sounds)} audio clips; {model} takes at most {most} on "
+                                     + ("a segment that continues the one before." if most < spec.max_sounds else "a segment."))
+                if not beat.references and "continue_from_clip_id" not in data:
+                    raise ValueError(f"Segment {i + 1} has audio but no pictures; {model} takes audio beside a picture or the clip before.")
+                data["reference_audios"] = list(beat.sounds)
         # A clip opens from one picture: an image, or the clip before's last frame.
         elif beat.image is not None:
             data["starting_frame"] = beat.image
@@ -692,4 +786,4 @@ def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> 
 COMPILERS = {"LongLive-2.0": compile_longlive, "Helios": compile_helios, "LingBot": compile_live,
              "LingBot World 2": compile_live, "Visko Orbis Dynamic": compile_live, "Visko Orbis Stable": compile_live,
              "Sana Streaming": compile_sana, "X2": compile_x2, "Vidu S2-Editing": compile_edit, "FastH3": compile_clips,
-             "H3 Reference Turbo Realtime": compile_clips, "LTX": compile_takes}
+             "H3 Reference Turbo Realtime": compile_clips, "FastH3-Omni": compile_clips, "LTX": compile_takes}

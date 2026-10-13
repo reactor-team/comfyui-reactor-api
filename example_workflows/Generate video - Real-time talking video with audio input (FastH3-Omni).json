@@ -1,0 +1,354 @@
+{
+  "id": "6bd8e287-e437-4854-9eff-09fbc3a84d5d",
+  "revision": 0,
+  "last_node_id": 6,
+  "last_link_id": 3,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        1700,
+        260
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Talking video with sound, generated in real time. FastH3-Omni takes audio input and reference images: here the portrait is Picture 1 and the voice is Audio 1, and the prompt writes her lines. Queue it and the first clip plays in the Reactor Realtime window, speaking in that voice. Write the next clip's prompt there and press Queue new shot, or Queue continuation to carry on from the last clip; every clip uses the same picture and voice. Press Save to save the take under reactor/realtime. This take's second clip is the prompt on the right, queued as a continuation.\n\nWriting prompts for FastH3-Omni:\n\u2022 Give each clip one clear beat: who appears, what happens, how the camera sees it and what we hear. Write sentences, or labelled lines such as Camera:, Dialogue:, Soundscape: and Music:.\n\u2022 Name inputs in angle brackets: <Picture 1>, <Picture 2>, \u2026 in picture-socket order, and <Audio 1>, <Audio 2>, \u2026 in sound-socket order, and say what each one is, for example \"<Audio 1> is the voice reference for <Subject 1>.\"\n\u2022 Write the spoken words in the prompt: Dialogue: <Subject 1> says, \"Hold on!\" A voice sound sets how the speech sounds, not what it says.\n\u2022 Say what music you want, or write Music: None.\n\u2022 A sound must be 2 to 15 seconds long, and needs a picture or a continued clip beside it.\n\u2022 A continuation carries on the clip before and keeps its voices. Give it a line of its own: told to stay silent, a continuation said the earlier line again in our runs.\n\nFastH3-Omni prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3-omni/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Talking video with sound, generated in real time. FastH3-Omni takes audio input and reference images: here the portrait is Picture 1 and the voice is Audio 1, and the prompt writes her lines. Queue it and the first clip plays in the Reactor Realtime window, speaking in that voice. Write the next clip's prompt there and press Queue new shot, or Queue continuation to carry on from the last clip; every clip uses the same picture and voice. Press Save to save the take under reactor/realtime. This take's second clip is the prompt on the right, queued as a continuation.\n\nWriting prompts for FastH3-Omni:\n\u2022 Give each clip one clear beat: who appears, what happens, how the camera sees it and what we hear. Write sentences, or labelled lines such as Camera:, Dialogue:, Soundscape: and Music:.\n\u2022 Name inputs in angle brackets: <Picture 1>, <Picture 2>, \u2026 in picture-socket order, and <Audio 1>, <Audio 2>, \u2026 in sound-socket order, and say what each one is, for example \"<Audio 1> is the voice reference for <Subject 1>.\"\n\u2022 Write the spoken words in the prompt: Dialogue: <Subject 1> says, \"Hold on!\" A voice sound sets how the speech sounds, not what it says.\n\u2022 Say what music you want, or write Music: None.\n\u2022 A sound must be 2 to 15 seconds long, and needs a picture or a continued clip beside it.\n\u2022 A continuation carries on the clip before and keeps its voices. Give it a line of its own: told to stay silent, a continuation said the earlier line again in our runs.\n\nFastH3-Omni prompt guide: https://docs.reactor.inc/model-api-reference/fast-h3-omni/prompt-guide\n\nSet your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        680
+      ],
+      "size": [
+        300,
+        320
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_webcam_portrait.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_webcam_portrait.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 4,
+      "type": "LoadAudio",
+      "pos": [
+        40,
+        1040
+      ],
+      "size": [
+        300,
+        140
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "audioUI",
+          "name": "audioUI",
+          "type": "AUDIO_UI",
+          "widget": {
+            "name": "audioUI"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "AUDIOUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "AUDIO",
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "reactor_voice.wav",
+        ""
+      ],
+      "widgets_values_named": {
+        "audio": "reactor_voice.wav",
+        "upload": ""
+      }
+    },
+    {
+      "id": 5,
+      "type": "ReactorRealtime",
+      "pos": [
+        400,
+        320
+      ],
+      "size": [
+        740,
+        786.8571428571429
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "model.prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "model.prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image",
+          "name": "model.image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "picture_1",
+          "name": "model.pictures.picture_1",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "localized_name": "picture_2",
+          "name": "model.pictures.picture_2",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "sound_1",
+          "name": "model.sounds.sound_1",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 3
+        },
+        {
+          "localized_name": "sound_2",
+          "name": "model.sounds.sound_2",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "localized_name": "aspect",
+          "name": "model.aspect",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "model.aspect"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "clip_seconds",
+          "name": "model.clip_seconds",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "model.clip_seconds"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRealtime"
+      },
+      "widgets_values": [
+        "FastH3-Omni",
+        "<Subject 1> is the young woman in <Picture 1>, with long dark curly hair and a pale blue hoodie with a small clip-on microphone.\n<Audio 1> is the voice reference for <Subject 1>.\nIn one shot at her desk in front of a bookshelf, <Subject 1> faces the camera, leans in a little and talks straight into the lens with a big smile, gesturing with both hands.\nCamera: A steady front-on webcam shot at eye level, framing her from the chest up. She keeps looking into the camera.\nDialogue: <Subject 1> says, \"Hi everyone! Today I'm showing you something I've been building all week, and I honestly can't wait for you to see it.\"\nSoundscape: A quiet room with a soft room tone.\nMusic: None.",
+        "16:9",
+        "5.875",
+        42,
+        "randomize",
+        "reactor/realtime"
+      ],
+      "widgets_values_named": {
+        "model": "FastH3-Omni",
+        "model.prompt": "<Subject 1> is the young woman in <Picture 1>, with long dark curly hair and a pale blue hoodie with a small clip-on microphone.\n<Audio 1> is the voice reference for <Subject 1>.\nIn one shot at her desk in front of a bookshelf, <Subject 1> faces the camera, leans in a little and talks straight into the lens with a big smile, gesturing with both hands.\nCamera: A steady front-on webcam shot at eye level, framing her from the chest up. She keeps looking into the camera.\nDialogue: <Subject 1> says, \"Hi everyone! Today I'm showing you something I've been building all week, and I honestly can't wait for you to see it.\"\nSoundscape: A quiet room with a soft room tone.\nMusic: None.",
+        "model.aspect": "16:9",
+        "model.clip_seconds": "5.875",
+        "seed": 42,
+        "control_after_generate": "randomize",
+        "filename_prefix": "reactor/realtime"
+      }
+    },
+    {
+      "id": 6,
+      "type": "Note",
+      "pos": [
+        1180,
+        320
+      ],
+      "size": [
+        560,
+        640
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Clip 2: paste into the Realtime window while clip 1 plays, then press Queue continuation.\n\n<Subject 1> is the young woman in <Picture 1>.\n<Audio 1> is the voice reference for <Subject 1>.\n<Subject 1> keeps facing the camera, raises her eyebrows and counts on her fingers as she talks, then laughs.\nKeep her hoodie, the bookshelf, the light and the front-on webcam shot from the previous clip. She keeps looking into the camera.\nDialogue: <Subject 1> says, \"And the best part? It all happens in real time, voice and all, so you can change the story while it plays.\"\nSoundscape: The same quiet room tone.\nMusic: None."
+      ],
+      "widgets_values_named": {
+        "text": "Clip 2: paste into the Realtime window while clip 1 plays, then press Queue continuation.\n\n<Subject 1> is the young woman in <Picture 1>.\n<Audio 1> is the voice reference for <Subject 1>.\n<Subject 1> keeps facing the camera, raises her eyebrows and counts on her fingers as she talks, then laughs.\nKeep her hoodie, the bookshelf, the light and the front-on webcam shot from the previous clip. She keeps looking into the camera.\nDialogue: <Subject 1> says, \"And the best part? It all happens in real time, voice and all, so you can change the story while it plays.\"\nSoundscape: The same quiet room tone.\nMusic: None."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      2,
+      3,
+      0,
+      5,
+      3,
+      "IMAGE"
+    ],
+    [
+      3,
+      4,
+      0,
+      5,
+      5,
+      "AUDIO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.45,
+      "offset": [
+        100,
+        100
+      ]
+    }
+  },
+  "version": 0.4
+}

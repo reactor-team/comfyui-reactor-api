@@ -17,7 +17,7 @@ from .encode import FrameWriter
 from .recording import Recording
 from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       api_message, closing_session, connect_with_retry, watch_for_failure)
-from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_setup
+from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_setup, upload_type
 
 # A live take is capped at half an hour; the SDK ends the session when the token hits this.
 LIVE_SESSION_LIMIT_SECONDS = 1800
@@ -94,11 +94,15 @@ def drive_setup(model: str, beat: Beat, seed: int, settings: dict[str, object]) 
     """The commands that open a live drive run from `beat`: its setup as a one-chunk timeline, without its camera moves.
 
     A "clips" model plays each clip as it is built, and its first clip takes the default length, as the window's later ones do.
+    `settings` may hold the model's `live_settings`, which go out before the first clip.
     """
     spec = MODELS[model]
+    live = [(setting.command, {setting.field or name: float(value) if setting.numeric else value})
+            for name, setting in spec.live_settings.items() if (value := settings.get(name)) is not None]
+    settings = {name: value for name, value in settings.items() if name not in spec.live_settings}
     if spec.pattern == "clips":
         plan = compile_timeline(model, [replace(beat, frames=1, moves=())], seed, settings)
-        return [*plan.setup, ("set_autoplay", {"enabled": True}),
+        return [*plan.setup, *live, ("set_autoplay", {"enabled": True}),
                 *((command, {k: v for k, v in data.items() if k != "seconds"}) for _, command, data in plan.timed)]
     if spec.pattern == "takes":
         # A live take lasts as long as its script takes to say.
@@ -435,10 +439,11 @@ class LiveRun:
             logging.error("Reactor live: stats task died.", exc_info=task.exception())
 
     async def _send_command(self, command: str, data: dict) -> dict:
-        """Send a command, uploading its images first; return the data as sent, with the uploads' file refs."""
+        """Send a command, uploading its files first; return the data as sent, with the uploads' file refs."""
         async def upload(key: str, value):
             if isinstance(value, bytes):
-                return await self._reactor.upload_file(value, name=f"{key}.png", mime_type="image/png")
+                name, mime_type = upload_type(key)
+                return await self._reactor.upload_file(value, name=name, mime_type=mime_type)
             if isinstance(value, list) and value and all(isinstance(v, bytes) for v in value):
                 return [await upload(key, v) for v in value]
             return value

@@ -1,3 +1,4 @@
+import io
 import itertools
 import os
 import queue
@@ -137,3 +138,24 @@ def add_audio(path: str, pcm: np.ndarray, sample_rate: int) -> None:
         dst.mux(audio.encode(frame))
         dst.mux(audio.encode())
     os.replace(tmp, path)
+
+
+
+# Opus's bitrate per channel: transparent for voice and music, an eighth of 16-bit 48 kHz PCM.
+OPUS_BITRATE_PER_CHANNEL = 96_000
+
+
+def opus_bytes(samples: np.ndarray, sample_rate: int) -> bytes:
+    """`(channels, samples)` float audio from -1 to 1 as an Ogg/Opus file, resampled to the 48 kHz Opus codes at."""
+    layout = "mono" if samples.shape[0] == 1 else "stereo"
+    buf = io.BytesIO()
+    with av.open(buf, "w", format="ogg") as out:
+        stream = out.add_stream("libopus", rate=48000, layout=layout)
+        stream.bit_rate = OPUS_BITRATE_PER_CHANNEL * samples.shape[0]
+        frame = av.AudioFrame.from_ndarray(np.ascontiguousarray(np.clip(samples, -1.0, 1.0), dtype=np.float32), format="fltp", layout=layout)
+        frame.sample_rate = sample_rate
+        resampler = av.AudioResampler(format="flt", layout=layout, rate=48000)
+        for resampled in (*resampler.resample(frame), *resampler.resample(None)):
+            out.mux(stream.encode(resampled))
+        out.mux(stream.encode())
+    return buf.getvalue()

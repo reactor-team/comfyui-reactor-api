@@ -1,0 +1,544 @@
+{
+  "id": "3c1f2f7e-6a58-4d7c-9d0e-2a1b7d4e9c11",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadVideo",
+      "pos": [
+        40,
+        420
+      ],
+      "size": [
+        282.798828125,
+        82
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "file",
+          "name": "file",
+          "type": "COMBO",
+          "widget": {
+            "name": "file"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "reactor_fisherman_still.mp4",
+        "image"
+      ],
+      "widgets_values_named": {
+        "file": "reactor_fisherman_still.mp4",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 2,
+      "type": "ReactorXMAXX21Segment",
+      "pos": [
+        700,
+        420
+      ],
+      "size": [
+        400,
+        212
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "video",
+          "name": "video",
+          "shape": 7,
+          "type": "VIDEO",
+          "link": 1
+        },
+        {
+          "localized_name": "drag_0",
+          "name": "drags.drag_0",
+          "shape": 7,
+          "type": "REACTOR_DRAG",
+          "link": 2
+        },
+        {
+          "localized_name": "drag_1",
+          "name": "drags.drag_1",
+          "shape": 7,
+          "type": "REACTOR_DRAG",
+          "link": 3
+        },
+        {
+          "localized_name": "drag_2",
+          "name": "drags.drag_2",
+          "shape": 7,
+          "type": "REACTOR_DRAG",
+          "link": null
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "shape": 7,
+          "type": "REACTOR_SEQUENCE",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorXMAXX21Segment"
+      },
+      "widgets_values": [
+        "The fisherman reaches out with his free hand and lets go of the rail with the other, bracing as the wave rolls in. Keep the boat, the sea and the camera fixed.",
+        96
+      ],
+      "widgets_values_named": {
+        "prompt": "The fisherman reaches out with his free hand and lets go of the rail with the other, bracing as the wave rolls in. Keep the boat, the sea and the camera fixed.",
+        "frames": 96
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorRender",
+      "pos": [
+        1140,
+        420
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 4
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        7,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 7,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 4,
+      "type": "SaveVideo",
+      "pos": [
+        1480,
+        420
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 5
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "encoding",
+          "name": "codec.encoding",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec.encoding"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/x21_drag",
+        "mp4",
+        "auto",
+        "h264",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/x21_drag",
+        "format": "mp4",
+        "format.codec": "auto",
+        "codec": "h264",
+        "codec.encoding": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "ReactorXMAXX21Drag",
+      "pos": [
+        40,
+        230
+      ],
+      "size": [
+        290,
+        130
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "start_x",
+          "name": "start_x",
+          "type": "FLOAT",
+          "widget": {
+            "name": "start_x"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "start_y",
+          "name": "start_y",
+          "type": "FLOAT",
+          "widget": {
+            "name": "start_y"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_x",
+          "name": "end_x",
+          "type": "FLOAT",
+          "widget": {
+            "name": "end_x"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_y",
+          "name": "end_y",
+          "type": "FLOAT",
+          "widget": {
+            "name": "end_y"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_DRAG",
+          "name": "REACTOR_DRAG",
+          "type": "REACTOR_DRAG",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorXMAXX21Drag"
+      },
+      "widgets_values": [
+        0.41,
+        0.58,
+        0.47,
+        0.2
+      ],
+      "widgets_values_named": {
+        "start_x": 0.41,
+        "start_y": 0.58,
+        "end_x": 0.47,
+        "end_y": 0.2
+      }
+    },
+    {
+      "id": 6,
+      "type": "ReactorXMAXX21Drag",
+      "pos": [
+        360,
+        230
+      ],
+      "size": [
+        290,
+        130
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "start_x",
+          "name": "start_x",
+          "type": "FLOAT",
+          "widget": {
+            "name": "start_x"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "start_y",
+          "name": "start_y",
+          "type": "FLOAT",
+          "widget": {
+            "name": "start_y"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_x",
+          "name": "end_x",
+          "type": "FLOAT",
+          "widget": {
+            "name": "end_x"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_y",
+          "name": "end_y",
+          "type": "FLOAT",
+          "widget": {
+            "name": "end_y"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_DRAG",
+          "name": "REACTOR_DRAG",
+          "type": "REACTOR_DRAG",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorXMAXX21Drag"
+      },
+      "widgets_values": [
+        0.13,
+        0.33,
+        0.2,
+        0.45
+      ],
+      "widgets_values_named": {
+        "start_x": 0.13,
+        "start_y": 0.33,
+        "end_x": 0.2,
+        "end_y": 0.45
+      }
+    },
+    {
+      "id": 7,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        1100,
+        170
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Pose a still by dragging it, with XMAX X2.1. Load Video holds one picture as the clip (a still of the fisherman, made from reactor_fisherman.jpg), and each Reactor XMAX X2.1 Drag node is one finger: it presses at the start point and drags to the end point over the segment's frames. Both are fractions of the frame, 0,0 at the top left. Here one drag pulls his free hand out and up while the other draws his rail hand away, as in the real-time window where you drag on the video. The prompt names what moves and what stays fixed.\n\nAdd up to eight drag nodes to one segment, or chain segments and give each its own prompt and drags.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Pose a still by dragging it, with XMAX X2.1. Load Video holds one picture as the clip (a still of the fisherman, made from reactor_fisherman.jpg), and each Reactor XMAX X2.1 Drag node is one finger: it presses at the start point and drags to the end point over the segment's frames. Both are fractions of the frame, 0,0 at the top left. Here one drag pulls his free hand out and up while the other draws his rail hand away, as in the real-time window where you drag on the video. The prompt names what moves and what stays fixed.\n\nAdd up to eight drag nodes, or a segment per move, and use a prompt per segment to change the edit. To start from a frame of another model's render instead, take a frame from it with a Get Video Components and Image From Batch, or save it and use it as the Load Image of a Create Video.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      1,
+      "VIDEO"
+    ],
+    [
+      2,
+      5,
+      0,
+      2,
+      2,
+      "REACTOR_DRAG"
+    ],
+    [
+      3,
+      6,
+      0,
+      2,
+      3,
+      "REACTOR_DRAG"
+    ],
+    [
+      4,
+      2,
+      0,
+      3,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      5,
+      3,
+      0,
+      4,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [
+        416,
+        110
+      ]
+    }
+  },
+  "version": 0.4
+}

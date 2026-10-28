@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render.timeline import MODELS, check_sound, POSES, Beat, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts, upload_type, clip_seconds
+from reactor_render.timeline import MODELS, check_sound, POSES, Beat, Drag, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts, upload_type, clip_seconds
 
 # LongLive: a scene opens with a 29-frame chunk, then 32 frames a chunk. A beat's start is the chunk
 # whose video comes nearest its running total of frames: 96 -> 3, 175 -> 6.
@@ -170,6 +170,36 @@ def test_x2_streams_the_clip_and_sends_later_beats_on_their_frame():
 def test_x2_without_an_image_sends_no_reference_image():
     plan = compile_timeline("X2", [Beat("a", 48, video=b"mp4")], seed=0)
     assert plan.setup == [("set_keep_backlog", {"keep_backlog": True}), ("set_prompt", {"prompt": "a"})]
+
+
+def test_xmax_x2_1_streams_the_clip_without_set_keep_backlog():
+    plan = compile_timeline("XMAX X2.1", [Beat("a", 48, video=b"mp4", image=b"png"), Beat("b", 24)], seed=7)
+    assert plan.setup == [("set_reference_image", {"reference_image": b"png"}), ("set_prompt", {"prompt": "a"})]
+    assert plan.timed == [(48, "set_prompt", {"prompt": "b"})]
+    assert plan.chunks == 72 and plan.source == b"mp4"
+    assert MODELS["XMAX X2.1"].slug == "reactor/xmax-x2-1"
+
+
+def test_xmax_x2_1_drags_a_point_a_window_a_frame_and_lets_go_with_an_empty_one():
+    drag = Drag("XMAX X2.1", (0.0, 0.5), (1.0, 0.5))
+    plan = compile_timeline("XMAX X2.1", [Beat("a", 5, video=b"mp4", drags=(drag,)), Beat("b", 2)], seed=0)
+    drags = [(n, d["frames"]) for n, c, d in plan.timed if c == "set_pointers"]
+    assert [n for n, _ in drags] == [0, 1, 2, 3, 4, 5]
+    point = lambda x: [{"x": x, "y": 0.5}]
+    # The window is the last four frames, oldest first; the first frames repeat the opening one.
+    assert drags[0][1] == [point(0.0)] * 4
+    assert drags[4][1] == [point(0.25), point(0.5), point(0.75), point(1.0)]
+    assert drags[5][1] == [[], [], [], []]
+
+
+def test_xmax_x2_1_refuses_more_drag_points_than_it_takes_and_other_models_drags():
+    drag = Drag("XMAX X2.1", (0.5, 0.5), (0.5, 0.5))
+    with pytest.raises(ValueError, match="takes up to 8 drag points"):
+        compile_timeline("XMAX X2.1", [Beat("a", 5, video=b"mp4", drags=(drag,) * 9)], seed=0)
+    with pytest.raises(ValueError, match="does not take drag points"):
+        compile_timeline("X2", [Beat("a", 5, video=b"mp4", drags=(drag,))], seed=0)
+    with pytest.raises(ValueError, match="does not take Other drag points"):
+        compile_timeline("XMAX X2.1", [Beat("a", 5, video=b"mp4", drags=(Drag("Other", (0, 0), (1, 1)),))], seed=0)
 
 
 def test_an_edit_starts_from_the_first_image_and_switches_only_what_a_later_beat_changes():

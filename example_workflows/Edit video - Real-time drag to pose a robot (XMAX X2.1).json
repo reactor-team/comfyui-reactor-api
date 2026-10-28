@@ -1,8 +1,8 @@
 {
   "id": "8a5d1c42-7e3b-4f60-b2a9-5c0e6d3f1a77",
   "revision": 0,
-  "last_node_id": 3,
-  "last_link_id": 1,
+  "last_node_id": 4,
+  "last_link_id": 2,
   "nodes": [
     {
       "id": 1,
@@ -98,7 +98,7 @@
           "name": "model.image",
           "shape": 7,
           "type": "IMAGE",
-          "link": null
+          "link": 2
         },
         {
           "localized_name": "video",
@@ -146,14 +146,14 @@
       },
       "widgets_values": [
         "XMAX X2.1",
-        "The white robot stands with both arms raised above its head, following the drag points, and holds the pose. Keep the grey studio and the camera fixed.",
+        "The same white robot with the black visor face, standing still with both arms raised straight above its head. Keep the robot's design, the grey studio and the camera fixed.",
         42,
         "randomize",
         "reactor/realtime"
       ],
       "widgets_values_named": {
         "model": "XMAX X2.1",
-        "model.prompt": "The white robot stands with both arms raised above its head, following the drag points, and holds the pose. Keep the grey studio and the camera fixed.",
+        "model.prompt": "The same white robot with the black visor face, standing still with both arms raised straight above its head. Keep the robot's design, the grey studio and the camera fixed.",
         "seed": 42,
         "control_after_generate": "randomize",
         "filename_prefix": "reactor/realtime"
@@ -177,13 +177,75 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "Pose a character by dragging it, in real time, with XMAX X2.1. Load Video holds one picture as the clip: a still of a robot, taken from a frame of a Helios render of 'a small white humanoid robot with a black visor face stands in an empty light grey studio, arms held out to its sides'. Reactor Realtime loops it into the model until you press Save. In the window, press on the robot's hands and drag them up: the model follows the paths, and the prompt says what the drag means and that the pose holds. Drag with more fingers for more points, up to eight, and make each drag a smooth path. Edit the prompt and press Apply to change the edit; press Save to end the take, which is saved as a video under reactor/realtime. Cancel ends it without saving. Keep takes short: a held still drifts after about fifteen seconds.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+        "Pose a character by dragging it, in real time, with XMAX X2.1. Load Video holds one picture as the clip: a still of a robot, taken from a frame of a Helios render of 'a small white humanoid robot with a black visor face stands in an empty light grey studio, arms held out to its sides'. Load Image passes the same picture as the model's image, which keeps the robot's design from drifting while it moves. Reactor Realtime loops the clip into the model until you press Save. In the window, press on the robot's hands and drag them up: the model follows the paths, and the prompt says what the drag means and the pose to hold. Drag with more fingers for more points, up to eight, and make each drag a smooth path. Edit the prompt and press Apply to change the edit; press Save to end the take, which is saved as a video under reactor/realtime. Cancel ends it without saving. Keep takes short: the pose holds for a few seconds, then a held still drifts.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
       ],
       "widgets_values_named": {
-        "text": "Pose a character by dragging it, in real time, with XMAX X2.1. Load Video holds one picture as the clip: a still of a robot, taken from a frame of a Helios render of 'a small white humanoid robot with a black visor face stands in an empty light grey studio, arms held out to its sides'. Reactor Realtime loops it into the model until you press Save. In the window, press on the robot's hands and drag them up: the model follows the paths, and the prompt says what the drag means and that the pose holds. Drag with more fingers for more points, up to eight, and make each drag a smooth path. Edit the prompt and press Apply to change the edit; press Save to end the take, which is saved as a video under reactor/realtime. Cancel ends it without saving. Keep takes short: a held still drifts after about fifteen seconds.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+        "text": "Pose a character by dragging it, in real time, with XMAX X2.1. Load Video holds one picture as the clip: a still of a robot, taken from a frame of a Helios render of 'a small white humanoid robot with a black visor face stands in an empty light grey studio, arms held out to its sides'. Load Image passes the same picture as the model's image, which keeps the robot's design from drifting while it moves. Reactor Realtime loops the clip into the model until you press Save. In the window, press on the robot's hands and drag them up: the model follows the paths, and the prompt says what the drag means and the pose to hold. Drag with more fingers for more points, up to eight, and make each drag a smooth path. Edit the prompt and press Apply to change the edit; press Save to end the take, which is saved as a video under reactor/realtime. Cancel ends it without saving. Keep takes short: the pose holds for a few seconds, then a held still drifts.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
       },
       "color": "#432",
       "bgcolor": "#653"
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        430
+      ],
+      "size": [
+        282.8,
+        314
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_robot.png",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_robot.png",
+        "upload": "image"
+      }
     }
   ],
   "links": [
@@ -194,6 +256,14 @@
       2,
       3,
       "VIDEO"
+    ],
+    [
+      2,
+      4,
+      0,
+      2,
+      2,
+      "IMAGE"
     ]
   ],
   "groups": [],

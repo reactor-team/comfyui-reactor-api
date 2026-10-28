@@ -61,8 +61,8 @@ scripting every move ahead of time.
 
 ### Edit video
 
-Restyle, re-dress or recast your camera or a video file from a single image, or edit it with a
-prompt. Source on the left, result on the right.
+Restyle, re-dress or recast your camera or a video file from a single image, edit it with a
+prompt, or drag points on it to move things. Source on the left, result on the right.
 
 <table>
 <tr>
@@ -156,7 +156,7 @@ and each example's note links it.
 | Model | What it does | Takes | Prompt guide |
 | --- | --- | --- | --- |
 | [Vidu S2-Editing](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/overview) | Restyle, re-dress or recast from an image | video, image | [Prompt guide](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/prompt-guide) |
-| [XMAX X2.1](https://docs.reactor.inc/model-api-reference/xmax-x2-1/overview) | Edit a video or camera from a prompt, a reference image and drag points | video, optional image, drag points | [Prompt guide](https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide) |
+| [XMAX X2.1](https://docs.reactor.inc/model-api-reference/xmax-x2-1/overview) | Edit a video or camera from a prompt, swap in a character, object or outfit from an image, or drag points to move things | video, optional image, drag points | [Prompt guide](https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide) |
 | [X2](https://docs.reactor.inc/model-api-reference/x2/overview) | Edit a video or camera from a prompt | video, optional image | [Prompt guide](https://docs.reactor.inc/model-api-reference/x2/prompt-guide) |
 | [Sana Streaming](https://docs.reactor.inc/model-api-reference/sana-streaming/overview) | Edit a video file from a prompt | video (Render only) | [Prompt guide](https://docs.reactor.inc/model-api-reference/sana-streaming/prompt-guide) |
 

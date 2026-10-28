@@ -79,7 +79,7 @@ prompt. Source on the left, result on the right.
 </tr>
 <tr>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Swap%20a%20character%20from%20an%20image%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_character_swap.webp" width="100%" alt="Swap a character from an image"></a><br><sub><b>Swap a character from an image</b><br>XMAX X2.1 · 🎬 Render</sub></td>
-<td width="50%"></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Swap%20an%20outfit%20from%20an%20image%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_outfit_swap.webp" width="100%" alt="Swap an outfit from an image"></a><br><sub><b>Swap an outfit from an image</b><br>XMAX X2.1 · 🎬 Render</sub></td>
 </tr>
 <tr>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Pose%20a%20still%20by%20dragging%20points%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_drag_pose.webp" width="100%" alt="Pose a still by dragging points"></a><br><sub><b>Pose a still by dragging points</b><br>XMAX X2.1 · 🎬 Render</sub></td>

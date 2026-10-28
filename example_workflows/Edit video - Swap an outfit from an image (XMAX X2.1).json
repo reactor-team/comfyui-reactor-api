@@ -1,0 +1,442 @@
+{
+  "id": "9d4c7e13-2a85-4b6f-8e01-7c3f5a9b1d62",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadVideo",
+      "pos": [
+        40,
+        420
+      ],
+      "size": [
+        282.798828125,
+        82
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "file",
+          "name": "file",
+          "type": "COMBO",
+          "widget": {
+            "name": "file"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "reactor_vidu_walk.mp4",
+        "image"
+      ],
+      "widgets_values_named": {
+        "file": "reactor_vidu_walk.mp4",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 2,
+      "type": "ReactorXMAXX21Segment",
+      "pos": [
+        700,
+        420
+      ],
+      "size": [
+        400,
+        212
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "localized_name": "video",
+          "name": "video",
+          "shape": 7,
+          "type": "VIDEO",
+          "link": 1
+        },
+        {
+          "localized_name": "drag_0",
+          "name": "drags.drag_0",
+          "shape": 7,
+          "type": "REACTOR_DRAG",
+          "link": null
+        },
+        {
+          "localized_name": "drag_1",
+          "name": "drags.drag_1",
+          "shape": 7,
+          "type": "REACTOR_DRAG",
+          "link": null
+        },
+        {
+          "localized_name": "drag_2",
+          "name": "drags.drag_2",
+          "shape": 7,
+          "type": "REACTOR_DRAG",
+          "link": null
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "shape": 7,
+          "type": "REACTOR_SEQUENCE",
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "REACTOR_SEQUENCE",
+          "name": "REACTOR_SEQUENCE",
+          "type": "REACTOR_SEQUENCE",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorXMAXX21Segment"
+      },
+      "widgets_values": [
+        "Replace only the woman's green jacket with the jacket from the reference image, keeping her face, hair, white top, pose and movement. Keep the street and the camera fixed.",
+        96
+      ],
+      "widgets_values_named": {
+        "prompt": "Replace only the woman's green jacket with the jacket from the reference image, keeping her face, hair, white top, pose and movement. Keep the street and the camera fixed.",
+        "frames": 96
+      }
+    },
+    {
+      "id": 3,
+      "type": "ReactorRender",
+      "pos": [
+        1140,
+        420
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "REACTOR_SEQUENCE",
+          "link": 4
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ReactorRender"
+      },
+      "widgets_values": [
+        7,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 7,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 4,
+      "type": "SaveVideo",
+      "pos": [
+        1480,
+        420
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 5
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "encoding",
+          "name": "codec.encoding",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec.encoding"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "reactor/x21_outfit",
+        "mp4",
+        "auto",
+        "h264",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "reactor/x21_outfit",
+        "format": "mp4",
+        "format.codec": "auto",
+        "codec": "h264",
+        "codec.encoding": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "Note",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        1100,
+        170
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "Swap an outfit in a video with XMAX X2.1. Load Video is a clip of a woman walking down a street, and Load Image is a sequined jacket. The prompt replaces only her jacket with the one from the reference image and names what stays: her face, hair, pose and movement, the street and the camera. The source video gives the scene and the motion, and the reference image gives the appearance. A reference image can also be a character or an object, as in the character swap example.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      ],
+      "widgets_values_named": {
+        "text": "Swap an outfit in a video with XMAX X2.1. Load Video is a clip of a woman walking down a street, and Load Image is a sequined jacket. The prompt replaces only her jacket with the one from the reference image and names what stays: her face, hair, pose and movement, the street and the camera. The source video gives the scene and the motion, and the reference image gives the appearance. A reference image can also be a character or an object, as in the character swap example.\n\nX2.1 prompt guide: https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide\n\nCopy example_inputs/ into ComfyUI's input folder first, and set your Reactor API key in this plugin's config.ini."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        360,
+        420
+      ],
+      "size": [
+        282.8,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "reactor_outfit_sequined_jacket.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "reactor_outfit_sequined_jacket.jpg",
+        "upload": "image"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      1,
+      "VIDEO"
+    ],
+    [
+      2,
+      5,
+      0,
+      2,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      2,
+      0,
+      3,
+      0,
+      "REACTOR_SEQUENCE"
+    ],
+    [
+      5,
+      3,
+      0,
+      4,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [
+        416,
+        110
+      ]
+    }
+  },
+  "version": 0.4
+}

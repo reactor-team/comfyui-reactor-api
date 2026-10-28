@@ -78,6 +78,10 @@ prompt. Source on the left, result on the right.
 <td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Restyle%2C%20re-dress%20and%20recast%20a%20video%20%28Vidu%20S2-Editing%29.json"><img src="example_outputs/reactor_vidu_edit.webp" width="100%" alt="Restyle, re-dress and recast a video"></a><br><sub><b>Restyle, re-dress and recast a video</b><br>Vidu S2-Editing · 🎬 Render</sub></td>
 </tr>
 <tr>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Swap%20a%20character%20from%20an%20image%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_character_swap.webp" width="100%" alt="Swap a character from an image"></a><br><sub><b>Swap a character from an image</b><br>XMAX X2.1 · 🎬 Render</sub></td>
+<td width="50%"></td>
+</tr>
+<tr>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Pose%20a%20still%20by%20dragging%20points%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_drag_pose.webp" width="100%" alt="Pose a still by dragging points"></a><br><sub><b>Pose a still by dragging points</b><br>XMAX X2.1 · 🎬 Render</sub></td>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Real-time%20drag%20to%20pose%20a%20robot%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_drag_realtime.webp" width="100%" alt="Real-time drag to pose a robot"></a><br><sub><b>Real-time drag to pose a robot</b><br>XMAX X2.1 · ⚡ Real time</sub></td>
 </tr>

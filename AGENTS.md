@@ -119,6 +119,13 @@ session's traffic. Measured behaviour, such as a chunk length that differs from 
 say it was measured. Don't include private repository names or links, internal service names, or
 ticket IDs. This applies to code, comments, the README and commit messages.
 
+## Releases
+
+A release is a version bump in `pyproject.toml` and `uv.lock`, merged to `main`, which publishes to the
+Comfy Registry. Add a `## <version>` section to `CHANGELOG.md` in the same PR. The publish workflow sends
+that section to the registry as the version's changelog, and a test fails if it is missing. Like everything
+here, it holds only public information.
+
 ## Tests
 
 `uv run pytest -q tests`, and for the window's state in `web/*.mjs`, `node --test "tests/web/*.test.mjs"`

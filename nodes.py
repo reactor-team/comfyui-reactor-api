@@ -22,10 +22,11 @@ from .reactor_render.config import connect_args, max_sessions
 from .reactor_render.clip import ClipStream
 from .reactor_render.encode import opus_bytes
 from .reactor_render.session import render
-from .reactor_render.timeline import MODELS, Beat, check_sound, ModelSpec, Reference, Setting, Timeline, call_setup, clip_seconds, compile_timeline, editor_moves, model_facts, join_chains
+from .reactor_render.timeline import MODELS, Beat, Drag, check_sound, ModelSpec, Reference, Setting, Timeline, call_setup, clip_seconds, compile_timeline, editor_moves, model_facts, join_chains
 
 ReactorSequenceType = io.Custom("REACTOR_SEQUENCE")
 ReactorReferenceType = io.Custom("REACTOR_REFERENCE")
+ReactorDragType = io.Custom("REACTOR_DRAG")
 # A browser camera, by its label; the widget lists the cameras the browser can see.
 ReactorCameraType = io.Custom("REACTOR_CAMERA")
 ReactorCameraDeviceType = io.Custom("REACTOR_CAMERA_DEVICE")
@@ -73,6 +74,16 @@ def pictures_input(most: int, tooltip: str):
         input=io.Image.Input("picture", tooltip=f"One character, object or place for the clip to draw on, {tooltip} It guides the look "
                                                 "rather than fixing a frame. Prompts call the connected pictures Picture 1, Picture 2, … in socket order."),
         names=[f"picture_{i}" for i in range(1, most + 1)], min=0))
+
+
+# The factory node that makes each model's drag points.
+DRAG_NODES = {"XMAX X2.1": "Reactor XMAX X2.1 Drag"}
+
+
+def drags_input(name: str, most: int, tooltip: str):
+    """Sockets for a model's drag points, one more appearing as each is connected, up to `most`."""
+    return io.Autogrow.Input("drags", optional=True, template=io.Autogrow.TemplatePrefix(
+        input=ReactorDragType.Input("drag", tooltip=f"A {DRAG_NODES[name]}, {tooltip}"), prefix="drag_", min=0, max=most))
 
 
 def taken_references(name: str, references, pictures) -> tuple[Reference, ...]:
@@ -149,7 +160,7 @@ CAPABILITY = {"LongLive-2.0": "Generate video", "Helios": "Generate video", "Fas
               "FastH3-Omni": "Generate video",
               "Visko Orbis Dynamic": "Generate video", "Visko Orbis Stable": "Generate video",
               "LingBot": "Explore worlds", "LingBot World 2": "Explore worlds",
-              "Sana Streaming": "Edit video", "X2": "Edit video", "Vidu S2-Editing": "Edit video",
+              "Sana Streaming": "Edit video", "X2": "Edit video", "XMAX X2.1": "Edit video", "Vidu S2-Editing": "Edit video",
               "Vidu S2-Avatar": "Avatars", "LTX": "Avatars"}
 
 
@@ -200,6 +211,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                     *[setting_input(key, setting, "Read on the first segment.") for key, setting in spec.settings.items()],
                     *[setting_input(key, setting, "Holds until a later segment changes it.") for key, setting in spec.beat_settings.items()],
                     *reference_inputs(family, spec, "in effect during this segment."),
+                    *([drags_input(models[0], spec.drags, "moving during this segment. It stops at the segment's end.")] if spec.drags else []),
                     ReactorSequenceType.Input("sequence", optional=True, tooltip="The segments before this one. Leave it empty on the first segment.",
                                            extra_dict={"model_facts": {name: model_facts(MODELS[name]) for name in models},
                                                        "start_settings": list(spec.settings)}),
@@ -208,7 +220,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
             )
 
         @classmethod
-        def execute(cls, frames=0, prompt="", model=models[0], seconds=None, sequence=None, kind="shot", image=None, last_image=None, video=None, moves=None, references=None, pictures=None, sounds=None, **settings) -> io.NodeOutput:
+        def execute(cls, frames=0, prompt="", model=models[0], seconds=None, sequence=None, kind="shot", image=None, last_image=None, video=None, moves=None, references=None, pictures=None, sounds=None, drags=None, **settings) -> io.NodeOutput:
             # A later segment's model and start settings are the first segment's, so its own are not read.
             name = model if sequence is None else sequence.model
             if name not in models:
@@ -219,6 +231,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                         last_image=None if last_image is None else image_to_png(last_image),
                         video=None if video is None else video_bytes(video), moves=tuple(editor_moves(moves)) if moves else (),
                         references=taken_references(name, references, pictures), sounds=taken_sounds(MODELS[name], sounds),
+                        drags=tuple(d for d in (drags or {}).values() if d is not None),
                         settings={key: value for key, value in settings.items() if key in spec.beat_settings and value is not None})
             if sequence is None:
                 return io.NodeOutput(Timeline(name, (beat,), {key: value for key, value in settings.items() if key in spec.settings and value is not None}))
@@ -292,6 +305,29 @@ class ReactorViduS2AvatarReference(io.ComfyNode):
     @classmethod
     def execute(cls, image, kind, text="") -> io.NodeOutput:
         return io.NodeOutput(Reference("Vidu S2-Avatar", image_to_png(image), kind, text.strip()))
+
+
+class ReactorXmaxX21Drag(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ReactorXMAXX21Drag",
+            display_name="Reactor XMAX X2.1 Drag",
+            category="Reactor/Edit video",
+            search_aliases=["reactor drag", "XMAX X2.1", "pointer", "move", "pose"],
+            description="A point on the video for XMAX X2.1 to drag along a straight line while a segment plays. Connect it to each segment it moves for; "
+                        "it stops at the first segment without it.",
+            inputs=[io.Float.Input(key, default=default, min=0.0, max=1.0, step=0.01, tooltip=tooltip) for key, default, tooltip in (
+                ("start_x", 0.4, "Where the point starts across the frame, from 0 (left) to 1 (right)."),
+                ("start_y", 0.5, "Where the point starts down the frame, from 0 (top) to 1 (bottom)."),
+                ("end_x", 0.6, "Where the point ends across the frame."),
+                ("end_y", 0.5, "Where the point ends down the frame."))],
+            outputs=[ReactorDragType.Output()],
+        )
+
+    @classmethod
+    def execute(cls, start_x, start_y, end_x, end_y) -> io.NodeOutput:
+        return io.NodeOutput(Drag("XMAX X2.1", (start_x, start_y), (end_x, end_y)))
 
 
 class ReactorRender(io.ComfyNode):
@@ -542,7 +578,7 @@ class ReactorRealtime(io.ComfyNode):
 class ReactorExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [*SEGMENT_NODES, ReactorSequenceJoin, ReactorSequenceVisualizer, ReactorViduS2AvatarReference, ReactorRender, ReactorCameraCapture, ReactorMicrophoneCapture, ReactorRealtime]
+        return [*SEGMENT_NODES, ReactorSequenceJoin, ReactorSequenceVisualizer, ReactorViduS2AvatarReference, ReactorXmaxX21Drag, ReactorRender, ReactorCameraCapture, ReactorMicrophoneCapture, ReactorRealtime]
 
 
 async def comfy_entrypoint() -> ReactorExtension:

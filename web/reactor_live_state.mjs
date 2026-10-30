@@ -123,3 +123,59 @@ export class ClipQueue {
         ];
     }
 }
+
+// Where a pointer at (x, y) falls on a video shown with object-fit: contain in `box`, as 0 to 1 across the video itself,
+// so bars beside or above it don't count. Before its size is known, the box is the video.
+export function videoPoint(box, video, x, y) {
+    const scale = video.width && video.height ? Math.min(box.width / video.width, box.height / video.height) : null;
+    const [w, h] = scale ? [video.width * scale, video.height * scale] : [box.width, box.height];
+    return [(x - box.left - (box.width - w) / 2) / w, (y - box.top - (box.height - h) / 2) / h];
+}
+
+// How many frames of drag points one `set_pointers` call holds, oldest first.
+export const DRAG_WINDOW = 4;
+
+// The drag points held on the video, one per finger or button, as the model's drag window takes them.
+export class DragTracker {
+    #points = new Map();
+    #released = [];
+    #recent = [];
+
+    constructor(most) {
+        this.most = most;
+    }
+
+    // A point goes down at (x, y), each from 0 to 1 across the video. False when the model has no room for another.
+    down(id, x, y) {
+        if (!this.#points.has(id) && this.#points.size >= this.most) return false;
+        this.#points.set(id, { x, y });
+        return true;
+    }
+
+    move(id, x, y) {
+        if (this.#points.has(id)) this.#points.set(id, { x, y });
+    }
+
+    // A point let go before the next tick still goes out once, where it was let go.
+    up(id) {
+        if (this.#points.has(id)) this.#released.push(this.#points.get(id));
+        this.#points.delete(id);
+    }
+
+    get active() {
+        return this.#points.size > 0 || this.#released.length > 0 || this.#recent.length > 0;
+    }
+
+    // One tick: the window to send, or null once the last drag has ended and its empty window has gone out.
+    tick() {
+        const now = [...this.#released.splice(0), ...this.#points.values()].slice(0, this.most).map(({ x, y }) => ({ x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) }));
+        if (!now.length) {
+            const was = this.#recent.length;
+            this.#recent = [];
+            return was ? Array.from({ length: DRAG_WINDOW }, () => []) : null;
+        }
+        this.#recent = [...this.#recent, now].slice(-DRAG_WINDOW);
+        while (this.#recent.length < DRAG_WINDOW) this.#recent.unshift(this.#recent[0]);
+        return this.#recent.slice();
+    }
+}

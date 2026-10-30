@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { ClipQueue, canMove, statusLine } from "./reactor_live_state.mjs";
+import { ClipQueue, DragTracker, canMove, statusLine, videoPoint } from "./reactor_live_state.mjs";
 
 const HINT = "Press Run to start a real-time session: the model plays in a window and you steer it as it runs. "
     + "Each run records a take. Set the seed's control after generate to fixed to keep the last take instead of starting a new session.";
@@ -126,6 +126,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let stream = null;       // the camera or microphone, when this browser publishes it
     let held = null;
     let lanes = [];          // the model's drive lanes, from the config
+    let drags = null;        // the drag points held on the video, for a model that takes them
+    let dragTimer = null;
     let promptCommand = null;
     let promptField = null;
     let promptThen = null;   // a command sent after each prompt, such as the start of a take
@@ -161,7 +163,37 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         return text;
     }
 
+    // A drag window goes out each frame while a point is held, and an empty one when the last lets go.
+    const DRAG_TICK_MS = 1000 / 24;
+    function dragAt(e) {
+        return videoPoint(output.getBoundingClientRect(), { width: output.videoWidth, height: output.videoHeight }, e.clientX, e.clientY);
+    }
+    function dragTick() {
+        const frames = started() ? drags.tick() : null;
+        if (frames) command("set_pointers", { frames });
+        if (!drags.active && dragTimer) {
+            clearInterval(dragTimer);
+            dragTimer = null;
+        }
+    }
+    function startDrags(most) {
+        drags = new DragTracker(most);
+        preview.classList.add("drive");
+        preview.style.touchAction = "none";
+        preview.append(el("div", { className: "reactor-live-hint", textContent: "Drag on the video to steer; use more fingers for more points" }));
+        preview.addEventListener("pointerdown", (e) => {
+            if (!started() || !drags.down(e.pointerId, ...dragAt(e))) return;
+            try { preview.setPointerCapture(e.pointerId); } catch {}
+            dragTimer ??= setInterval(dragTick, DRAG_TICK_MS);
+            e.preventDefault();
+        });
+        preview.addEventListener("pointermove", (e) => drags.move(e.pointerId, ...dragAt(e)));
+        for (const type of ["pointerup", "pointercancel"]) preview.addEventListener(type, (e) => drags.up(e.pointerId));
+    }
+
     function stopKeys() {
+        clearInterval(dragTimer);
+        dragTimer = null;
         window.removeEventListener("keydown", onKeyDown, true);
         window.removeEventListener("keyup", onKeyUp, true);
         preview.removeEventListener("blur", releaseKeys);
@@ -526,6 +558,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 composer.hidden = true;
                 look = buildLook(message.switch);
             }
+            if (message.drags) startDrags(message.drags);
             if (caps.size) {
                 legend.hidden = false;
                 preview.tabIndex = 0;

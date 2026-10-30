@@ -32,6 +32,18 @@ class Beat:
     references: tuple["Reference", ...] = ()
     sounds: tuple[bytes, ...] = ()
     settings: dict[str, object] = field(default_factory=dict)
+    drags: tuple["Drag", ...] = ()
+
+
+@dataclass(frozen=True)
+class Drag:
+    """A drag point, made by its model's drag node and carried on beats to it: for the beat, it moves in a straight line from `start` to `end`.
+
+    `model` is the model it was made for; no other model takes it. Each point is `(x, y)` from 0 to 1 across the output frame, from its top-left corner.
+    """
+    model: str
+    start: tuple[float, float]
+    end: tuple[float, float]
 
 
 @dataclass(frozen=True)
@@ -139,6 +151,8 @@ class ModelSpec:
     beat's image is its first frame and it may pin its last, and whether a beat may start from the last frame of the one
     before; both go beside at least one reference, and are cropped to the shape of the `aspect` setting. `live_settings`
     are settings only a live run takes, read at start, for a value a render sets on each segment instead.
+    `drags` is how many drag points a beat may carry, each a point on the output the model's drag window pulls along; the live window drags them with the pointer.
+    `backlog` is whether a "source" model takes `set_keep_backlog`, which trades latency for smoothness.
     """
     slug: str
     pattern: str
@@ -181,6 +195,8 @@ class ModelSpec:
     sound_seconds: tuple[float, float] = (0, float("inf"))
     keyframes: bool = False
     live_settings: dict[str, Setting] = field(default_factory=dict)
+    backlog: bool = True
+    drags: int = 0
 
     def frame_size(self, width: int, height: int) -> tuple[int, int]:
         """The size a width x height input is sent at."""
@@ -310,6 +326,10 @@ MODELS = {
                                 source_track="camera", size=(1280, 704), live=False),
     "X2": ModelSpec("xmax/x2", "source", 24.0, "first", False, videos="first", video_required=True, source_track="source",
                 size=(1472, 832), keeps_aspect=True, starts=False),
+    # TODO: XMAX X2.1's docs publish no frame rate or output size, so the 24 is a placeholder. Measured on a cloud session, a 960x528 source
+    # pushed at X2's short side of 832 came back 1920x1088 at 24 fps, so the model picks its own size.
+    "XMAX X2.1": ModelSpec("reactor/xmax-x2-1", "source", 24.0, "first", False, videos="first", video_required=True, source_track="source",
+                           size=(1472, 832), keeps_aspect=True, starts=False, backlog=False, drags=8),
     # An avatar takes a photo of any shape, so only its short side is fitted.
     "Vidu S2-Avatar": ModelSpec("reactor/vidu-s2-avatar", "call", 25.0, "first", False, references=True, image_required=True, size=(864, 1152),
                                 keeps_aspect=True, settings=AVATAR_SETTINGS),
@@ -416,6 +436,12 @@ def compile_timeline(model: str, beats: list[Beat], seed: int, settings: dict[st
             raise ValueError(f"{model} can't start a segment from the last frame of the one before; use a shot or a cut.")
         if other := next((r.model for r in beat.references if r.model != model), None):
             raise ValueError(f"{model} does not take {other} references.")
+        if beat.drags and not spec.drags:
+            raise ValueError(f"{model} does not take drag points.")
+        if other := next((d.model for d in beat.drags if d.model != model), None):
+            raise ValueError(f"{model} does not take {other} drag points.")
+        if len(beat.drags) > spec.drags:
+            raise ValueError(f"{model} takes up to {spec.drags} drag points, and segment {i + 1} has {len(beat.drags)}.")
         if unknown := next((name for name in beat.settings if name not in spec.beat_settings), None):
             raise ValueError(f"{model} has no {unknown} setting.")
         # The first beat opens the video, so there is nothing for it to cut from.
@@ -619,13 +645,37 @@ def compile_sana(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> P
 
 
 def compile_x2(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
-    plan = Plan(setup=[("set_keep_backlog", {"keep_backlog": True})], chunks=sum(beat.frames for beat in beats),
-                source=beats[0].video)
+    plan = Plan(setup=[("set_keep_backlog", {"keep_backlog": True})] if spec.backlog else [],
+                chunks=sum(beat.frames for beat in beats), source=beats[0].video)
     if beats[0].image is not None:
         plan.setup.append(("set_reference_image", {"reference_image": beats[0].image}))
     plan.setup.append(("set_prompt", {"prompt": beats[0].prompt}))
-    plan.timed = source_prompts(beats)
+    plan.timed = sorted([*source_prompts(beats), *drag_windows(beats)], key=lambda t: t[0])
     return plan
+
+
+# A `set_pointers` call holds the last four frames' points, oldest first.
+DRAG_WINDOW = 4
+
+
+def drag_windows(beats: list[Beat]) -> list[tuple[int, str, dict]]:
+    """A `set_pointers` call on each frame a beat's drags are moving, and an empty one where they stop."""
+    at: dict[int, list[dict]] = {}
+    start = 0
+    for beat in beats:
+        for f in range(beat.frames):
+            t = f / (beat.frames - 1) if beat.frames > 1 else 0.0
+            at[start + f] = [{"x": round(d.start[0] + (d.end[0] - d.start[0]) * t, 4),
+                              "y": round(d.start[1] + (d.end[1] - d.start[1]) * t, 4)} for d in beat.drags]
+        start += beat.frames
+    timed = []
+    for n in range(start):
+        if at[n]:
+            timed.append((n, "set_pointers", {"frames": [at.get(max(n - DRAG_WINDOW + 1 + k, 0), []) for k in range(DRAG_WINDOW)]}))
+        elif n and at[n - 1]:
+            # The model holds the newest window until another comes, so a drag ends with an empty one.
+            timed.append((n, "set_pointers", {"frames": [[] for _ in range(DRAG_WINDOW)]}))
+    return timed
 
 
 def edit_setup(image: bytes, editing_type: str | None) -> list[tuple[str, dict]]:
@@ -785,5 +835,5 @@ def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> 
 
 COMPILERS = {"LongLive-2.0": compile_longlive, "Helios": compile_helios, "LingBot": compile_live,
              "LingBot World 2": compile_live, "Visko Orbis Dynamic": compile_live, "Visko Orbis Stable": compile_live,
-             "Sana Streaming": compile_sana, "X2": compile_x2, "Vidu S2-Editing": compile_edit, "FastH3": compile_clips,
+             "Sana Streaming": compile_sana, "X2": compile_x2, "XMAX X2.1": compile_x2, "Vidu S2-Editing": compile_edit, "FastH3": compile_clips,
              "H3 Reference Turbo Realtime": compile_clips, "FastH3-Omni": compile_clips, "LTX": compile_takes}

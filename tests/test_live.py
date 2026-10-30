@@ -229,6 +229,11 @@ def join(sent):
     return next((m for m in texts(sent) if m["type"] == "join"), None)
 
 
+def test_xmax_x2_1_opens_a_live_run_with_a_prompt_and_no_backlog_command():
+    assert live.style_setup(MODELS["XMAX X2.1"], "noir", 1, b"png", {}) == [
+        ("set_reference_image", {"reference_image": b"png"}), ("set_prompt", {"prompt": "noir"})]
+
+
 async def test_a_camera_run_has_the_browser_publish_and_records_the_take(tmp_path, monkeypatch):
     fake = FakeLiveReactor()
     path = tmp_path / "take.mp4"

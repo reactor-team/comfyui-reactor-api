@@ -61,8 +61,8 @@ scripting every move ahead of time.
 
 ### Edit video
 
-Restyle, re-dress or recast your camera or a video file from a single image, or edit it with a
-prompt. Source on the left, result on the right.
+Restyle, re-dress or recast your camera or a video file from a single image, edit it with a
+prompt, or drag points on it to move things. Source on the left, result on the right.
 
 <table>
 <tr>
@@ -76,6 +76,14 @@ prompt. Source on the left, result on the right.
 <tr>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Real-time%20video%20file%20edited%20by%20a%20prompt%20%28X2%29.json"><img src="example_outputs/reactor_realtime_video_file.webp" width="100%" alt="Real-time video file edited by a prompt"></a><br><sub><b>Real-time video file edited by a prompt</b><br>X2 · ⚡ Real time</sub></td>
 <td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Restyle%2C%20re-dress%20and%20recast%20a%20video%20%28Vidu%20S2-Editing%29.json"><img src="example_outputs/reactor_vidu_edit.webp" width="100%" alt="Restyle, re-dress and recast a video"></a><br><sub><b>Restyle, re-dress and recast a video</b><br>Vidu S2-Editing · 🎬 Render</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Swap%20a%20character%20from%20an%20image%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_character_swap.webp" width="100%" alt="Swap a character from an image"></a><br><sub><b>Swap a character from an image</b><br>XMAX X2.1 · 🎬 Render</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Swap%20an%20outfit%20from%20an%20image%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_outfit_swap.webp" width="100%" alt="Swap an outfit from an image"></a><br><sub><b>Swap an outfit from an image</b><br>XMAX X2.1 · 🎬 Render</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Pose%20a%20still%20by%20dragging%20points%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_drag_pose.webp" width="100%" alt="Pose a still by dragging points"></a><br><sub><b>Pose a still by dragging points</b><br>XMAX X2.1 · 🎬 Render</sub></td>
+<td width="50%" valign="top" align="center"><a href="example_workflows/Edit%20video%20-%20Real-time%20drag%20to%20pose%20a%20robot%20%28XMAX%20X2.1%29.json"><img src="example_outputs/reactor_x21_drag_realtime.webp" width="100%" alt="Real-time drag to pose a robot"></a><br><sub><b>Real-time drag to pose a robot</b><br>XMAX X2.1 · ⚡ Real time</sub></td>
 </tr>
 </table>
 
@@ -148,6 +156,7 @@ and each example's note links it.
 | Model | What it does | Takes | Prompt guide |
 | --- | --- | --- | --- |
 | [Vidu S2-Editing](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/overview) | Restyle, re-dress or recast from an image | video, image | [Prompt guide](https://docs.reactor.inc/model-api-reference/vidu-s2-editing/prompt-guide) |
+| [XMAX X2.1](https://docs.reactor.inc/model-api-reference/xmax-x2-1/overview) | Edit a video or camera from a prompt, swap in a character, object or outfit from an image, or drag points to move things | video, optional image, drag points | [Prompt guide](https://docs.reactor.inc/model-api-reference/xmax-x2-1/prompt-guide) |
 | [X2](https://docs.reactor.inc/model-api-reference/x2/overview) | Edit a video or camera from a prompt | video, optional image | [Prompt guide](https://docs.reactor.inc/model-api-reference/x2/prompt-guide) |
 | [Sana Streaming](https://docs.reactor.inc/model-api-reference/sana-streaming/overview) | Edit a video file from a prompt | video (Render only) | [Prompt guide](https://docs.reactor.inc/model-api-reference/sana-streaming/prompt-guide) |
 

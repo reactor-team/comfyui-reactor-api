@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -139,7 +139,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -533,16 +533,16 @@ wheels = [
 
 [[package]]
 name = "reactor-sdk"
-version = "1.6.0"
+version = "1.14.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/1d/21509c2b95ec7d9c639d85b3052e1e609f087b09bb5c6c84e8fa2d80571b/reactor_sdk-1.6.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ef9fbad9c1c86c283880c55d8a2f23c4434cbbd76cced9c435dd6ce71e61c072", size = 9050094, upload-time = "2026-09-16T14:49:28.384Z" },
-    { url = "https://files.pythonhosted.org/packages/84/a0/7792b881c0b3a4f5843a6722241ec49c369f6f2047c3c4ddee0530b084fd/reactor_sdk-1.6.0-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:52b797f96730e8a139220894b532a9e1c24d3ee45bbbe752d0b3fef39708b0ab", size = 10292989, upload-time = "2026-09-16T14:49:30.842Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/39/346a7aa034065552ee3b87ff2f75b4a3ec1b289f81930ada2268ab42ad3a/reactor_sdk-1.6.0-py3-none-manylinux_2_34_aarch64.whl", hash = "sha256:e570262b2f40d627813b8b7883992dbf14dcb72c5136d63f6498710ab4da16e6", size = 10416689, upload-time = "2026-09-16T14:49:33.069Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/ca/1062467ae46770e7eaea11e0bb54490daed3a3448a64e81dee113dc9d5f5/reactor_sdk-1.6.0-py3-none-manylinux_2_34_x86_64.whl", hash = "sha256:fa1d26612df946a3802dfead4c1e778a0bcf61750ee9865cd794cd638924f290", size = 11086774, upload-time = "2026-09-16T14:49:35.139Z" },
-    { url = "https://files.pythonhosted.org/packages/33/42/f9c3690e489c1cc254b83ad535013093d7cf85f85fafe7d580bf708edf7c/reactor_sdk-1.6.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:d2e2fb7efa5f1f1841c4959c40d7ac274a0f04a97405d3b9aebd777076f9ae8f", size = 10448919, upload-time = "2026-09-16T14:49:37.233Z" },
-    { url = "https://files.pythonhosted.org/packages/5e/f3/5bf78d04d14241637f7f63530d64702fdd3255a5b732dea2c27263ca4ba4/reactor_sdk-1.6.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:23b3c354cee37222ac03731573a221a935b71b2127ecd2eb4adb9775e41f155f", size = 11134095, upload-time = "2026-09-16T14:49:39.452Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/15/dff5d6a79bdf69e11f92603fcee70ad83f02061d201bd18e3d41fbf2ec6c/reactor_sdk-1.6.0-py3-none-win_amd64.whl", hash = "sha256:24eff9e7ab6ca36e02eb57bccd6f5bca92ec2aff690cd82ce240deacd458be26", size = 9806554, upload-time = "2026-09-16T14:49:41.611Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/4a/9c7125f719e2dc3dc267d6f938e98582bcbd373fc4dc000128da9d80458c/reactor_sdk-1.14.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:891a8dc4aa5e22e28c27a5787b0470aab788b495e34e35b0bdcfc7f98a18c3f9", size = 9336442, upload-time = "2026-11-05T17:31:15.864Z" },
+    { url = "https://files.pythonhosted.org/packages/49/75/1ab1d3c5da6d6ea1bc49205fc688ac1962d3d3a15779cfc6a51388d13bdf/reactor_sdk-1.14.0-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:e88c11260e04a97496057d3a2370f8d25927309f31ee4d4ac0c0bdaa75e654e5", size = 10595933, upload-time = "2026-11-05T17:31:18.438Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/ed/b4cadaf011f2c4856e1fd1773e29f2eb683830717a97db464a335568215f/reactor_sdk-1.14.0-py3-none-manylinux_2_34_aarch64.whl", hash = "sha256:4af3ff222dc4c3b7a72409cd8d7f4f5e4f4daa36c0234ea247820a53b384bfb7", size = 10717659, upload-time = "2026-11-05T17:31:21.254Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/cb/925bff51e6c76e9fa9dfe01f5ff6a21232c9868cb09578115cb3b1a3d140/reactor_sdk-1.14.0-py3-none-manylinux_2_34_x86_64.whl", hash = "sha256:204b7086af3d19c6cbebee30b4162e1f3dd7d650bb03ea2e5209c338c9258be7", size = 11391634, upload-time = "2026-11-05T17:31:23.692Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/0a/023d5e993999daa7c752ec6fc2a73b3bba78df272df3558edc942dc849ea/reactor_sdk-1.14.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:22145a0d691ea3ec56282b18325b7b9d99c52580d937d24bee8d045dab6b807a", size = 10750369, upload-time = "2026-11-05T17:31:25.913Z" },
+    { url = "https://files.pythonhosted.org/packages/70/8c/f9518a5fe55748f0bd12f433fce33db2d8fba25fbfb88f68af020626150c/reactor_sdk-1.14.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:8e5d05410db07f8a5cc5adb4663d1bb296de4ea453741213201f8c6f3b532716", size = 11444949, upload-time = "2026-11-05T17:31:28.52Z" },
+    { url = "https://files.pythonhosted.org/packages/22/78/10c9910da61ca610de4425e803838738bfd7f7e4005a3b3a5d86a4202385/reactor_sdk-1.14.0-py3-none-win_amd64.whl", hash = "sha256:f847ce51ba4895cdc168ae08b85197a68ba3f6ddf5f5f05cf8764232be9a0ef1", size = 10041656, upload-time = "2026-11-05T17:31:30.573Z" },
 ]
 
 [[package]]

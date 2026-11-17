@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from reactor_render import diagnostics
-from reactor_render.diagnostics import Trace, brief, rounded
+from reactor_render.diagnostics import Trace, brief, development_mode, rounded
 from reactor_render.encode import FrameWriter
 
 
@@ -118,14 +118,37 @@ def test_the_saved_file_is_read_back_from_disk(lines, tmp_path):
     assert lines()[1].endswith("gone.mp4: missing")
 
 
-def test_nothing_is_logged_or_counted_outside_development_mode(caplog, monkeypatch):
-    monkeypatch.setattr(diagnostics, "DEV_MODE", False)
+# Each Trace method a session calls, with arguments of the kind it passes.
+CALLS = [("begin", "slug", {"api_key": "rk_secret"}, "run"), ("status", "connected"), ("sent", "start", {}), ("replied", "start", None),
+         ("uploaded", "a.png", b"x", 0.0), ("message", clip("clip_started")), ("track", types.SimpleNamespace(kind="video", direction="recvonly")),
+         ("frame", (1, 1, 3)), ("check",), ("audio", 480, 48000), ("push",), ("summary",),
+         ("recording", types.SimpleNamespace(session_id="s", end_marker=1.0), [0.0, 1.0]), ("saved", "missing.mp4")]
+
+
+def test_nothing_is_logged_or_counted_outside_development_mode(caplog):
     caplog.set_level(logging.INFO, logger="reactor")
     trace = Trace("live")
-    trace.frame((1, 1, 3))
-    trace.message(clip("clip_started"))
-    trace.summary()
-    assert caplog.records == [] and trace.frames == 0
+    for name, *args in CALLS:
+        getattr(trace, name)(*args)
+    assert caplog.records == []
+    assert (trace.frames, trace.sound, trace.pushed, trace.asked, trace.playing) == (0, 0.0, 0, {}, None)
+
+
+def test_a_fault_in_the_debug_log_is_logged_and_never_reaches_the_session(lines):
+    trace = Trace("live")
+    # Odd messages, and a clip with no session, as fakes and older SDKs give.
+    trace.message({"type": "state_update", "data": ["not", "a", "dict"]})
+    trace.message({"type": "clip_started", "data": {"clip": {"clip_id": "a", "frames": "many"}}})
+    trace.message({"type": "clip_finished", "data": {"clip": {"clip_id": "a"}}})
+    trace.recording(types.SimpleNamespace(), [])
+    failed = [line for line in lines() if "the debug log failed" in line]
+    assert [line.split(" in ")[1].split(":")[0] for line in failed] == ["message", "message", "recording"]
+
+
+def test_development_mode_is_on_only_when_asked_for():
+    assert all(development_mode({"REACTOR_DEV_MODE": value}) for value in ("1", "true", "Yes", " on "))
+    assert not any(development_mode({"REACTOR_DEV_MODE": value}) for value in ("", "0", "false", "no", "off"))
+    assert not development_mode({})
 
 
 def test_brief_keeps_small_values_as_they_are():

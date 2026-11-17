@@ -7,7 +7,10 @@ folder is sent with `no-cache`: the browser checks it with the server each time 
 This is on only in development mode (REACTOR_DEV_MODE), where the web files change without a release.
 """
 
+import logging
 import os
+
+from . import diagnostics
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
 
@@ -36,3 +39,15 @@ def fresh_web_files(web_dirs: dict[str, str], web_dir: str = WEB_DIR):
         return response
 
     return middleware
+
+
+def serve_fresh(app, web_dirs: dict[str, str]) -> None:
+    """Sends the plugin's web files with `no-cache` from `app`, in development mode only, where they change without a release."""
+    if not diagnostics.DEV_MODE:
+        return
+    from aiohttp import web
+    try:
+        app.middlewares.append(web.middleware(fresh_web_files(web_dirs)))
+    except RuntimeError:
+        # The server has started, as when a plugin is loaded again while ComfyUI runs; its web files keep ComfyUI's caching.
+        logging.warning("Reactor: the server has started, so a browser may keep old copies of this plugin's web files.")

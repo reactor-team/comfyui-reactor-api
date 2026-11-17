@@ -604,9 +604,8 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 render();
             }
         } else if (message.type === "clip_event") {
-            if (direct) return;
             const hadLast = clips.last;
-            clips.seen(message.message);
+            clips.relayed(message.message, direct);
             debug(`<- ${message.message?.type} clip ${message.message?.data?.clip?.clip_id?.slice(0, 8)}, passed on by the server`);
             if (!hadLast && clips.last && started()) proceed.disabled = false;
             if (continueField) showQueue();

@@ -7,6 +7,7 @@ change of its size, how long each clip played against its length, the sound and 
 take was recording, why the session ended, and the saved file as it is on disk. The Realtime window sends its own
 events to the same log. Secrets never appear: an API key or token is only ever said to be present."""
 
+import functools
 import importlib.metadata
 import logging
 import os
@@ -14,8 +15,15 @@ import re
 import time
 
 log = logging.getLogger("reactor")
+
+
+def development_mode(environ=os.environ) -> bool:
+    """Whether REACTOR_DEV_MODE turns development mode on: 1, true, yes or on. Unset, 0, false or anything else is off."""
+    return environ.get("REACTOR_DEV_MODE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 # Logged at INFO, since ComfyUI's console shows nothing below it; this switch alone turns it on.
-DEV_MODE = os.environ.get("REACTOR_DEV_MODE", "") not in ("", "0")
+DEV_MODE = development_mode()
 
 # A pause in the frames this long or longer is logged. Observed on cloud sessions: frames arrive in bursts a few
 # frame times apart, so shorter pauses are jitter, not a stop.
@@ -76,15 +84,29 @@ def on_disk(path: str) -> str:
         return f"{os.path.getsize(path)} bytes, unreadable: {e}"
 
 
+def quiet(method):
+    """A Trace method: it does nothing outside development mode, and a fault in it is logged, never raised into the session."""
+    @functools.wraps(method)
+    def guarded(self, *args):
+        if not DEV_MODE:
+            return
+        try:
+            method(self, *args)
+        except Exception as e:
+            log.warning("Reactor %s: the debug log failed in %s: %r", self.name, method.__name__, e)
+    return guarded
+
+
 class Trace:
-    """One session's debug log. Each method does nothing when debug logging is off."""
+    """One session's debug log. Each method does nothing outside development mode, and never raises."""
 
     def __init__(self, name: str, clock=time.monotonic):
         self.name, self.clock, self.start = name, clock, clock()
         self.frames = 0
         self.first = self.last = None
         self.shape = None
-        self.pauses: list[float] = []
+        self.pauses = 0
+        self.longest = 0.0
         self.playing: dict | None = None
         self.clips = 0
         self.sound = 0.0
@@ -93,66 +115,64 @@ class Trace:
         # What was playing when the video last stopped, once the stop is logged; None while it flows.
         self.stopped: str | None = None
 
-    @property
-    def on(self) -> bool:
-        return DEV_MODE
-
     def __call__(self, text: str, *args) -> None:
-        if self.on:
+        if DEV_MODE:
             log.info(f"Reactor {self.name} +%.2fs " + text, self.clock() - self.start, *args)
 
+    @quiet
     def begin(self, slug: str, connect: dict, what: str) -> None:
-        if self.on:
-            where = "cloud" if "api_key" in connect else f"local at {connect.get('api_url', 'the default address')}"
-            self("%s on %s (%s), API key %s; plugin %s, reactor-sdk %s", what, slug, where,
-                 "present" if connect.get("api_key") else "absent", plugin_version(), version("reactor-sdk"))
+        where = "cloud" if "api_key" in connect else f"local at {connect.get('api_url', 'the default address')}"
+        self("%s on %s (%s), API key %s; plugin %s, reactor-sdk %s", what, slug, where,
+             "present" if connect.get("api_key") else "absent", plugin_version(), version("reactor-sdk"))
 
+    @quiet
     def status(self, status) -> None:
         self("status %s", getattr(status, "value", status))
 
+    @quiet
     def sent(self, command: str, data: dict) -> None:
-        if self.on:
-            self.asked[command] = self.clock()
-            self("-> %s %s", command, brief(data))
+        self.asked[command] = self.clock()
+        self("-> %s %s", command, brief(data))
 
+    @quiet
     def replied(self, command: str, reply: dict | None) -> None:
-        if self.on:
-            took = (self.clock() - self.asked.pop(command, self.clock())) * 1000
-            self("<- reply to %s in %.0f ms: %s", command, took, brief(reply))
+        took = (self.clock() - self.asked.pop(command, self.clock())) * 1000
+        self("<- reply to %s in %.0f ms: %s", command, took, brief(reply))
 
+    @quiet
     def uploaded(self, name: str, data: bytes, began: float) -> None:
         self("uploaded %s, %d bytes, in %.0f ms", name, len(data), (self.clock() - began) * 1000)
 
+    @quiet
     def message(self, msg: dict) -> None:
-        if not self.on:
-            return
         kind = msg.get("type")
         data = msg.get("data") or {}
         clip = data.get("clip") or {}
         # A clip's own fields are many; its id and length say which it is.
         self("<- %s %s", kind, {"clip": str(clip.get("clip_id"))[:8], "frames": clip.get("frames")} if clip else brief(data))
+        playing = self.playing
         if kind == "clip_started":
             self.playing = {"id": clip.get("clip_id"), "at": self.clock(), "frames": self.frames, "holds": clip.get("frames")}
-        elif kind in ("clip_finished", "clip_stopped") and self.playing and self.playing["id"] == clip.get("clip_id"):
-            played, self.playing = self.playing, None
+        elif kind in ("clip_finished", "clip_stopped") and playing and playing["id"] == clip.get("clip_id"):
+            self.playing = None
             self.clips += kind == "clip_finished"
             # A count can be off by a frame or two, since a model's messages and its frames arrive apart.
-            holds = f" of the {played['holds']:g} it holds" if played["holds"] else ""
-            self("clip %s %s after %.2f s, with %d frames%s", str(played["id"])[:8], kind.removeprefix("clip_"),
-                 self.clock() - played["at"], self.frames - played["frames"], holds)
+            holds = f" of the {playing['holds']:g} it holds" if playing["holds"] else ""
+            self("clip %s %s after %.2f s, with %d frames%s", str(playing["id"])[:8], kind.removeprefix("clip_"),
+                 self.clock() - playing["at"], self.frames - playing["frames"], holds)
 
+    @quiet
     def track(self, track) -> None:
-        if self.on:
-            self("track %s: %s, %s", getattr(track, "name", "?"), track.kind, track.direction)
+        self("track %s: %s, %s", getattr(track, "name", "?"), track.kind, track.direction)
 
+    @quiet
     def frame(self, shape) -> None:
-        if not self.on:
-            return
         now = self.clock()
         if self.first is None:
             self("first video frame")
         elif now - self.last >= PAUSE_SECONDS:
-            self.pauses.append(now - self.last)
+            self.pauses += 1
+            self.longest = max(self.longest, now - self.last)
             self("video resumed after %.2f s with none, which stopped %s", now - self.last, self.stopped or self.during())
             self.stopped = None
         if shape != self.shape:
@@ -164,46 +184,49 @@ class Trace:
 
     def during(self) -> str:
         """What was playing: a stop mid-clip is a fault, while a clip model sends nothing between clips."""
-        return f"during clip {str(self.playing['id'])[:8]}" if self.playing else "with no clip playing" if self.clips else "mid-stream"
+        # Read once: the model's messages, which set it, and the frames, which read it, come on different threads.
+        playing = self.playing
+        return f"during clip {str(playing['id'])[:8]}" if playing else "with no clip playing" if self.clips else "mid-stream"
 
+    @quiet
     def check(self) -> None:
         """Logs the video stopping as soon as it has, rather than only once it comes back. Call it every second or so."""
-        if self.on and self.last is not None and self.stopped is None and self.clock() - self.last >= PAUSE_SECONDS:
+        if self.last is not None and self.stopped is None and self.clock() - self.last >= PAUSE_SECONDS:
             self.stopped = self.during()
             self("video stopped %s; the last frame came %.2f s ago", self.stopped, self.clock() - self.last)
 
+    @quiet
     def audio(self, samples: int, rate: int) -> None:
-        if self.on:
-            if not self.sound:
-                self("first sound, at %d Hz", rate)
-            self.sound += samples / rate
+        if not self.sound:
+            self("first sound, at %d Hz", rate)
+        self.sound += samples / rate
 
+    @quiet
     def push(self) -> None:
-        if self.on:
-            if not self.pushed:
-                self("first source frame pushed")
-            self.pushed += 1
+        if not self.pushed:
+            self("first source frame pushed")
+        self.pushed += 1
 
+    @quiet
     def summary(self) -> None:
-        if not self.on:
-            return
         if self.first is None:
             self("summary: no video arrived")
         else:
             span = self.last - self.first
             self("summary: %d frames over %.1f s (%.1f fps), %d clips played to the end, %d pauses of %g s or more, the longest %.2f s",
-                 self.frames, span, (self.frames - 1) / span if span > 0 else 0.0, self.clips, len(self.pauses),
-                 PAUSE_SECONDS, max(self.pauses, default=0.0))
+                 self.frames, span, (self.frames - 1) / span if span > 0 else 0.0, self.clips, self.pauses,
+                 PAUSE_SECONDS, self.longest)
             self("summary: the last frame came %.1f s before the end", self.clock() - self.last)
         self("summary: %.1f s of sound received, %d source frames pushed", self.sound, self.pushed)
 
+    @quiet
     def recording(self, clip, marks: list) -> None:
         """Which session's recording a take is cut from, and the spans of it the take keeps."""
-        if self.on and clip is not None:
+        if clip is not None:
             spans = ", ".join(f"{start:.2f}-{end:.2f} s" for start, end in zip(marks[::2], marks[1::2]))
             self("the session's recording (session %s) runs to %.2f s; the take keeps %s",
                  str(clip.session_id)[:8], clip.end_marker, spans or "nothing")
 
+    @quiet
     def saved(self, path: str) -> None:
-        if self.on:
-            self("saved %s: %s", path, on_disk(path))
+        self("saved %s: %s", path, on_disk(path))

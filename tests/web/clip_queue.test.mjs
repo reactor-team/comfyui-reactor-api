@@ -172,3 +172,21 @@ test("a clip the model marks with a continue mode shows as continuing", () => {
     q.seen(msg("queue_update", { generation: [{ clip_id: "b", prompt: "next", continue_mode: "frame" }, { clip_id: "c", prompt: "cut", continue_mode: null }], playout: [] }));
     assert.deepEqual(stages(q), ["Building:next+", "Building:cut"]);
 });
+
+test("a build the server passes on settles the clip, even once the window hears the model itself", async () => {
+    const q = new ClipQueue();
+    q.opened(clip("a", "open"));
+    const pending = q.anchor(q.apply("more", true));
+    // The opening clip failed before the window joined, and the server's word on it comes after the model's first message.
+    q.relayed(msg("clip_failed", { clip: clip("a", "open") }), true);
+    assert.deepEqual(await pending, { anchor: null, failed: true });
+});
+
+test("a clip the server passes on as playing is taken only until the window hears the model itself", () => {
+    const q = new ClipQueue();
+    q.relayed(msg("clip_started", { clip: clip("a", "open") }), false);
+    assert.equal(q.playing?.clip_id, "a");
+    q.seen(msg("clip_finished", { clip: clip("a", "open") }));
+    q.relayed(msg("clip_started", { clip: clip("a", "open") }), true);
+    assert.equal(q.playing, null);
+});

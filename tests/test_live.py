@@ -281,6 +281,27 @@ async def test_a_camera_run_has_the_browser_publish_and_records_the_take(tmp_pat
     assert fake.disconnected
 
 
+async def test_a_live_take_records_only_the_models_output_track(tmp_path, monkeypatch):
+    fake = FakeLiveReactor()
+    draft = RecvTrack()
+    draft.name = "draft_video"
+    connect = fake.connect
+
+    async def connect_with_a_side_track():
+        fake.track_handler(draft)
+        await connect()
+    fake.connect = connect_with_a_side_track
+    run = make_run(fake, monkeypatch, "style", "X2", tmp_path / "take.mp4", size=X2_INPUT)
+    task = asyncio.create_task(run.run(lambda: None))
+    run.connected(lambda m: None)
+    run.receive('{"type":"published"}')
+    assert await until(lambda: run._writer is not None and run._writer.received > 0)
+    run.receive('{"type":"done"}')
+    await asyncio.wait_for(task, 10)
+    # The side track never gets a frame handler, so none of its frames reach the take.
+    assert not hasattr(draft, "push")
+
+
 async def test_a_browser_that_never_publishes_its_camera_fails_the_run(tmp_path, monkeypatch):
     monkeypatch.setattr(live, "PUBLISH_TIMEOUT_SECONDS", 0.3)
     fake = FakeLiveReactor()

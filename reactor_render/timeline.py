@@ -396,6 +396,13 @@ def check_sound(spec: ModelSpec, name: str, seconds: float, channels: int):
         raise ValueError(f"{name} has {channels} channels; each sound must be mono or stereo.")
 
 
+def check_sounds_total(spec: ModelSpec, seconds: float):
+    """Refuse a segment's sounds that last longer together than the model takes. A sum of lengths in samples can land a
+    hair over a limit it meets, so the total is compared to the millisecond."""
+    if round(seconds, 3) > spec.sounds_total:
+        raise ValueError(f"The sounds last {seconds:.1f} s together; they must last at most {spec.sounds_total:g} seconds in all.")
+
+
 def model_facts(spec: ModelSpec) -> dict:
     """What the timeline editor needs to draw a model's chunk grid and flag beats it would reject."""
     # A model without chunks plays each beat for exactly its frames, which the editor draws as one-frame chunks.
@@ -755,6 +762,8 @@ def compile_clips(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> 
             if i and not beat.cut and beat.image is None:
                 data["continue_from_clip_id"] = i - 1
                 if beat.from_frame:
+                    if spec.frames_alone and beat.last_image is not None:
+                        raise ValueError(f"Segment {i + 1} starts from the last frame of the one before, so {model} takes no last frame on it.")
                     data["continue_mode"] = "frame"
                 elif beat.last_image is not None:
                     raise ValueError(f"Segment {i + 1} has a last frame but carries on the motion of the one before; "
@@ -832,6 +841,9 @@ def compile_world(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> 
 
     The world is paused first, since a new image needs a paused world, and the clip is chosen as its source before the image.
     """
+    for i, beat in enumerate(beats):
+        if spec.prompted and not beat.prompt.strip():
+            raise ValueError(f"Segment {i + 1} has no prompt; {model} needs one on every segment.")
     return Plan(setup=[("set_paused", {"paused": True}), ("set_source", {"source": "client"}), ("set_image", {"image": beats[0].image}),
                        ("set_prompt", {"prompt": beats[0].prompt}), ("start", {"seed": seed})],
                 chunks=sum(beat.frames for beat in beats), timed=source_prompts(beats), source=beats[0].video)

@@ -61,6 +61,13 @@ export class ClipQueue {
         }
     }
 
+    // A clip event the server passed on, since the window may join after the model sent it. Once the window hears the
+    // model itself, such an event can arrive after newer ones, so it only settles whether a clip built, which can't go stale.
+    relayed(message, direct) {
+        const type = message?.type;
+        if (!direct || type === "clip_generated" || type === "clip_failed") this.seen(message);
+    }
+
     // The run's opening clip, which the model announced before this window joined.
     opened(clip) {
         if (clip?.clip_id) this.last ??= clip.clip_id;

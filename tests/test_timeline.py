@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render.timeline import MODELS, check_sound, POSES, Beat, Drag, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts, upload_type, clip_seconds
+from reactor_render.timeline import MODELS, check_sound, check_sounds_total, POSES, Beat, Drag, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts, upload_type, clip_seconds
 
 # LongLive: a scene opens with a 29-frame chunk, then 32 frames a chunk. A beat's start is the chunk
 # whose video comes nearest its running total of frames: 96 -> 3, 175 -> 6.
@@ -686,6 +686,9 @@ def test_pika_h3_flex_refuses_a_frame_beside_pictures_or_sounds():
         compile_timeline("Pika H3 Flex", [Beat("x", 124, image=b"f", references=(a,))], seed=1)
     with pytest.raises(ValueError, match="Segment 2 starts from the last frame of the one before and pictures or sounds"):
         compile_timeline("Pika H3 Flex", [Beat("x", 124), Beat("y", 124, from_frame=True, sounds=(b"1",))], seed=1)
+    # Its docs: the model refuses a frame continuation that has frame images.
+    with pytest.raises(ValueError, match="Segment 2 starts from the last frame of the one before, so Pika H3 Flex takes no last frame"):
+        compile_timeline("Pika H3 Flex", [Beat("x", 124), Beat("y", 124, from_frame=True, last_image=b"e")], seed=1)
     with pytest.raises(ValueError, match="Segment 1 has audio but no pictures"):
         compile_timeline("Pika H3 Flex", [Beat("x", 124, sounds=(b"v",))], seed=1)
     with pytest.raises(ValueError, match="at most 3 on a segment"):
@@ -700,6 +703,9 @@ def test_eden_live_draws_a_world_over_the_clip_from_its_image_and_steers_it_by_p
     assert (plan.chunks, plan.source) == (72, b"scene")
     with pytest.raises(ValueError, match="needs an image"):
         compile_timeline("EdenLive", [Beat("x", 24, video=b"scene")], seed=1)
+    # Its docs: both sources require a non-blank prompt.
+    with pytest.raises(ValueError, match="Segment 2 has no prompt; EdenLive needs one on every segment"):
+        compile_timeline("EdenLive", [Beat("a fortress", 48, image=b"look", video=b"scene"), Beat(" ", 24)], seed=7)
 
 
 def test_files_upload_as_their_own_media_type():
@@ -746,3 +752,16 @@ def test_fast_h3_omni_refuses_a_sound_outside_two_to_fifteen_seconds_or_past_ste
             check_sound(spec, "sound_1", seconds, 1)
     with pytest.raises(ValueError, match="mono or stereo"):
         check_sound(spec, "sound_1", 5.0, 6)
+
+
+def test_pika_h3_flex_takes_sounds_that_last_15_seconds_together_and_no_more():
+    spec = MODELS["Pika H3 Flex"]
+    # Three sounds that make exactly 15 s, though their lengths added one by one, as a node adds them, come a hair over it.
+    total = 0.0
+    for samples in (97020, 260190, 304290):
+        total += samples / 44100
+    assert total > 15
+    check_sounds_total(spec, total)
+    with pytest.raises(ValueError, match="The sounds last 15.1 s together; they must last at most 15 seconds in all"):
+        check_sounds_total(spec, 15.1)
+    check_sounds_total(MODELS["FastH3-Omni"], 45.0)

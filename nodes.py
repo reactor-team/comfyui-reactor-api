@@ -20,12 +20,11 @@ from server import PromptServer
 
 from .reactor_render import live
 from .reactor_render.config import connect_args, max_sessions
-from .reactor_render.diagnostics import DEV_MODE
 from .reactor_render.clip import ClipStream
 from .reactor_render.encode import opus_bytes
 from .reactor_render.session import render
-from .reactor_render.web_files import fresh_web_files
-from .reactor_render.timeline import MODELS, Beat, Drag, check_sound, ModelSpec, Reference, Setting, Timeline, call_setup, clip_seconds, compile_timeline, editor_moves, model_facts, join_chains
+from .reactor_render.web_files import serve_fresh
+from .reactor_render.timeline import MODELS, Beat, Drag, check_sound, check_sounds_total, ModelSpec, Reference, Setting, Timeline, call_setup, clip_seconds, compile_timeline, editor_moves, model_facts, join_chains
 
 ReactorSequenceType = io.Custom("REACTOR_SEQUENCE")
 ReactorReferenceType = io.Custom("REACTOR_REFERENCE")
@@ -126,11 +125,11 @@ def taken_sounds(spec: ModelSpec, sounds) -> tuple[bytes, ...]:
         if audio is None:
             continue
         samples = audio["waveform"][0].cpu().numpy()
-        check_sound(spec, key, samples.shape[1] / audio["sample_rate"], samples.shape[0])
-        total += samples.shape[1] / audio["sample_rate"]
+        seconds = samples.shape[1] / audio["sample_rate"]
+        check_sound(spec, key, seconds, samples.shape[0])
+        total += seconds
         taken.append(opus_bytes(samples, audio["sample_rate"]))
-    if total > spec.sounds_total:
-        raise ValueError(f"The sounds last {total:.1f} s together; they must last at most {spec.sounds_total:g} seconds in all.")
+    check_sounds_total(spec, total)
     return tuple(taken)
 
 
@@ -215,7 +214,7 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                     *([io.Image.Input("image", optional=True, tooltip=f"The frame this segment starts on. It starts fresh, as a cut does; {beside_frame(spec)}."
                                       if spec.keyframes else "Reference image." if spec.images == "any" else "Reference image, read on the first segment.")]
                       if spec.images != "none" else []),
-                    *([io.Image.Input("last_image", optional=True, tooltip=f"The frame this segment ends on, on a cut or frame segment; {beside_frame(spec)}.")]
+                    *([io.Image.Input("last_image", optional=True, tooltip=f"The frame this segment ends on, on a cut{'' if spec.frames_alone else ' or frame segment'}; {beside_frame(spec)}.")]
                       if spec.keyframes else []),
                     *([io.Video.Input("video", optional=True, tooltip="Source clip to edit, read on the first segment.")] if spec.videos != "none" else []),
                     *([MoveEditor.Input("moves", tooltip="Camera moves during this segment. A move ends with its segment; continue it on the next segment to keep it going.")]
@@ -382,13 +381,7 @@ class ReactorRender(io.ComfyNode):
         return io.NodeOutput(InputImpl.VideoFromFile(out_path))
 
 
-# Only while developing the plugin, where its web files change without a release; see web_files.
-if DEV_MODE:
-    try:
-        PromptServer.instance.app.middlewares.append(web.middleware(fresh_web_files(comfy_nodes.EXTENSION_WEB_DIRS)))
-    except RuntimeError:
-        # The server has started, as when a plugin is loaded again while ComfyUI runs; its web files keep ComfyUI's caching.
-        logging.warning("Reactor: the server has started, so a browser may keep old copies of this plugin's web files.")
+serve_fresh(PromptServer.instance.app, comfy_nodes.EXTENSION_WEB_DIRS)
 
 
 @PromptServer.instance.routes.get("/reactor/live/{run_id}")

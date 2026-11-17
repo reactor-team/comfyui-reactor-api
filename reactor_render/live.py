@@ -337,7 +337,8 @@ class LiveRun:
                         trace.recording(clip, recording.marks)
                 finally:
                     self._watching = False
-        except BaseException:
+        except BaseException as e:
+            trace("ended: %r", e)
             # The session's error is the one worth reporting, not the encoder's.
             with contextlib.suppress(Exception):
                 writer.close()

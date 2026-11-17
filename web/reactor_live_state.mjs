@@ -49,17 +49,35 @@ export class ClipQueue {
         if (clip) {
             // The run queues the opening clip itself, so the window learns its id from the clips it sees.
             if (!this.last && (type === "clip_generated" || type === "clip_started")) this.last = clip;
-            if (type === "clip_generated" || type === "clip_failed") {
-                this.#built.set(clip, type === "clip_generated");
-                this.#waiters.get(clip)?.(type === "clip_generated");
-                this.#waiters.delete(clip);
-            }
+            if (type === "clip_generated" || type === "clip_failed") this.#settle(clip, type === "clip_generated");
+            // A clip that plays has built, though the window may have joined after the model said so.
+            else if (type === "clip_started" || type === "clip_finished" || type === "clip_stopped") this.#settle(clip, true);
             if (type === "clip_started") this.playing = message.data.clip;
             else if ((type === "clip_finished" || type === "clip_stopped") && this.playing?.clip_id === clip) this.playing = null;
         }
         if (type === "queue_update") {
             this.queued = { generation: message.data?.generation ?? [], playout: message.data?.playout ?? [] };
+            for (const c of this.queued.playout) this.#settle(c.clip_id, true);
         }
+    }
+
+    // A clip event the server passed on, since the window may join after the model sent it. Once the window hears the
+    // model itself, such an event can arrive after newer ones, so it only settles whether a clip built, which can't go stale.
+    relayed(message, direct) {
+        const type = message?.type;
+        if (!direct || type === "clip_generated" || type === "clip_failed") this.seen(message);
+    }
+
+    // The run's opening clip, which the model announced before this window joined.
+    opened(clip) {
+        if (clip?.clip_id) this.last ??= clip.clip_id;
+    }
+
+    #settle(clip, ok) {
+        if (this.#built.has(clip)) return;
+        this.#built.set(clip, ok);
+        this.#waiters.get(clip)?.(ok);
+        this.#waiters.delete(clip);
     }
 
     // Queues a prompt applied here, to be sent in turn.

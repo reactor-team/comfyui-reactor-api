@@ -16,6 +16,24 @@ test("the opening clip the run queued becomes the clip to continue once the wind
     assert.equal(q.last, "a");
 });
 
+test("the opening clip the run names becomes the clip to continue, and carries on once it plays", async () => {
+    const q = new ClipQueue();
+    q.opened(clip("a", "open"));
+    assert.equal(q.last, "a");
+    q.opened(clip("b", "other"));
+    assert.equal(q.last, "a");
+    const pending = q.anchor(q.apply("more", true));
+    q.seen(msg("clip_finished", { clip: clip("a", "open") }));
+    assert.deepEqual(await pending, { anchor: "a", failed: false });
+});
+
+test("a clip the model lists as ready has built, though the window missed it building", async () => {
+    const q = new ClipQueue();
+    q.opened(clip("a", "open"));
+    q.seen(msg("queue_update", { generation: [], playout: [clip("a", "open")] }));
+    assert.deepEqual(await q.anchor(q.apply("more", true)), { anchor: "a", failed: false });
+});
+
 test("clips list in play order: playing, ready, building, then prompts not yet queued", () => {
     const q = new ClipQueue();
     q.seen(msg("queue_update", { generation: [clip("c", "third", "b")], playout: [clip("a", "first"), clip("b", "second")] }));
@@ -153,4 +171,22 @@ test("a clip the model marks with a continue mode shows as continuing", () => {
     const q = new ClipQueue();
     q.seen(msg("queue_update", { generation: [{ clip_id: "b", prompt: "next", continue_mode: "frame" }, { clip_id: "c", prompt: "cut", continue_mode: null }], playout: [] }));
     assert.deepEqual(stages(q), ["Building:next+", "Building:cut"]);
+});
+
+test("a build the server passes on settles the clip, even once the window hears the model itself", async () => {
+    const q = new ClipQueue();
+    q.opened(clip("a", "open"));
+    const pending = q.anchor(q.apply("more", true));
+    // The opening clip failed before the window joined, and the server's word on it comes after the model's first message.
+    q.relayed(msg("clip_failed", { clip: clip("a", "open") }), true);
+    assert.deepEqual(await pending, { anchor: null, failed: true });
+});
+
+test("a clip the server passes on as playing is taken only until the window hears the model itself", () => {
+    const q = new ClipQueue();
+    q.relayed(msg("clip_started", { clip: clip("a", "open") }), false);
+    assert.equal(q.playing?.clip_id, "a");
+    q.seen(msg("clip_finished", { clip: clip("a", "open") }));
+    q.relayed(msg("clip_started", { clip: clip("a", "open") }), true);
+    assert.equal(q.playing, null);
 });

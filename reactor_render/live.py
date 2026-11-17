@@ -13,11 +13,12 @@ import numpy as np
 from reactor_sdk import DEFAULT_API_URL, FileRef, Reactor, ReactorStatus
 
 from .clip import ClipStream
+from .diagnostics import DEV_MODE, Trace, rounded
 from .encode import FrameWriter
 from .recording import Recording
 from .session import (SETUP_PHASES, SETUP_READY, SETUP_SECONDS, CONNECT_SETTLE_SECONDS, REPLY_TIMEOUT_SECONDS, SessionEnded, session_phase,
                       api_message, closing_session, connect_with_retry, watch_for_failure)
-from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, edit_setup, upload_type
+from .timeline import MODELS, Beat, ModelSpec, compile_timeline, data_url, upload_type
 
 # A live take is capped at half an hour; the SDK ends the session when the token hits this.
 LIVE_SESSION_LIMIT_SECONDS = 1800
@@ -36,7 +37,7 @@ RUNS: dict[str, "LiveRun"] = {}
 
 def model_tracks(spec: ModelSpec) -> list[dict]:
     """The session's media tracks for a model, as the JS SDK's `modelTracks` must list them: its
-    source track, if it takes one, the video it plays, and its `main_audio` for a model with sound.
+    source track, if it takes one, the video it plays and any side tracks, and its `main_audio` for a model with sound.
     The list must match the session's real tracks exactly, or the browser's join is refused. A call
     lists `webcam` though only a video call reads it; this run publishes only `mic`."""
     if spec.pattern == "call":
@@ -46,7 +47,8 @@ def model_tracks(spec: ModelSpec) -> list[dict]:
                 {"name": "main_audio", "kind": "audio", "direction": "recvonly"}]
     source = [{"name": spec.source_track, "kind": "video", "direction": "sendonly"}] if spec.source_track else []
     audio = [{"name": "main_audio", "kind": "audio", "direction": "recvonly"}] if spec.audio else []
-    return source + [{"name": "main_video", "kind": "video", "direction": "recvonly"}] + audio
+    side = [{"name": name, "kind": "video", "direction": "recvonly"} for name in spec.side_tracks]
+    return source + [{"name": "main_video", "kind": "video", "direction": "recvonly"}] + side + audio
 
 
 def session_token(api_key: str, model: str, session_id: str, api_url: str = DEFAULT_API_URL) -> str:
@@ -111,18 +113,14 @@ def drive_setup(model: str, beat: Beat, seed: int, settings: dict[str, object]) 
     return compile_timeline(model, [replace(beat, frames=spec.frames_in(1), moves=())], seed, settings).setup
 
 
-def style_setup(spec: ModelSpec, prompt: str, seed: int, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
-    """The commands that open a live style run."""
-    if not spec.prompted:
-        # A model without a prompt is steered by its image and settings alone, as an edit is.
-        return edit_setup(image, settings.get("editing_type"))
-    if not spec.starts:
-        # X2 generates once a prompt is set and source frames arrive.
-        commands = [("set_keep_backlog", {"keep_backlog": False})] if spec.backlog else []
-        if image is not None:
-            commands.append(("set_reference_image", {"reference_image": image}))
-        return commands + [("set_prompt", {"prompt": prompt})]
-    return [("set_seed", {"seed": seed}), ("set_prompt", {"prompt": prompt}), ("start", {})]
+def style_setup(model: str, prompt: str, seed: int, image: bytes | None, settings: dict[str, object]) -> list[tuple[str, dict]]:
+    """The commands that open a live style run: a render's setup for one segment, with the source streamed instead of a clip.
+
+    A live run keeps no backlog, which would trade its latency for smoothness.
+    """
+    # The source is the browser's camera or a looped clip, so the segment's clip only stands in for it.
+    plan = compile_timeline(model, [Beat(prompt, 1, image=image, video=b"", settings=settings)], seed)
+    return [(command, {"keep_backlog": False} if command == "set_keep_backlog" else data) for command, data in plan.setup]
 
 
 def switch_controls(spec: ModelSpec, settings: dict[str, object], setup: list[tuple[str, dict]]) -> dict | None:
@@ -146,6 +144,10 @@ def browser_ref(value):
     if isinstance(value, list):
         return [browser_ref(v) for v in value]
     return value
+
+
+# A clip model's messages that say how a clip stands, which the browser's window needs from the start of the run.
+CLIP_EVENTS = ("clip_generated", "clip_failed", "clip_started", "clip_finished", "clip_stopped")
 
 
 class LiveRun:
@@ -190,6 +192,8 @@ class LiveRun:
         self._published = asyncio.Event()
         # The model's messages, which a call's setup waits on for its phases.
         self._messages: asyncio.Queue[dict] = asyncio.Queue()
+        # The run's debug log, which the browser's window writes to as well.
+        self._trace = Trace("live")
         self._frame_shape: tuple[int, ...] | None = None
         # True from connect until the run starts closing: a disconnect then is a drop, not ours.
         self._watching = False
@@ -228,6 +232,7 @@ class LiveRun:
                              # A clip model can carry the clip before on instead of opening a new shot.
                              **({"continue_field": "continue_from_clip_id"} if self.spec.pattern == "clips" else {}),
                              "switch": switch_controls(self.spec, self.settings, self.setup),
+                             **({"debug": True} if DEV_MODE else {}),
                              "preview": dict(zip(("width", "height"), self.source_size)),
                              "input": None if self.input_size is None else
                                       {"width": self.input_size[0], "height": self.input_size[1], "fps": self.spec.fps}})
@@ -253,16 +258,24 @@ class LiveRun:
         reactor = Reactor(self.spec.slug, max_session_duration_seconds=LIVE_SESSION_LIMIT_SECONDS, **self.connect)
         self._reactor = reactor
         writer = self._writer = FrameWriter(self.path, self.spec.fps)
+        trace = self._trace
+        trace.begin(self.spec.slug, self.connect, f"live {self.mode} run")
+        reactor.on_status(trace.status)
 
         @reactor.on_track
         def capture(track) -> None:
-            if track.kind == "video" and track.direction == "recvonly":
+            trace.track(track)
+            if track.kind == "video" and track.direction == "recvonly" and track.name == "main_video":
                 track.on_frame(self._push_video)
             if track.kind == "audio" and track.direction == "recvonly":
-                track.on_frame(lambda pcm, sample_rate: self.capturing and writer.push_audio(pcm, sample_rate))
+                track.on_frame(lambda pcm, sample_rate: trace.audio(len(pcm), sample_rate) or (self.capturing and writer.push_audio(pcm, sample_rate)))
 
         @reactor.on_message
         def queue_message(msg: dict) -> None:
+            trace.message(msg)
+            # The browser joins after the opening clip is queued, and may miss it being built; it learns that from here.
+            if self.spec.pattern == "clips" and msg.get("type") in CLIP_EVENTS:
+                self._send_json({"type": "clip_event", "message": msg})
             self._loop.call_soon_threadsafe(self._messages.put_nowait, msg)
 
         watch_for_failure(reactor, lambda reason: self._loop.call_soon_threadsafe(self._dropped, reason))
@@ -294,11 +307,13 @@ class LiveRun:
                         # The clip flows from before setup, as a camera does, for a model that warms up on its source.
                         push = asyncio.create_task(self._push_clip(await reactor.publish_track(self.spec.source_track)))
                         push.add_done_callback(self._push_failed)
-                    held = {}
+                    held, opening = {}, None
                     for command, data in self.setup:
-                        sent = await self._send_command(command, data)
+                        sent, reply = await self._send_command(command, data)
                         if command == self.spec.prompt_command:
                             held.update({key: browser_ref(sent[key]) for key in self.spec.live_held if key in sent})
+                            # The model announces the opening clip before the browser joins, so the browser learns it here.
+                            opening = ((reply or {}).get("data") or {}).get("clip") or opening
                         if command in SETUP_PHASES:
                             self._status("Starting the call…" if self.mode == "call" else "Starting…")
                             await self._wait_for_phase(SETUP_PHASES[command], SETUP_READY.get(command), command != "create_avatar", check_interrupt)
@@ -306,11 +321,12 @@ class LiveRun:
                         await self._wait_for_character(check_interrupt)
                         writer.fill_gaps = True
                     self.capturing = True
+                    trace("capture on: the browser drives the run from here")
                     recording = Recording(reactor)
                     recording.mark()
                     self._status("")
                     # From here the browser sends the model its prompt and drive commands itself.
-                    self._send_json({"type": "started", **({"held": held} if held else {})})
+                    self._send_json({"type": "started", **({"held": held} if held else {}), **({"clip": opening} if opening else {})})
                     stats = asyncio.create_task(self._report_stats(reactor))
                     stats.add_done_callback(self._stats_failed)
                     await self._pump(check_interrupt)
@@ -318,9 +334,11 @@ class LiveRun:
                     stats.cancel()
                     if self._error is None:
                         clip = await recording.finish()
+                        trace.recording(clip, recording.marks)
                 finally:
                     self._watching = False
-        except BaseException:
+        except BaseException as e:
+            trace("ended: %r", e)
             # The session's error is the one worth reporting, not the encoder's.
             with contextlib.suppress(Exception):
                 writer.close()
@@ -331,6 +349,7 @@ class LiveRun:
                 task.cancel()
             # Awaited so a task's own error on the way down is retrieved, never lost.
             await asyncio.gather(*tasks, return_exceptions=True)
+            trace.summary()
         try:
             writer.close()
         except Exception:
@@ -342,6 +361,8 @@ class LiveRun:
         if clip is not None:
             self._status("Saving the session's recording…")
             await recording.save(clip, jwt, self.path, self.spec.fps)
+        self._trace("the take is %s", "the session's recording" if clip is not None else "the frames received here")
+        self._trace.saved(self.path)
 
     async def _connect(self, reactor, check_interrupt) -> None:
         task = asyncio.ensure_future(connect_with_retry(reactor, check_interrupt, self._status))
@@ -407,6 +428,7 @@ class LiveRun:
 
     def _push_video(self, frame: np.ndarray) -> None:
         self._frame_shape = frame.shape
+        self._trace.frame(frame.shape)
         if self.capturing:
             self._writer.push(frame)
 
@@ -415,14 +437,19 @@ class LiveRun:
         next_at = time.monotonic()
         while True:
             track.push_frame(await self.clip.next())
+            self._trace.push()
             next_at += 1 / self.spec.fps
             await asyncio.sleep(max(next_at - time.monotonic(), 0))
 
     async def _report_stats(self, reactor) -> None:
         while True:
             await asyncio.sleep(STATS_INTERVAL_SECONDS)
+            self._trace.check()
             stats = await reactor.get_stats()
             video = next((s for s in stats.inbound if s.kind == "video"), None)
+            self._trace("stats: rtt %s ms, loss %s%%, in %s kbps, out %s kbps, model %s fps", rounded(stats.rtt_ms),
+                        rounded(stats.packet_loss_ratio, 0.01, 2), rounded(stats.incoming_bitrate_bps, 1000),
+                        rounded(stats.outgoing_bitrate_bps, 1000), rounded(video and video.frames_per_second))
             self._send_json({"type": "stats", "rtt_ms": stats.rtt_ms, "loss": stats.packet_loss_ratio,
                              "in_bps": stats.incoming_bitrate_bps, "out_bps": stats.outgoing_bitrate_bps,
                              "fps": video and video.frames_per_second})
@@ -439,20 +466,25 @@ class LiveRun:
         if not task.cancelled() and task.exception() is not None:
             logging.error("Reactor live: stats task died.", exc_info=task.exception())
 
-    async def _send_command(self, command: str, data: dict) -> dict:
-        """Send a command, uploading its files first; return the data as sent, with the uploads' file refs."""
+    async def _send_command(self, command: str, data: dict) -> tuple[dict, dict | None]:
+        """Send a command, uploading its files first; return the data as sent, with the uploads' file refs, and the reply."""
         async def upload(key: str, value):
             if isinstance(value, bytes):
                 name, mime_type = upload_type(key)
-                return await self._reactor.upload_file(value, name=name, mime_type=mime_type)
+                began = time.monotonic()
+                ref = await self._reactor.upload_file(value, name=name, mime_type=mime_type)
+                self._trace.uploaded(name, value, began)
+                return ref
             if isinstance(value, list) and value and all(isinstance(v, bytes) for v in value):
                 return [await upload(key, v) for v in value]
             return value
         data = {key: await upload(key, value) for key, value in data.items()}
+        self._trace.sent(command, data)
         reply = await self._reactor.send_command(command, data)
+        self._trace.replied(command, reply)
         if reply is not None and reply.get("type") == "command_error":
             raise RuntimeError(f"Reactor rejected {command}: {reply.get('data', {}).get('reason')}")
-        return data
+        return data, reply
 
     def _on_message(self, message) -> None:
         try:
@@ -467,6 +499,8 @@ class LiveRun:
             self._finished.set()
         elif kind == "cancel":
             self._cancel(msg.get("error"))
+        elif kind == "debug":
+            self._trace("window: %s", str(msg.get("text"))[:500])
 
     def _on_disconnected(self) -> None:
         # A close after "done" is benign: the take finishes and its "ended" just goes nowhere.
@@ -475,12 +509,15 @@ class LiveRun:
 
     def _cancel(self, error: str | None = None) -> None:
         if self._error is None:
+            self._trace("cancelled: %s", error or "by the browser or its socket closing")
             self._error = error or "Cancelled."
         self._finished.set()
 
     def _dropped(self, reason: str = "The Reactor session ended unexpectedly.") -> None:
         """The server's side of the session went away mid-run; the take ends with what it has."""
         if self._watching:
+            # Only while the take runs: the session closing once the take ends is expected, and its status is logged.
+            self._trace("dropped: %s", reason)
             self._cancel(reason)
 
     def _finish(self, error: str | None) -> None:

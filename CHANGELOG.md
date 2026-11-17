@@ -4,6 +4,16 @@ Each release has a section headed `## <version>`, matching `version` in `pyproje
 The publish workflow sends the section for the version it publishes to the Comfy Registry as
 that version's changelog. Earlier versions are in the git history.
 
+## 0.5.0
+
+- Add Pika H3 Flex, which makes clips with sound from a prompt, up to nine reference pictures and
+  three sounds of at most 15 seconds together, or a first and last frame. It works in Reactor
+  Realtime and in a segment node.
+- Add EdenLive, which restyles a plain draft video, such as a rendered 3D scene, from a prompt and
+  a reference image. It works in Reactor Realtime and in a segment node.
+- Fix Reactor Realtime failing to open after an update, when the browser kept an old copy of
+  its files.
+
 ## 0.4.0
 
 - Add XMAX X2.1, a video-editing model that takes a source video, a prompt, an optional

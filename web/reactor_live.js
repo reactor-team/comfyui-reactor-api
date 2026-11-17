@@ -1,6 +1,8 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { ClipQueue, DragTracker, canMove, statusLine, videoPoint } from "./reactor_live_state.mjs";
+// The plugin's own modules are imported with its release version, so an update loads them anew: ComfyUI lets a
+// browser cache .mjs files, and an old one beside this new file breaks the window. A test checks the version.
+import { ClipQueue, DragTracker, canMove, statusLine, videoPoint } from "./reactor_live_state.mjs?v=0.5.0";
 
 const HINT = "Press Run to start a real-time session: the model plays in a window and you steer it as it runs. "
     + "Each run records a take. Set the seed's control after generate to fixed to keep the last take instead of starting a new session.";
@@ -148,10 +150,15 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     let phase = "connecting";   // where the take is in its life, one of PHASES
     let continueField = null;   // the prompt field that carries a clip model's previous clip on, so Continue is offered
     const clips = new ClipQueue();
+    // Whether this window gets the model's messages itself yet; until then the server passes on how its clips stand.
+    let direct = false;
     let sending = Promise.resolve();  // prompts go out one at a time, so clips play in the order they were applied
     render();
 
     const send = (object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(object)); };
+    // In development mode (REACTOR_DEV_MODE set on the server), the window's own events go to the server's log beside the session's.
+    let debugging = false;
+    const debug = (text) => { if (debugging) send({ type: "debug", text }); };
 
     // What to show for an SDK error: the sentence in the Reactor API reply it carries, with its link, or its own message.
     function errorText(e) {
@@ -227,6 +234,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         }
         const was = phase;
         phase = next;
+        debug(`phase ${was} -> ${next}`);
         if (next === "clipEnded") note = "";
         if (over() && was !== "held") teardown();
         render();
@@ -289,7 +297,10 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     // While the modal is open, keys outside its text fields stop here so ComfyUI's hotkeys never
     // fire; the drive keys drive only while the preview has focus, and a blur releases them all.
     function command(name, data) {
+        const at = performance.now();
+        debug(`-> ${name} ${Object.keys(data ?? {}).join(", ")}`);
         return reactor?.sendCommand(name, data).then((reply) => {
+            debug(`<- reply to ${name} in ${Math.round(performance.now() - at)} ms: ${reply?.type ?? "none"}${reply?.data?.clip ? ` clip ${reply.data.clip.clip_id?.slice(0, 8)}` : ""}${reply?.data?.reason ? `: ${reply.data.reason}` : ""}`);
             if (reply?.type === "command_error") say(`Reactor rejected ${name}: ${reply.data?.reason ?? "no reason given"}`);
             return reply;
         }, (e) => say(`Sending ${name} failed: ${errorText(e)}`));
@@ -421,12 +432,15 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             }
             if (over()) return;
         }
-        const { Reactor } = await import("./vendor/reactor-sdk.mjs");
+        const { Reactor } = await import("./vendor/reactor-sdk.mjs?v=0.5.0");
         if (over()) return;
         reactor = new Reactor({ modelName: join.model, local: join.local, modelTracks: join.tracks });
         reactor.on("trackReceived", (name, track, media) => {
+            debug(`track ${name}: ${track.kind}`);
             if (name === join.publish) return;
             if (track.kind === "video") {
+                // A model may send other video beside its output, such as the source frames it used.
+                if (name !== "main_video") return;
                 output.srcObject = media;
                 nextFrame();
             } else sound.srcObject = media;
@@ -435,9 +449,15 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         // A take can't start while another plays: the model rejects promptThen with a command_error message,
         // so it waits until a state_update lists it as valid again.
         reactor.on("message", (message) => {
+            direct = true;
+            const clip = message?.data?.clip?.clip_id;
+            debug(`<- ${message?.type}${clip ? ` clip ${clip.slice(0, 8)}` : ""}`);
             const hadLast = clips.last;
             clips.seen(message);
-            if (!hadLast && clips.last) proceed.disabled = !started();
+            if (!hadLast && clips.last) {
+                proceed.disabled = !started();
+                debug(`clip to continue: ${clips.last.slice(0, 8)}; Queue continuation ${proceed.disabled ? "off" : "on"}`);
+            }
             if (continueField && (message?.type === "queue_update" || message?.data?.clip?.clip_id)) showQueue();
             if (message?.type === "command_error" && message.data?.command === promptThen) {
                 thenWaiting = true;
@@ -461,6 +481,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             if (message?.type === "sessionEnded") lost = message.data?.reason || "Reactor ended the session.";
         });
         reactor.on("error", (e) => {
+            debug(`error: ${errorText(e)}${e?.recoverable ? " (recoverable)" : ""}`);
             console.error("Reactor:", e);
             if (e?.recoverable || over() || phase === "saving") return;
             lost ??= errorText(e);
@@ -468,6 +489,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             status.classList.add("error");
         });
         const ready = new Promise((resolve) => reactor.on("statusChanged", (s) => {
+            debug(`status ${s}`);
             if (s === "ready") resolve();
             // This browser's side dropped: end the run on the server too, so neither side outlives the other. After Save
             // the server leaves the session to save the take, so a drop then is expected and the window waits for "ended".
@@ -526,6 +548,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
     socket.addEventListener("message", (event) => {
         const message = JSON.parse(event.data);
         if (message.type === "config") {
+            debugging = !!message.debug;
             input = message.input;
             const { width, height } = message.preview;
             spacer.style.aspectRatio = `${width}/${height}`;
@@ -580,12 +603,20 @@ function openLive({ run_id, mode, title, camera, microphone }) {
                 stage = message.text;
                 render();
             }
+        } else if (message.type === "clip_event") {
+            const hadLast = clips.last;
+            clips.relayed(message.message, direct);
+            debug(`<- ${message.message?.type} clip ${message.message?.data?.clip?.clip_id?.slice(0, 8)}, passed on by the server`);
+            if (!hadLast && clips.last && started()) proceed.disabled = false;
+            if (continueField) showQueue();
         } else if (message.type === "started") {
             setPhase("firstFrame");
             heldFields = message.held ?? {};
+            clips.opened(message.clip);
             markStarted();
             apply.disabled = false;
             proceed.disabled = !clips.last;
+            debug(`started; opening clip ${message.clip?.clip_id?.slice(0, 8) ?? "none"}; Queue continuation ${proceed.hidden ? "hidden" : proceed.disabled ? "off" : "on"}`);
             look?.refresh();
             if (held) drive();
         } else if (message.type === "stats") {
@@ -737,7 +768,9 @@ function openLive({ run_id, mode, title, camera, microphone }) {
         look.refresh();
         try {
             if (look.next) data[look.image] = await reactor.uploadFile(look.next);
+            debug(`-> ${promptCommand} ${Object.keys(data).join(", ")}`);
             const reply = await reactor.sendCommand(promptCommand, data);
+            debug(`<- reply to ${promptCommand}: ${reply?.type ?? "none"}`);
             if (reply?.type === "command_error") throw new Error(reply.data?.reason ?? "no reason given");
             look.commit();
             say("Switched; the new look shows in a moment.");

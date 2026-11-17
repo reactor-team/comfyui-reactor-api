@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from reactor_render.timeline import MODELS, check_sound, POSES, Beat, Drag, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts, upload_type, clip_seconds
+from reactor_render.timeline import MODELS, check_sound, check_sounds_total, POSES, Beat, Drag, Move, Reference, Timeline, compile_timeline, editor_moves, join_chains, model_facts, upload_type, clip_seconds
 
 # LongLive: a scene opens with a 29-frame chunk, then 32 frames a chunk. A beat's start is the chunk
 # whose video comes nearest its running total of frames: 96 -> 3, 175 -> 6.
@@ -648,6 +648,66 @@ def test_fast_h3_omni_takes_three_pictures_live_and_nine_in_a_render():
         compile_timeline("FastH3-Omni", [Beat("x", 141, references=(a,) * 10)], seed=1)
 
 
+def test_pika_h3_flex_sends_lengths_as_the_seconds_its_docs_list():
+    spec = MODELS["Pika H3 Flex"]
+    listed = ("5.167", "5.875", "6.583", "7.292", "8", "8.708", "9.417", "10.125", "10.833", "11.542", "12.25", "12.958",
+              "13.667", "14.375", "15.083")
+    assert clip_seconds(spec.clip_frames, spec.fps) == listed
+    assert [round(float(s) * spec.fps) for s in listed] == list(spec.clip_frames)
+    plan = compile_timeline("Pika H3 Flex", [Beat("x", 120), Beat("y", 360, cut=True)], seed=1)
+    assert [data["seconds"] for _, _, data in plan.timed] == [5.167, 15.083]
+
+
+def test_pika_h3_flex_sets_its_canvas_and_resolution_before_the_first_clip():
+    plan = compile_timeline("Pika H3 Flex", [Beat("x", 124)], seed=1, settings={"aspect": "21:9", "resolution": "480p"})
+    assert plan.setup == [("set_seed", {"seed": 1}), ("set_flush_on_clip_end", {"enabled": False}),
+                          ("set_canvas", {"aspect": "21:9"}), ("set_resolution", {"resolution": "480p"})]
+
+
+def test_pika_h3_flex_takes_a_frame_alone_and_pictures_on_any_other_clip():
+    a = Reference("Pika H3 Flex", b"a", "image")
+    plan = compile_timeline("Pika H3 Flex", [Beat("x", 124, image=b"first", last_image=b"last"),
+                                             Beat("y", 124, from_frame=True),
+                                             Beat("z", 124, references=(a,), sounds=(b"1", b"2", b"3")),
+                                             Beat("w", 124, cut=True, last_image=b"end")], seed=1)
+    assert plan.timed == [
+        (0, "enqueue", {"prompt": "x", "seconds": 5.167, "first_frame_image": b"first", "last_frame_image": b"last"}),
+        (1, "enqueue", {"prompt": "y", "seconds": 5.167, "continue_from_clip_id": 0, "continue_mode": "frame"}),
+        # The sound a clip carries on takes none of its three audio slots.
+        (2, "enqueue", {"prompt": "z", "seconds": 5.167, "reference_images": [b"a"], "continue_from_clip_id": 1,
+                        "reference_audios": [b"1", b"2", b"3"]}),
+        (3, "enqueue", {"prompt": "w", "seconds": 5.167, "last_frame_image": b"end"}),
+    ]
+
+
+def test_pika_h3_flex_refuses_a_frame_beside_pictures_or_sounds():
+    a = Reference("Pika H3 Flex", b"a", "image")
+    with pytest.raises(ValueError, match="Segment 1 has a first or last frame and pictures or sounds"):
+        compile_timeline("Pika H3 Flex", [Beat("x", 124, image=b"f", references=(a,))], seed=1)
+    with pytest.raises(ValueError, match="Segment 2 starts from the last frame of the one before and pictures or sounds"):
+        compile_timeline("Pika H3 Flex", [Beat("x", 124), Beat("y", 124, from_frame=True, sounds=(b"1",))], seed=1)
+    # Its docs: the model refuses a frame continuation that has frame images.
+    with pytest.raises(ValueError, match="Segment 2 starts from the last frame of the one before, so Pika H3 Flex takes no last frame"):
+        compile_timeline("Pika H3 Flex", [Beat("x", 124), Beat("y", 124, from_frame=True, last_image=b"e")], seed=1)
+    with pytest.raises(ValueError, match="Segment 1 has audio but no pictures"):
+        compile_timeline("Pika H3 Flex", [Beat("x", 124, sounds=(b"v",))], seed=1)
+    with pytest.raises(ValueError, match="at most 3 on a segment"):
+        compile_timeline("Pika H3 Flex", [Beat("x", 124, references=(a,)), Beat("y", 124, sounds=(b"1", b"2", b"3", b"4"))], seed=1)
+
+
+def test_eden_live_draws_a_world_over_the_clip_from_its_image_and_steers_it_by_prompt():
+    plan = compile_timeline("EdenLive", [Beat("a frozen fortress", 48, image=b"look", video=b"scene"), Beat("at night", 24)], seed=7)
+    assert plan.setup == [("set_paused", {"paused": True}), ("set_source", {"source": "client"}), ("set_image", {"image": b"look"}),
+                          ("set_prompt", {"prompt": "a frozen fortress"}), ("start", {"seed": 7})]
+    assert plan.timed == [(48, "set_prompt", {"prompt": "at night"})]
+    assert (plan.chunks, plan.source) == (72, b"scene")
+    with pytest.raises(ValueError, match="needs an image"):
+        compile_timeline("EdenLive", [Beat("x", 24, video=b"scene")], seed=1)
+    # Its docs: both sources require a non-blank prompt.
+    with pytest.raises(ValueError, match="Segment 2 has no prompt; EdenLive needs one on every segment"):
+        compile_timeline("EdenLive", [Beat("a fortress", 48, image=b"look", video=b"scene"), Beat(" ", 24)], seed=7)
+
+
 def test_files_upload_as_their_own_media_type():
     assert upload_type("reference_audios") == ("audio.ogg", "audio/ogg")
     assert upload_type("video") == ("video.mp4", "video/mp4")
@@ -692,3 +752,16 @@ def test_fast_h3_omni_refuses_a_sound_outside_two_to_fifteen_seconds_or_past_ste
             check_sound(spec, "sound_1", seconds, 1)
     with pytest.raises(ValueError, match="mono or stereo"):
         check_sound(spec, "sound_1", 5.0, 6)
+
+
+def test_pika_h3_flex_takes_sounds_that_last_15_seconds_together_and_no_more():
+    spec = MODELS["Pika H3 Flex"]
+    # Three sounds that make exactly 15 s, though their lengths added one by one, as a node adds them, come a hair over it.
+    total = 0.0
+    for samples in (97020, 260190, 304290):
+        total += samples / 44100
+    assert total > 15
+    check_sounds_total(spec, total)
+    with pytest.raises(ValueError, match="The sounds last 15.1 s together; they must last at most 15 seconds in all"):
+        check_sounds_total(spec, 15.1)
+    check_sounds_total(MODELS["FastH3-Omni"], 45.0)

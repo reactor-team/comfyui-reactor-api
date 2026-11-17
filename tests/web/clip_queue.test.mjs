@@ -16,6 +16,24 @@ test("the opening clip the run queued becomes the clip to continue once the wind
     assert.equal(q.last, "a");
 });
 
+test("the opening clip the run names becomes the clip to continue, and carries on once it plays", async () => {
+    const q = new ClipQueue();
+    q.opened(clip("a", "open"));
+    assert.equal(q.last, "a");
+    q.opened(clip("b", "other"));
+    assert.equal(q.last, "a");
+    const pending = q.anchor(q.apply("more", true));
+    q.seen(msg("clip_finished", { clip: clip("a", "open") }));
+    assert.deepEqual(await pending, { anchor: "a", failed: false });
+});
+
+test("a clip the model lists as ready has built, though the window missed it building", async () => {
+    const q = new ClipQueue();
+    q.opened(clip("a", "open"));
+    q.seen(msg("queue_update", { generation: [], playout: [clip("a", "open")] }));
+    assert.deepEqual(await q.anchor(q.apply("more", true)), { anchor: "a", failed: false });
+});
+
 test("clips list in play order: playing, ready, building, then prompts not yet queued", () => {
     const q = new ClipQueue();
     q.seen(msg("queue_update", { generation: [clip("c", "third", "b")], playout: [clip("a", "first"), clip("b", "second")] }));

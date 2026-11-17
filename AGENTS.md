@@ -122,9 +122,28 @@ ticket IDs. This applies to code, comments, the README and commit messages.
 ## Releases
 
 A release is a version bump in `pyproject.toml` and `uv.lock`, merged to `main`, which publishes to the
-Comfy Registry. Add a `## <version>` section to `CHANGELOG.md` in the same PR. The publish workflow sends
+Comfy Registry. Bump the `?v=<version>` on each of the plugin's own module imports in `web/*.js` too: it gives a
+release new URLs, so a browser can't run a cached old `.mjs` beside a new page script, and a test fails if one
+differs from `pyproject.toml`. The vendored `web/vendor/reactor-sdk.mjs` is changed so its wasm keeps that `?v=`;
+keep that change when vendoring the SDK again, and a test checks it. Add a `## <version>` section to `CHANGELOG.md` in the same PR. The publish workflow sends
 that section to the registry as the version's changelog, and a test fails if it is missing. Like everything
 here, it holds only public information.
+
+## Development mode
+
+Start ComfyUI with `REACTOR_DEV_MODE=1` when working on the plugin or checking that a model works. It turns on two
+things, and is off in a normal install:
+
+- **A debug log** (`reactor_render/diagnostics.py`) in ComfyUI's console, one line per event, each timed from the
+  session's start, for renders and Realtime runs alike. It shows the connection and versions, each command with its
+  reply time, each upload, each message from the model, every stop in the video and what was playing then, how many
+  frames each clip played against its length, a stats line each second, the Realtime window's own events, which
+  session's recording the take was cut from, and the saved file as read back from disk. Read it before guessing why
+  a run stalled or a take came out short: a clip model sends no video between clips, so `video stopped with no clip
+  playing` is expected, while `video stopped during clip …` is a fault. API keys are only ever said to be present.
+- **Fresh web files** (`reactor_render/web_files.py`). ComfyUI lets a browser cache `.mjs` and `.wasm` files, so after an
+  edit the window can run a new `.js` against an old module. In development mode the plugin's web files are sent with
+  `Cache-Control: no-cache`, so a page reload picks up every edit.
 
 ## Tests
 

@@ -21,7 +21,7 @@ BLACK, WHITE = 0, 255
 
 
 class FakeTrack:
-    kind, direction = "video", "recvonly"
+    kind, direction, name = "video", "recvonly", "main_video"
 
     def on_frame(self, fn):
         self.push = fn
@@ -90,6 +90,9 @@ class FakeReactor:
 
     def on_error(self, func):
         self.events["error"] = func
+        return func
+
+    def on_status(self, func):
         return func
 
     async def publish_track(self, name):
@@ -322,6 +325,22 @@ async def test_a_chunk_that_emits_no_frames_is_not_counted(tmp_path, monkeypatch
     _, coro = run(fake, Plan(setup=[START], chunks=2), tmp_path, monkeypatch, model="Visko Orbis Dynamic")
     await coro
     assert len(frames_in(tmp_path / "out.mp4")) == 6
+
+
+async def test_a_render_records_only_the_models_output_track(tmp_path, monkeypatch):
+    fake = FakeReactor(chunks=5)
+    draft = FakeTrack()
+    draft.name = "draft_video"
+    connect = fake.connect
+
+    async def connect_with_a_side_track():
+        await connect()
+        fake.track_handler(draft)
+    fake.connect = connect_with_a_side_track
+    _, coro = run(fake, Plan(setup=[START], chunks=2), tmp_path, monkeypatch)
+    await coro
+    # The side track never gets a frame handler, so none of its frames reach the take.
+    assert not hasattr(draft, "push") and frames_in(tmp_path / "out.mp4")
 
 
 async def test_a_timed_command_for_chunk_zero_goes_out_before_any_chunk(tmp_path, monkeypatch):
@@ -603,6 +622,9 @@ class FakeCall:
         pass
 
     def on_error(self, func):
+        return func
+
+    def on_status(self, func):
         return func
 
     async def connect(self):

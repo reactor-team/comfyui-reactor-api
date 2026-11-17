@@ -147,12 +147,16 @@ class ModelSpec:
     accepts, when it refuses others; each segment is snapped to the nearest. `references_required` is whether every
     segment must carry at least one reference. `max_sounds` is how many reference audio clips a beat may carry; they
     shape the clip's sound, not its picture, and go beside a reference or the clip before. `sound_seconds` is the
-    shortest and longest each may last. `keyframes` is whether a
+    shortest and longest each may last, and `sounds_total` the longest a beat's sounds may last together. `keyframes` is whether a
     beat's image is its first frame and it may pin its last, and whether a beat may start from the last frame of the one
     before; both go beside at least one reference, and are cropped to the shape of the `aspect` setting. `live_settings`
     are settings only a live run takes, read at start, for a value a render sets on each segment instead.
     `drags` is how many drag points a beat may carry, each a point on the output the model's drag window pulls along; the live window drags them with the pointer.
     `backlog` is whether a "source" model takes `set_keep_backlog`, which trades latency for smoothness.
+    `frames_alone` is whether a clip's first or last frame, or a start from the last frame of the clip before, takes no
+    pictures or sounds beside it, where otherwise it needs at least one picture. `continued_sound` is whether the sound a
+    clip carries on from the clip before takes one of its `max_sounds`. `side_tracks` are video tracks the model sends
+    besides `main_video`, which a session lists but never records.
     """
     slug: str
     pattern: str
@@ -193,10 +197,14 @@ class ModelSpec:
     references_required: bool = False
     max_sounds: int = 0
     sound_seconds: tuple[float, float] = (0, float("inf"))
+    sounds_total: float = float("inf")
     keyframes: bool = False
     live_settings: dict[str, Setting] = field(default_factory=dict)
     backlog: bool = True
     drags: int = 0
+    frames_alone: bool = False
+    continued_sound: bool = True
+    side_tracks: tuple[str, ...] = ()
 
     def frame_size(self, width: int, height: int) -> tuple[int, int]:
         """The size a width x height input is sent at."""
@@ -281,11 +289,17 @@ FAST_H3_OMNI_CLIPS = (141, 192, 243, 294, 345)
 
 
 def clip_seconds(clip_frames: tuple[int, ...], fps: float) -> tuple[str, ...]:
-    """Clip lengths in frames as the seconds a picker lists, such as "5.875"."""
-    return tuple(f"{frames / fps:g}" for frames in clip_frames)
+    """Clip lengths in frames as the seconds a picker lists, such as "5.875", to the thousandth the models list them to."""
+    return tuple(f"{round(frames / fps, 3):g}" for frames in clip_frames)
 
 
 FAST_H3_SETTINGS = {"aspect": Setting("set_canvas", ("16:9", "1:1", "9:16", "4:3"), "16:9")}
+
+# Pika H3 Flex's clip lengths in frames at 24 fps, 5.167 to 15.083 seconds in steps of 17 frames. Its docs also list the whole
+# seconds 5 to 15, each of which gives the next of these.
+PIKA_CLIPS = tuple(range(124, 363, 17))
+PIKA_SETTINGS = {"aspect": Setting("set_canvas", ("16:9", "21:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16", "9:21"), "16:9"),
+                 "resolution": Setting("set_resolution", ("768p", "480p"), "768p")}
 
 
 MODELS = {
@@ -352,6 +366,19 @@ MODELS = {
                              max_sounds=3, sound_seconds=(2, 15), keyframes=True,
                              live_settings={"clip_seconds": Setting("set_clip_seconds", clip_seconds(FAST_H3_OMNI_CLIPS, 24.0), "14.375",
                                                                     field="seconds", numeric=True)}),
+    # A clip may carry pictures or follow its prompt alone. Unlike FastH3-Omni, a first or last frame, or a start from the
+    # clip before's last frame, takes no pictures or sounds, and the sound a clip carries on takes no audio slot.
+    "Pika H3 Flex": ModelSpec("reactor/pika-h3-flex", "clips", 24.0, "any", True, references=True, pictures=True, max_references=9,
+                              size=(1344, 768), keeps_aspect=True, starts=False, settings=PIKA_SETTINGS, prompt_command="enqueue",
+                              audio=True, live_held=("reference_images", "reference_audios"), clip_frames=PIKA_CLIPS,
+                              max_sounds=3, sound_seconds=(2, 15), sounds_total=15, keyframes=True, frames_alone=True, continued_sound=False,
+                              live_settings={"clip_seconds": Setting("set_clip_seconds", clip_seconds(PIKA_CLIPS, 24.0), "15.083",
+                                                                     field="seconds", numeric=True)}),
+    # A world drawn over a source video, such as a rendered 3D scene, from an image and a prompt. It plays at the rate the
+    # source is pushed, and sends the source frames it used on `draft_video`. Its built-in games are not offered.
+    "EdenLive": ModelSpec("reactor/eden-live", "source", 24.0, "first", False, image_required=True, videos="first",
+                          video_required=True, source_track="source_video", size=(1280, 704), backlog=False,
+                          side_tracks=("draft_video",)),
     # Each segment is one take: its prompt is the script the avatar speaks, its length the take's.
     # Live, each prompt is the next take's script, started once the take before ends.
     # A portrait fitted to its wide frame keeps the face, which sits near its top.
@@ -716,7 +743,7 @@ def compile_clips(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> 
     plan = Plan(setup=[("set_seed", {"seed": seed}), ("set_flush_on_clip_end", {"enabled": False})],
                 chunks=sum(beat.frames for beat in beats))
     for i, beat in enumerate(beats):
-        data = {"prompt": beat.prompt, "seconds": beat.frames / spec.fps}
+        data = {"prompt": beat.prompt, "seconds": round(beat.frames / spec.fps, 3)}
         if spec.references:
             if spec.references_required and not beat.references:
                 raise ValueError(f"Segment {i + 1} has no references; every {model} segment needs at least one.")
@@ -738,12 +765,14 @@ def compile_clips(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> 
                 data["first_frame_image"] = beat.image
             if beat.last_image is not None:
                 data["last_frame_image"] = beat.last_image
-            if not beat.references and ("continue_mode" in data or beat.image is not None or beat.last_image is not None):
-                raise ValueError(f"Segment {i + 1} " + ("starts from the last frame of the one before" if "continue_mode" in data
-                                                        else "has a first or last frame") + f" but no pictures; {model} needs at least one beside it.")
+            framed = ("starts from the last frame of the one before" if "continue_mode" in data
+                      else "has a first or last frame" if beat.image is not None or beat.last_image is not None else None)
+            if framed and spec.frames_alone and (beat.references or beat.sounds):
+                raise ValueError(f"Segment {i + 1} {framed} and pictures or sounds; {model} takes one or the other on a segment.")
+            if framed and not spec.frames_alone and not beat.references:
+                raise ValueError(f"Segment {i + 1} {framed} but no pictures; {model} needs at least one beside it.")
             if beat.sounds:
-                # A continued clip's own sound takes one of the audio slots.
-                most = spec.max_sounds - ("continue_from_clip_id" in data)
+                most = spec.max_sounds - (spec.continued_sound and "continue_from_clip_id" in data)
                 if len(beat.sounds) > most:
                     raise ValueError(f"Segment {i + 1} has {len(beat.sounds)} audio clips; {model} takes at most {most} on "
                                      + ("a segment that continues the one before." if most < spec.max_sounds else "a segment."))
@@ -798,6 +827,16 @@ def call_setup(model: str, image: bytes | None, settings: dict[str, object]) -> 
     return [("create_avatar", {"image": image}), ("start_call", start)]
 
 
+def compile_world(model: str, spec: ModelSpec, beats: list[Beat], seed: int) -> Plan:
+    """A world drawn over the clip: the first beat's image and prompt start it, and each later beat's prompt steers it.
+
+    The world is paused first, since a new image needs a paused world, and the clip is chosen as its source before the image.
+    """
+    return Plan(setup=[("set_paused", {"paused": True}), ("set_source", {"source": "client"}), ("set_image", {"image": beats[0].image}),
+                       ("set_prompt", {"prompt": beats[0].prompt}), ("start", {"seed": seed})],
+                chunks=sum(beat.frames for beat in beats), timed=source_prompts(beats), source=beats[0].video)
+
+
 def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> Plan:
     """A scripted call: the first beat's image becomes the character, and each beat's prompt is said to it in turn.
 
@@ -836,4 +875,4 @@ def compile_call(model: str, beats: list[Beat], settings: dict[str, object]) -> 
 COMPILERS = {"LongLive-2.0": compile_longlive, "Helios": compile_helios, "LingBot": compile_live,
              "LingBot World 2": compile_live, "Visko Orbis Dynamic": compile_live, "Visko Orbis Stable": compile_live,
              "Sana Streaming": compile_sana, "X2": compile_x2, "XMAX X2.1": compile_x2, "Vidu S2-Editing": compile_edit, "FastH3": compile_clips,
-             "H3 Reference Turbo Realtime": compile_clips, "FastH3-Omni": compile_clips, "LTX": compile_takes}
+             "H3 Reference Turbo Realtime": compile_clips, "FastH3-Omni": compile_clips, "Pika H3 Flex": compile_clips, "EdenLive": compile_world, "LTX": compile_takes}

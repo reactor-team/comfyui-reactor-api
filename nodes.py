@@ -14,14 +14,17 @@ from typing_extensions import override
 import comfy.model_management
 import comfy.utils
 import folder_paths
+import nodes as comfy_nodes
 from comfy_api.latest import ComfyExtension, InputImpl, io, ui
 from server import PromptServer
 
 from .reactor_render import live
 from .reactor_render.config import connect_args, max_sessions
+from .reactor_render.diagnostics import DEV_MODE
 from .reactor_render.clip import ClipStream
 from .reactor_render.encode import opus_bytes
 from .reactor_render.session import render
+from .reactor_render.web_files import fresh_web_files
 from .reactor_render.timeline import MODELS, Beat, Drag, check_sound, ModelSpec, Reference, Setting, Timeline, call_setup, clip_seconds, compile_timeline, editor_moves, model_facts, join_chains
 
 ReactorSequenceType = io.Custom("REACTOR_SEQUENCE")
@@ -118,13 +121,16 @@ def sounds_input(spec: ModelSpec, tooltip: str):
 def taken_sounds(spec: ModelSpec, sounds) -> tuple[bytes, ...]:
     """The sounds connected to a node, in socket order, as Ogg/Opus files, the smallest the model takes."""
     ordered = sorted((sounds or {}).items(), key=lambda item: int(item[0].rsplit("_", 1)[1]))
-    taken = []
+    taken, total = [], 0.0
     for key, audio in ordered:
         if audio is None:
             continue
         samples = audio["waveform"][0].cpu().numpy()
         check_sound(spec, key, samples.shape[1] / audio["sample_rate"], samples.shape[0])
+        total += samples.shape[1] / audio["sample_rate"]
         taken.append(opus_bytes(samples, audio["sample_rate"]))
+    if total > spec.sounds_total:
+        raise ValueError(f"The sounds last {total:.1f} s together; they must last at most {spec.sounds_total:g} seconds in all.")
     return tuple(taken)
 
 
@@ -152,14 +158,19 @@ def setting_input(key: str, setting: Setting, tooltip: str):
     return io.String.Input(key, default=setting.default, multiline=True, optional=True, tooltip=tooltip)
 
 
+def beside_frame(spec: ModelSpec) -> str:
+    """What a model with keyframes takes beside a first or last frame."""
+    return "takes no pictures or sounds beside it" if spec.frames_alone else "needs a picture beside it"
+
+
 # Models that share a segment node, as their inputs match; every other model has its own.
 SEGMENT_FAMILIES = {"Visko Orbis": ("Visko Orbis Dynamic", "Visko Orbis Stable")}
 FAMILY_OF = {name: next((f for f, names in SEGMENT_FAMILIES.items() if name in names), name) for name in MODELS}
 # What each model does, as the node menu groups them.
 CAPABILITY = {"LongLive-2.0": "Generate video", "Helios": "Generate video", "FastH3": "Generate video", "H3 Reference Turbo Realtime": "Generate video",
-              "FastH3-Omni": "Generate video",
+              "FastH3-Omni": "Generate video", "Pika H3 Flex": "Generate video",
               "Visko Orbis Dynamic": "Generate video", "Visko Orbis Stable": "Generate video",
-              "LingBot": "Explore worlds", "LingBot World 2": "Explore worlds",
+              "LingBot": "Explore worlds", "LingBot World 2": "Explore worlds", "EdenLive": "Explore worlds",
               "Sana Streaming": "Edit video", "X2": "Edit video", "XMAX X2.1": "Edit video", "Vidu S2-Editing": "Edit video",
               "Vidu S2-Avatar": "Avatars", "LTX": "Avatars"}
 
@@ -197,13 +208,14 @@ def segment_node(family: str) -> type[io.ComfyNode]:
                                          + ("; both ends round to the nearest chunk." + length if spec.frames_per_chunk else ".")),
                     *([io.Combo.Input("kind", options=["shot", "cut", *(["frame"] if spec.keyframes else [])],
                                       tooltip="How this segment enters from the one before: shot blends softly, cut starts fresh"
-                                              + (", frame starts afresh from its last frame and carries its sound on as an audio reference"
-                                                 if spec.keyframes else "") + ". The first segment just opens the video.")]
+                                              + ("" if not spec.keyframes else ", frame starts afresh from its last frame from the prompt alone"
+                                                 if spec.frames_alone else ", frame starts afresh from its last frame and carries its sound on as an audio reference")
+                                              + ". The first segment just opens the video.")]
                       if spec.supports_cuts else []),
-                    *([io.Image.Input("image", optional=True, tooltip="The frame this segment starts on. It starts fresh, as a cut does; needs a picture beside it."
+                    *([io.Image.Input("image", optional=True, tooltip=f"The frame this segment starts on. It starts fresh, as a cut does; {beside_frame(spec)}."
                                       if spec.keyframes else "Reference image." if spec.images == "any" else "Reference image, read on the first segment.")]
                       if spec.images != "none" else []),
-                    *([io.Image.Input("last_image", optional=True, tooltip="The frame this segment ends on, on a cut or frame segment; needs a picture beside it.")]
+                    *([io.Image.Input("last_image", optional=True, tooltip=f"The frame this segment ends on, on a cut or frame segment; {beside_frame(spec)}.")]
                       if spec.keyframes else []),
                     *([io.Video.Input("video", optional=True, tooltip="Source clip to edit, read on the first segment.")] if spec.videos != "none" else []),
                     *([MoveEditor.Input("moves", tooltip="Camera moves during this segment. A move ends with its segment; continue it on the next segment to keep it going.")]
@@ -370,6 +382,15 @@ class ReactorRender(io.ComfyNode):
         return io.NodeOutput(InputImpl.VideoFromFile(out_path))
 
 
+# Only while developing the plugin, where its web files change without a release; see web_files.
+if DEV_MODE:
+    try:
+        PromptServer.instance.app.middlewares.append(web.middleware(fresh_web_files(comfy_nodes.EXTENSION_WEB_DIRS)))
+    except RuntimeError:
+        # The server has started, as when a plugin is loaded again while ComfyUI runs; its web files keep ComfyUI's caching.
+        logging.warning("Reactor: the server has started, so a browser may keep old copies of this plugin's web files.")
+
+
 @PromptServer.instance.routes.get("/reactor/live/{run_id}")
 async def live_socket(request):
     """The browser modal's end of a live take: websocket messages relayed to and from the run."""
@@ -503,7 +524,7 @@ def live_option(name: str) -> io.DynamicCombo.Option:
                            + (" " + prompt_tooltip(spec)).rstrip())] if spec.prompted else []),
         *([io.Image.Input("image", optional=not spec.image_required,
                           tooltip="The person the character is made from." if spec.pattern == "call"
-                          else "The frame the first clip starts on; needs a picture beside it." if spec.keyframes else "Reference image.")]
+                          else f"The frame the first clip starts on; {beside_frame(spec)}." if spec.keyframes else "Reference image.")]
           if spec.images != "none" else []),
         *(reference_inputs(name, spec, "kept by every clip.", spec.live_max_references) if spec.pattern != "call" else []),
         *([io.Video.Input("video", optional=True, tooltip="Source clip to restyle, looped until you press Save."),
@@ -568,7 +589,7 @@ class ReactorRealtime(io.ComfyNode):
             if clip is None:
                 raise ValueError(f"{name}'s source video has no frames.")
         try:
-            return await live_output("style", name, prompt, live.style_setup(spec, prompt, seed, png, beat_settings), clip,
+            return await live_output("style", name, prompt, live.style_setup(name, prompt, seed, png, beat_settings), clip,
                                      filename_prefix, camera, beat_settings)
         finally:
             if clip is not None:

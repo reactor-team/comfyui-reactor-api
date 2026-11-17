@@ -66,7 +66,7 @@ def test_only_models_with_camera_lanes_get_drive_lanes():
 
 
 class RecvTrack:
-    kind, direction = "video", "recvonly"
+    kind, direction, name = "video", "recvonly", "main_video"
 
     def on_frame(self, fn):
         self.push = fn
@@ -220,7 +220,7 @@ def make_run(fake, monkeypatch, mode, model, path, prompt="a", seed=42, image=No
     monkeypatch.setattr(live, "CONNECT_SETTLE_SECONDS", 0)
     fake.tokens = []
     monkeypatch.setattr(live, "session_token", lambda *args: fake.tokens.append(args) or "jwt-test")
-    setup = (live.style_setup(MODELS[model], prompt, seed, image, {}) if mode == "style"
+    setup = (live.style_setup(model, prompt, seed, image, {}) if mode == "style"
              else live.drive_setup(model, timeline.Beat(prompt, 1, image=image), seed, {}))
     return live.LiveRun(mode, MODELS[model], str(path), prompt, setup, size, connect or {"api_key": "rk_test"})
 
@@ -229,8 +229,22 @@ def join(sent):
     return next((m for m in texts(sent) if m["type"] == "join"), None)
 
 
+def test_a_model_lists_its_side_tracks_beside_its_output():
+    assert live.model_tracks(MODELS["EdenLive"]) == [
+        {"name": "source_video", "kind": "video", "direction": "sendonly"},
+        {"name": "main_video", "kind": "video", "direction": "recvonly"},
+        {"name": "draft_video", "kind": "video", "direction": "recvonly"}]
+
+
+def test_a_live_style_run_opens_as_its_render_would_without_a_backlog():
+    assert live.style_setup("X2", "noir", 1, None, {}) == [("set_keep_backlog", {"keep_backlog": False}), ("set_prompt", {"prompt": "noir"})]
+    assert live.style_setup("EdenLive", "a frozen fortress", 7, b"look", {}) == [
+        ("set_paused", {"paused": True}), ("set_source", {"source": "client"}), ("set_image", {"image": b"look"}),
+        ("set_prompt", {"prompt": "a frozen fortress"}), ("start", {"seed": 7})]
+
+
 def test_xmax_x2_1_opens_a_live_run_with_a_prompt_and_no_backlog_command():
-    assert live.style_setup(MODELS["XMAX X2.1"], "noir", 1, b"png", {}) == [
+    assert live.style_setup("XMAX X2.1", "noir", 1, b"png", {}) == [
         ("set_reference_image", {"reference_image": b"png"}), ("set_prompt", {"prompt": "noir"})]
 
 
@@ -443,6 +457,32 @@ async def test_a_drive_run_uploads_the_image_and_sends_lane_changes(tmp_path, mo
     assert frames_in(tmp_path / "take.mp4")
 
 
+class FakeClipModel(FakeLiveReactor):
+    """A clip model, whose reply to a queued prompt names the clip it queued."""
+
+    async def send_command(self, command, data):
+        await super().send_command(command, data)
+        if command == "enqueue":
+            # The model builds the clip before the browser has joined.
+            self.message_handler({"type": "clip_generated", "data": {"clip": {"clip_id": "c1"}}})
+            self.message_handler({"type": "state_update", "data": {}})
+            return {"type": "enqueue", "data": {"clip": {"clip_id": "c1", "prompt": data["prompt"]}}}
+
+
+async def test_the_browser_learns_the_opening_clip_and_its_build_it_joined_too_late_to_see(tmp_path, monkeypatch):
+    fake = FakeClipModel()
+    run = make_run(fake, monkeypatch, "drive", "Pika H3 Flex", tmp_path / "take.mp4", prompt="a harbour")
+    task = asyncio.create_task(run.run(lambda: None))
+    sent = []
+    run.connected(sent.append)
+    assert await until(lambda: any(m["type"] == "started" for m in texts(sent)))
+    assert next(m for m in texts(sent) if m["type"] == "started")["clip"] == {"clip_id": "c1", "prompt": "a harbour"}
+    # How the clip stands is passed on too, and nothing else the model says.
+    assert [m["message"]["type"] for m in texts(sent) if m["type"] == "clip_event"] == ["clip_generated"]
+    run.receive('{"type":"done"}')
+    await asyncio.wait_for(task, 10)
+
+
 async def test_a_promptable_model_leaves_mid_run_prompts_to_the_browser(tmp_path, monkeypatch):
     fake = FakeLiveReactor()
     run = make_run(fake, monkeypatch, "drive", "LongLive-2.0", tmp_path / "take.mp4", prompt="a harbour", seed=3)
@@ -459,11 +499,11 @@ async def test_a_promptable_model_leaves_mid_run_prompts_to_the_browser(tmp_path
 
 def test_an_edit_starts_from_its_image_and_offers_its_switch_controls():
     spec = MODELS["Vidu S2-Editing"]
-    assert live.style_setup(spec, "", 0, b"clay", {"editing_type": "virtual_tryon"}) == [
+    assert live.style_setup("Vidu S2-Editing", "", 0, b"clay", {"editing_type": "virtual_tryon"}) == [
         ("start_edit", {"reference_image": b"clay", "editing_type": "virtual_tryon"})]
     buf = io.BytesIO()
     Image.new("RGB", (4, 4), "orange").save(buf, format="PNG")
-    setup = live.style_setup(spec, "", 0, buf.getvalue(), {"editing_type": "virtual_tryon"})
+    setup = live.style_setup("Vidu S2-Editing", "", 0, buf.getvalue(), {"editing_type": "virtual_tryon"})
     assert live.switch_controls(spec, {"editing_type": "virtual_tryon"}, setup) == {
         "image": "reference_image", "reference": timeline.data_url(buf.getvalue()),
         "settings": [{"field": "editing_type", "options": list(timeline.EDIT_TYPES), "value": "virtual_tryon"}]}
@@ -478,7 +518,7 @@ async def test_a_source_clip_loops_in_place_of_the_camera(tmp_path, monkeypatch)
     monkeypatch.setattr(live, "session_token", lambda *args: "jwt-test")
     stream = ClipStream(itertools.islice(itertools.cycle(clip), 1, None), clip[0])
     run = live.LiveRun("style", MODELS["X2"], str(tmp_path / "take.mp4"), "a",
-                       live.style_setup(MODELS["X2"], "a", 42, None, {}), None, {"api_key": "rk_test"}, stream)
+                       live.style_setup("X2", "a", 42, None, {}), None, {"api_key": "rk_test"}, stream)
     task = asyncio.create_task(run.run(lambda: None))
     sent = []
     run.connected(sent.append)

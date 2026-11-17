@@ -13,6 +13,7 @@ from reactor_sdk import Reactor
 from reactor_sdk.errors import RateLimitedError, ReactorError, UnauthorizedError
 
 from .clip import ClipStream
+from .diagnostics import Trace
 from .encode import FrameWriter
 from .recording import Recording
 from .timeline import ModelSpec, Plan, upload_type
@@ -80,6 +81,7 @@ class Session:
         self.sounded_at = 0.0
         # Why Reactor ended the session or the SDK gave up on it, raised at the next message wait.
         self.failure: str | None = None
+        self.trace = Trace("render")
 
     @property
     def capturing(self) -> bool:
@@ -100,10 +102,13 @@ class Session:
         # A recording span runs between on/off changes, so arming doesn't mark.
         if (value == "on") != (self.capture == "on") and self.recording is not None:
             self.recording.mark()
+        if value != self.capture:
+            self.trace("capture %s, at frame %d of the take", value, self.writer.received)
         self.capture = value
 
     def push_video(self, frame: np.ndarray) -> None:
         self.frame_shape = frame.shape
+        self.trace.frame(frame.shape)
         if self.capture == "await_frame":
             self.start_capture()
         if self.capture == "on":
@@ -112,6 +117,7 @@ class Session:
                 self.stop_capture()
 
     def push_audio(self, pcm: np.ndarray, sample_rate: int) -> None:
+        self.trace.audio(len(pcm), sample_rate)
         if np.sqrt(np.mean(np.square(pcm, dtype=np.float32))) > SPEECH_LEVEL:
             self.sounded_at = time.monotonic()
             if self.capture == "await_speech":
@@ -128,13 +134,17 @@ class Session:
             # A file is uploaded once a session, however many clips reuse it.
             if value not in self.uploads:
                 name, mime_type = upload_type(key)
+                began = time.monotonic()
                 self.uploads[value] = await self.reactor.upload_file(value, name=name, mime_type=mime_type)
+                self.trace.uploaded(name, value, began)
             return self.uploads[value]
 
         data = {k: await upload(k, v) for k, v in data.items()}
         if command == "start" and self.capture != "await_frame":
             self.start_capture()
+        self.trace.sent(command, data)
         reply = await self.reactor.send_command(command, data)
+        self.trace.replied(command, reply)
         if reply is not None and reply.get("type") == "command_error":
             raise RuntimeError(f"Reactor rejected {command}: {reply.get('data', {}).get('reason')}")
         return reply
@@ -142,6 +152,7 @@ class Session:
     async def next_message(self, timeout: float = PROGRESS_INTERVAL_SECONDS) -> dict | None:
         """The next model message, or None after `timeout` without one. Raises on a rejected command."""
         self.check_interrupt()
+        self.trace.check()
         if self.failure is not None:
             raise RuntimeError(self.failure)
         if self.writer.received != self.reported and time.monotonic() - self.reported_at >= PROGRESS_INTERVAL_SECONDS:
@@ -270,6 +281,7 @@ async def push_source(session: Session, spec: ModelSpec, plan: Plan, frames: Cli
             else:
                 frame = decoded
         track.push_frame(frame)
+        session.trace.push()
         pushed += 1
         next_frame_at += 1 / spec.fps
     model_done_at = model_done_at or time.monotonic()
@@ -551,16 +563,21 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
     # A "source" plan's chunks count its source frames, so the estimate is the count itself.
     planned = plan.chunks * (spec.frames_per_chunk or 1)
     session = Session(reactor, writer, planned, check_interrupt, on_progress)
+    session.trace.begin(spec.slug, connect, f"render of {plan.chunks} chunks")
+    reactor.on_status(session.trace.status)
 
     @reactor.on_message
     def queue_message(msg: dict) -> None:
+        session.trace.message(msg)
         session.messages.put_nowait(msg)
 
     watch_for_failure(reactor, lambda reason: setattr(session, "failure", session.failure or reason))
 
     @reactor.on_track
     def capture(track) -> None:
-        if track.kind == "video" and track.direction == "recvonly":
+        session.trace.track(track)
+        # A model may send other video beside its output, such as the source frames it used.
+        if track.kind == "video" and track.direction == "recvonly" and track.name == "main_video":
             track.on_frame(session.push_video)
         if track.kind == "audio" and track.direction == "recvonly":
             track.on_frame(session.push_audio)
@@ -574,21 +591,27 @@ async def render(spec: ModelSpec, plan: Plan, out_path: str, on_progress: Progre
             on_status("Rendering")
             await RUNNERS[spec.pattern](session, spec, plan)
             clip, jwt = await session.recording.finish(), None
+            session.trace.recording(clip, session.recording.marks)
             if clip is not None:
                 try:
                     jwt = await recording_token(reactor, spec, connect)
                 except Exception as e:
                     logging.warning("Reactor: no token to download the session's recording (%s); keeping the frames this client received.", e)
                     clip = None
-    except BaseException:
+    except BaseException as e:
+        session.trace("ended: %r", e)
         # The session's error is the one worth reporting, not the encoder's.
         with contextlib.suppress(Exception):
             writer.close()
         raise
+    finally:
+        session.trace.summary()
     writer.close()
     if clip is not None:
         on_status("Saving the session's recording…")
         await session.recording.save(clip, jwt, out_path, spec.fps, writer.limit)
+    session.trace("the take is %s", "the session's recording" if clip is not None else "the frames received here")
+    session.trace.saved(out_path)
     on_progress(writer.received, writer.received, writer.previous)
 
 

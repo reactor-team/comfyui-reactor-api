@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 // The plugin's own modules are imported with its release version, so an update loads them anew: ComfyUI lets a
 // browser cache .mjs files, and an old one beside this new file breaks the window. A test checks the version.
-import { ClipQueue, DragTracker, canMove, statusLine, videoPoint } from "./reactor_live_state.mjs?v=0.4.0";
+import { ClipQueue, DragTracker, canMove, statusLine, videoPoint } from "./reactor_live_state.mjs?v=0.5.0";
 
 const HINT = "Press Run to start a real-time session: the model plays in a window and you steer it as it runs. "
     + "Each run records a take. Set the seed's control after generate to fixed to keep the last take instead of starting a new session.";
@@ -432,7 +432,7 @@ function openLive({ run_id, mode, title, camera, microphone }) {
             }
             if (over()) return;
         }
-        const { Reactor } = await import("./vendor/reactor-sdk.mjs?v=0.4.0");
+        const { Reactor } = await import("./vendor/reactor-sdk.mjs?v=0.5.0");
         if (over()) return;
         reactor = new Reactor({ modelName: join.model, local: join.local, modelTracks: join.tracks });
         reactor.on("trackReceived", (name, track, media) => {

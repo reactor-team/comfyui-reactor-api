@@ -11,11 +11,8 @@ that version's changelog. Earlier versions are in the git history.
   Realtime and in a segment node.
 - Add EdenLive, which restyles a plain draft video, such as a rendered 3D scene, from a prompt and
   a reference image. It works in Reactor Realtime and in a segment node.
-- In Reactor Realtime, Pika's next clip now plays straight after the one before, with no pause.
-- After an update, the browser loads the new version of the Reactor Realtime window instead of an
-  old cached copy.
-- Start ComfyUI with `REACTOR_DEV_MODE=1` to log each Reactor session's events to the console
-  when checking a model or working on the plugin.
+- Fix Reactor Realtime failing to open after an update, when the browser kept an old copy of
+  its files.
 
 ## 0.4.0
 

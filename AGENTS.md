@@ -125,9 +125,14 @@ A release is a version bump in `pyproject.toml` and `uv.lock`, merged to `main`,
 Comfy Registry. Bump the `?v=<version>` on each relative module import in the plugin's own `.js` and `.mjs` files under `web/`
 too: it gives a release new URLs, so a browser can't run a cached old `.mjs` beside a new page script, and a test
 fails if one differs from `pyproject.toml`. Between releases the URLs stay the same, so develop in development mode. The vendored `web/vendor/reactor-sdk.mjs` is changed so its wasm keeps that `?v=`;
-keep that change when vendoring the SDK again, and a test checks it. Add a `## <version>` section to `CHANGELOG.md` in the same PR. The publish workflow sends
-that section to the registry as the version's changelog, and a test fails if it is missing. Like everything
-here, it holds only public information.
+keep that change when vendoring the SDK again, and a test checks it.
+
+Add a `## <version>` section to `CHANGELOG.md` in the same PR. The publish workflow sends that section to the
+registry as the version's changelog, and a test fails if it is missing. Write it for people who use the plugin in
+ComfyUI: one line per change they would notice, such as a new model, node, input or example, or a fix to a fault
+they could hit, said as what they see. Leave out what changes only how the plugin is built, tested or worked on,
+such as development mode, tests and refactors, and fixes to code that is new in the same release, since no user
+saw that fault. Like everything here, it holds only public information.
 
 ## Development mode
 
